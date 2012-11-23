@@ -33,6 +33,8 @@
 
 #ifdef ANDROID
 #include "android_drv.h"
+int wpa_driver_wext_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len );
+int wpa_driver_signal_poll(void *priv, struct wpa_signal_info *si);
 #endif /* ANDROID */
 
 static int wpa_driver_wext_flush_pmkid(void *priv);
