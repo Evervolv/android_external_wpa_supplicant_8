@@ -14,6 +14,8 @@
 
 #define WPA_EVENT_DRIVER_STATE "CTRL-EVENT-DRIVER-STATE "
 
+#define WEXT_CSCAN_AMOUNT               9
+
 #define MAX_SSID_LEN 32
 
 #define MAX_DRV_CMD_SIZE		248
