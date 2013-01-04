@@ -35,8 +35,10 @@
 #include "android_drv.h"
 extern int wpa_driver_wext_driver_cmd(void *priv, char *cmd, char *buf,
                                         size_t buf_len);
+#ifndef WEXT_NO_COMBO_SCAN
 extern int wpa_driver_wext_combo_scan(void *priv,
                                         struct wpa_driver_scan_params *params);
+#endif
 extern int wpa_driver_signal_poll(void *priv, struct wpa_signal_info *si);
 #endif /* ANDROID */
 
@@ -1030,7 +1032,7 @@ int wpa_driver_wext_scan(void *priv, struct wpa_driver_scan_params *params)
 	const u8 *ssid = params->ssids[0].ssid;
 	size_t ssid_len = params->ssids[0].ssid_len;
 
-#if defined(HAVE_PRIVATE_LIB) && defined(CONFIG_DRIVER_WEXT)
+#ifndef WEXT_NO_COMBO_SCAN
         if (drv->capa.max_scan_ssids > 1) {
                 ret = wpa_driver_wext_combo_scan(priv, params);
                 goto scan_out;
@@ -1061,7 +1063,7 @@ int wpa_driver_wext_scan(void *priv, struct wpa_driver_scan_params *params)
 		perror("ioctl[SIOCSIWSCAN]");
 		ret = -1;
 	}
-#if defined(HAVE_PRIVATE_LIB) && defined(CONFIG_DRIVER_WEXT)
+#ifndef WEXT_NO_COMBO_SCAN
 scan_out:
 #endif
 	/* Not all drivers generate "scan completed" wireless event, so try to
