@@ -3179,7 +3179,7 @@ static void nl80211_get_phy_name(struct wpa_driver_nl80211_data *drv)
 		 drv->first_bss.ifname);
 #ifdef USE_LOOP
 	//Gives 5 attempts to connect to file
-	while ((f < 0) || (x < 5)){
+	while ((f < 0) && (x < 5)){
 		f = open(buf, O_RDONLY);
 		sleep(5);
 		x++;
