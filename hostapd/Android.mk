@@ -28,6 +28,14 @@ ifeq ($(BOARD_WLAN_DEVICE), bcmdhd)
 L_CFLAGS += -DANDROID_P2P
 endif
 
+ifeq ($(BOARD_LEGACY_NL80211_STA_EVENTS),true)
+L_CFLAGS += -DLEGACY_STA_EVENTS
+endif
+
+ifeq ($(BOARD_NO_APSME_ATTR),true)
+L_CFLAGS += -DNO_APSME_ATTR
+endif
+
 ifeq ($(BOARD_WLAN_DEVICE), qcwcn)
 L_CFLAGS += -DANDROID_P2P
 endif
@@ -38,7 +46,11 @@ endif
 
 # Use Android specific directory for control interface sockets
 L_CFLAGS += -DCONFIG_CTRL_IFACE_CLIENT_DIR=\"/data/misc/wifi/sockets\"
+ifdef USES_TI_MAC80211
+L_CFLAGS += -DCONFIG_CTRL_IFACE_DIR=\"/data/system/wpa_supplicant\"
+else
 L_CFLAGS += -DCONFIG_CTRL_IFACE_DIR=\"/data/system/hostapd\"
+endif
 
 # To force sizeof(enum) = 4
 ifeq ($(TARGET_ARCH),arm)

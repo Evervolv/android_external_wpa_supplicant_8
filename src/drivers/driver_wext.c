@@ -40,6 +40,11 @@ static int wpa_driver_wext_get_range(void *priv);
 static int wpa_driver_wext_finish_drv_init(struct wpa_driver_wext_data *drv);
 static void wpa_driver_wext_disconnect(struct wpa_driver_wext_data *drv);
 static int wpa_driver_wext_set_auth_alg(void *priv, int auth_alg);
+#ifdef ANDROID
+extern int wpa_driver_wext_driver_cmd(void *priv, char *cmd, char *buf,
+                                       size_t buf_len);
+extern int wpa_driver_signal_poll(void *priv, struct wpa_signal_info *si);
+#endif
 
 
 int wpa_driver_wext_set_auth_param(struct wpa_driver_wext_data *drv,
@@ -1696,7 +1701,7 @@ static int wpa_driver_wext_set_key_ext(void *priv, enum wpa_alg alg,
 	case WPA_ALG_PMK:
 		ext->alg = IW_ENCODE_ALG_PMK;
 		break;
-#ifdef CONFIG_IEEE80211W
+#ifdef CONFIG_IEEE80211W_DISABLE
 	case WPA_ALG_IGTK:
 		ext->alg = IW_ENCODE_ALG_AES_CMAC;
 		break;
@@ -2122,7 +2127,7 @@ int wpa_driver_wext_associate(void *priv,
 					   IW_AUTH_RX_UNENCRYPTED_EAPOL,
 					   allow_unencrypted_eapol) < 0)
 		ret = -1;
-#ifdef CONFIG_IEEE80211W
+#ifdef CONFIG_IEEE80211W_DISABLE
 	switch (params->mgmt_frame_protection) {
 	case NO_MGMT_FRAME_PROTECTION:
 		value = IW_AUTH_MFP_DISABLED;
@@ -2483,5 +2488,7 @@ const struct wpa_driver_ops wpa_driver_wext_ops = {
 #ifdef ANDROID
 	.sched_scan = wext_sched_scan,
 	.stop_sched_scan = wext_stop_sched_scan,
+	.signal_poll = wpa_driver_signal_poll,
+	.driver_cmd = wpa_driver_wext_driver_cmd,
 #endif /* ANDROID */
 };

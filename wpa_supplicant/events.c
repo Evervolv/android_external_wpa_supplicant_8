@@ -718,10 +718,13 @@ static struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 	rsn_ie_len = ie ? ie[1] : 0;
 
 	wpa_dbg(wpa_s, MSG_DEBUG, "%d: " MACSTR " ssid='%s' "
-		"wpa_ie_len=%u rsn_ie_len=%u caps=0x%x level=%d%s",
+		"wpa_ie_len=%u rsn_ie_len=%u caps=0x%x level=%d%s%s",
 		i, MAC2STR(bss->bssid), wpa_ssid_txt(bss->ssid, bss->ssid_len),
 		wpa_ie_len, rsn_ie_len, bss->caps, bss->level,
-		wpa_bss_get_vendor_ie(bss, WPS_IE_VENDOR_TYPE) ? " wps" : "");
+		wpa_bss_get_vendor_ie(bss, WPS_IE_VENDOR_TYPE) ? " wps" : "",
+		(wpa_bss_get_vendor_ie(bss, P2P_IE_VENDOR_TYPE) ||
+		 wpa_bss_get_vendor_ie_beacon(bss, P2P_IE_VENDOR_TYPE)) ?
+		" p2p" : "");
 
 	e = wpa_blacklist_get(wpa_s, bss->bssid);
 	if (e) {
@@ -858,6 +861,13 @@ static struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 		}
 
 #ifdef CONFIG_P2P
+		if (ssid->p2p_group &&
+		    !wpa_bss_get_vendor_ie(bss, P2P_IE_VENDOR_TYPE) &&
+		    !wpa_bss_get_vendor_ie_beacon(bss, P2P_IE_VENDOR_TYPE)) {
+			wpa_dbg(wpa_s, MSG_DEBUG, "   skip - no P2P IE seen");
+			continue;
+		}
+
 		/*
 		 * TODO: skip the AP if its P2P IE has Group Formation
 		 * bit set in the P2P Group Capability Bitmap and we
@@ -1315,10 +1325,12 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 			if (wpas_p2p_scan_no_go_seen(wpa_s) == 1)
 				return 0;
 
-			if (wpa_s->p2p_in_provisioning) {
+			if (wpa_s->p2p_in_provisioning ||
+			    wpa_s->show_group_started) {
 				/*
 				 * Use shorter wait during P2P Provisioning
-				 * state to speed up group formation.
+				 * state and during P2P join-a-group operation
+				 * to speed up group formation.
 				 */
 				timeout_sec = 0;
 				timeout_usec = 250000;
@@ -2459,6 +2471,51 @@ static void wpa_supplicant_event_unprot_disassoc(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_IEEE80211W */
 }
 
+static void wpa_supplicant_update_channel_list(struct wpa_supplicant *wpa_s)
+{
+	const char *rn, *rn2;
+	struct wpa_supplicant *ifs;
+
+	if (wpa_s->drv_priv == NULL)
+		return; /* Ignore event during drv initialization */
+
+	free_hw_features(wpa_s);
+	wpa_s->hw.modes = wpa_drv_get_hw_feature_data(
+		wpa_s, &wpa_s->hw.num_modes, &wpa_s->hw.flags);
+
+#ifdef CONFIG_P2P
+	wpas_p2p_update_channel_list(wpa_s);
+#endif /* CONFIG_P2P */
+
+	/*
+	 * Check other interfaces to see if they have the same radio-name. If
+	 * so, they get updated with this same hw mode info.
+	 */
+	if (!wpa_s->driver->get_radio_name)
+		return;
+
+	rn = wpa_s->driver->get_radio_name(wpa_s->drv_priv);
+	if (rn == NULL || rn[0] == '\0')
+		return;
+
+	wpa_dbg(wpa_s, MSG_DEBUG, "Checking for other virtual interfaces "
+		"sharing same radio (%s) in event_channel_list_change", rn);
+
+	for (ifs = wpa_s->global->ifaces; ifs; ifs = ifs->next) {
+		if (ifs == wpa_s || !ifs->driver->get_radio_name)
+			continue;
+
+		rn2 = ifs->driver->get_radio_name(ifs->drv_priv);
+		if (rn2 && os_strcmp(rn, rn2) == 0) {
+			wpa_printf(MSG_DEBUG, "%s: Updating hw mode",
+				   ifs->ifname);
+			free_hw_features(ifs);
+			ifs->hw.modes = wpa_drv_get_hw_feature_data(
+				ifs, &ifs->hw.num_modes, &ifs->hw.flags);
+		}
+	}
+}
+
 
 static void wpas_event_disconnect(struct wpa_supplicant *wpa_s, const u8 *addr,
 				  u16 reason_code, int locally_generated,
@@ -2698,52 +2755,11 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		if (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME)
 			sme_event_assoc_reject(wpa_s, data);
 		else {
-#ifdef ANDROID_P2P
-			if(!wpa_s->current_ssid) {
-				wpa_printf(MSG_ERROR, "current_ssid == NULL");
-				break;
-			}
-			/* If assoc reject is reported by the driver, then avoid
-			 * waiting for  the authentication timeout. Cancel the
-			 * authentication timeout and retry the assoc.
-			 */
-			if(wpa_s->current_ssid->assoc_retry++ < 10) {
-				wpa_printf(MSG_ERROR, "Retrying assoc: %d ",
-								wpa_s->current_ssid->assoc_retry);
-
-				wpa_supplicant_cancel_auth_timeout(wpa_s);
-
-				/* Clear the states */
-				wpa_sm_notify_disassoc(wpa_s->wpa);
-				wpa_supplicant_deauthenticate(wpa_s, WLAN_REASON_DEAUTH_LEAVING);
-
-				wpa_s->reassociate = 1;
-				if (wpa_s->p2p_group_interface == NOT_P2P_GROUP_INTERFACE) {
-					const u8 *bl_bssid = data->assoc_reject.bssid;
-					if (!bl_bssid || is_zero_ether_addr(bl_bssid))
-						bl_bssid = wpa_s->pending_bssid;
-					wpa_blacklist_add(wpa_s, bl_bssid);
-					wpa_supplicant_req_scan(wpa_s, 0, 0);
-				} else {
-					wpa_supplicant_req_scan(wpa_s, 1, 0);
-				}
-			} else if (wpa_s->p2p_group_interface != NOT_P2P_GROUP_INTERFACE) {
-				/* If we ASSOC_REJECT's hits threshold, disable the 
-			 	 * network
-			 	 */
-				wpa_printf(MSG_ERROR, "Assoc retry threshold reached. "
-				"Disabling the network");
-				wpa_s->current_ssid->assoc_retry = 0;
-				wpa_supplicant_disable_network(wpa_s, wpa_s->current_ssid);
-				wpas_p2p_group_remove(wpa_s, wpa_s->ifname);
-			}
-#else
 			const u8 *bssid = data->assoc_reject.bssid;
 			if (bssid == NULL || is_zero_ether_addr(bssid))
 				bssid = wpa_s->pending_bssid;
 			wpas_connection_failed(wpa_s, bssid);
 			wpa_supplicant_mark_disassoc(wpa_s);
-#endif /* ANDROID_P2P */
 		}
 		break;
 	case EVENT_AUTH_TIMED_OUT:
@@ -3105,16 +3121,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		wpa_supplicant_set_state(wpa_s, WPA_INTERFACE_DISABLED);
 		break;
 	case EVENT_CHANNEL_LIST_CHANGED:
-		if (wpa_s->drv_priv == NULL)
-			break; /* Ignore event during drv initialization */
-
-		free_hw_features(wpa_s);
-		wpa_s->hw.modes = wpa_drv_get_hw_feature_data(
-			wpa_s, &wpa_s->hw.num_modes, &wpa_s->hw.flags);
-
-#ifdef CONFIG_P2P
-		wpas_p2p_update_channel_list(wpa_s);
-#endif /* CONFIG_P2P */
+		wpa_supplicant_update_channel_list(wpa_s);
 		break;
 	case EVENT_INTERFACE_UNAVAILABLE:
 #ifdef CONFIG_P2P
