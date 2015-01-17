@@ -530,6 +530,7 @@ static const char * nl80211_command_to_string(enum nl80211_commands cmd)
 	C2S(NL80211_CMD_CHANNEL_SWITCH)
 	C2S(NL80211_CMD_VENDOR)
 	C2S(NL80211_CMD_SET_QOS_MAP)
+	C2S(NL80211_CMD_KEY_MGMT_SET_PMK)
 	default:
 		return "NL80211_CMD_UNKNOWN";
 	}
@@ -1367,7 +1368,7 @@ static void wpa_driver_nl80211_event_rtm_dellink(void *ctx,
 		attr = RTA_NEXT(attr, attrlen);
 	}
 
-	if (ifname[0])
+	if (ifname[0] && (ifi->ifi_family != AF_BRIDGE || !brid))
 		wpa_driver_nl80211_event_dellink(drv, ifname);
 
 	if (ifi->ifi_family == AF_BRIDGE && brid) {
@@ -2989,6 +2990,49 @@ static void nl80211_reg_change_event(struct wpa_driver_nl80211_data *drv,
 }
 
 
+static void nl80211_event_authorization(struct wpa_driver_nl80211_data *drv,
+				struct nlattr *tb[])
+{
+	union wpa_event_data data;
+	enum nl80211_authorization_status auth_status;
+	int freq;
+
+	os_memset(&data, 0, sizeof(data));
+
+	auth_status = nla_get_u8(tb[NL80211_ATTR_AUTHORIZATION_STATUS]);
+	if (auth_status == NL80211_AUTHORIZED)
+		data.authorization_info.authorized = 1;
+	wpa_printf(MSG_DEBUG, "nl80211: authorization event, status: %d",
+		  auth_status);
+
+	data.authorization_info.key_replay_ctr =
+		  nla_data(tb[NL80211_ATTR_KEY_REPLAY_CTR]);
+	if (NULL != data.authorization_info.key_replay_ctr) {
+		wpa_hexdump(MSG_MSGDUMP, "  * key replay counter",
+			  data.authorization_info.key_replay_ctr,
+			  NL80211_KEY_REPLAY_CTR_LEN);
+	}
+
+	data.authorization_info.ptk_kck =
+		  nla_data(tb[NL80211_ATTR_PTK_KCK]);
+	if (NULL != data.authorization_info.ptk_kck) {
+		wpa_hexdump(MSG_MSGDUMP, "  * PTK KCK",
+			  data.authorization_info.ptk_kck,
+			  NL80211_KEY_LEN_PTK_KCK);
+	}
+
+	data.authorization_info.ptk_kek =
+		  nla_data(tb[NL80211_ATTR_PTK_KEK]);
+	if (NULL != data.authorization_info.ptk_kek) {
+		wpa_hexdump(MSG_MSGDUMP, "  * PTK KEK",
+			  data.authorization_info.ptk_kek,
+			  NL80211_KEY_LEN_PTK_KEK);
+	}
+
+	wpa_supplicant_event(drv->ctx, EVENT_AUTHORIZATION, &data);
+}
+
+
 static void do_process_drv_event(struct i802_bss *bss, int cmd,
 				 struct nlattr **tb)
 {
@@ -3149,6 +3193,9 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 		break;
 	case NL80211_CMD_VENDOR:
 		nl80211_vendor_event(drv, tb);
+		break;
+	case NL80211_CMD_AUTHORIZATION_EVENT:
+		nl80211_event_authorization(drv, tb);
 		break;
 	default:
 		wpa_dbg(drv->ctx, MSG_DEBUG, "nl80211: Ignored unknown event "
@@ -3748,6 +3795,52 @@ static void wiphy_info_wowlan_triggers(struct wpa_driver_capa *capa,
 }
 
 
+static void wiphy_info_key_mgmt_offload_support(
+			  struct wiphy_info_data *info,
+			  struct nlattr *tb)
+{
+	u32 flags;
+	struct wpa_driver_capa *capa = info->capa;
+
+	if (NULL == tb)
+		return;
+
+	flags = nla_get_u32(tb);
+	if (flags & NL80211_KEY_MGMT_OFFLOAD_SUPPORT_PSK)
+		capa->key_mgmt_offload_support |=
+		  WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_PSK;
+	if (flags & NL80211_KEY_MGMT_OFFLOAD_SUPPORT_FT_PSK)
+		capa->key_mgmt_offload_support |=
+		  WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_FT_PSK;
+	if (flags & NL80211_KEY_MGMT_OFFLOAD_SUPPORT_PMKSA)
+		capa->key_mgmt_offload_support |=
+		  WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_PMKSA;
+	if (flags & NL80211_KEY_MGMT_OFFLOAD_SUPPORT_FT_802_1X)
+		capa->key_mgmt_offload_support |=
+		  WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_FT_802_1X;
+}
+
+
+static void wiphy_info_key_derive_offload_support(
+			  struct wiphy_info_data *info,
+			  struct nlattr *tb)
+{
+	u32 flags;
+	struct wpa_driver_capa *capa = info->capa;
+
+	if (NULL == tb)
+		return;
+
+	flags = nla_get_u32(tb);
+	if (flags & NL80211_KEY_DERIVE_OFFLOAD_SUPPORT_IGTK)
+		capa->key_derive_offload_support |=
+		  WPA_DRIVER_KEY_DERIVE_OFFLOAD_SUPPORT_IGTK;
+	if (flags & NL80211_KEY_DERIVE_OFFLOAD_SUPPORT_SHA256)
+		capa->key_derive_offload_support |=
+		  WPA_DRIVER_KEY_DERIVE_OFFLOAD_SUPPORT_SHA256;
+}
+
+
 static int wiphy_info_handler(struct nl_msg *msg, void *arg)
 {
 	struct nlattr *tb[NL80211_ATTR_MAX + 1];
@@ -3877,6 +3970,15 @@ static int wiphy_info_handler(struct nl_msg *msg, void *arg)
 	if (tb[NL80211_ATTR_MAX_AP_ASSOC_STA])
 		capa->max_stations =
 			nla_get_u32(tb[NL80211_ATTR_MAX_AP_ASSOC_STA]);
+
+	wiphy_info_key_mgmt_offload_support(info,
+		  tb[NL80211_ATTR_KEY_MGMT_OFFLOAD_SUPPORT]);
+	wpa_printf(MSG_DEBUG, "nl80211: Supported key managment offloads 0x%x",
+		  info->capa->key_mgmt_offload_support);
+	wiphy_info_key_derive_offload_support(info,
+		  tb[NL80211_ATTR_KEY_DERIVE_OFFLOAD_SUPPORT]);
+	wpa_printf(MSG_DEBUG, "nl80211: Supported key derivation offloads 0x%x",
+		  info->capa->key_derive_offload_support);
 
 	return NL_SKIP;
 }
@@ -7686,7 +7788,8 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 }
 
 
-static int wpa_driver_nl80211_sta_remove(struct i802_bss *bss, const u8 *addr)
+static int wpa_driver_nl80211_sta_remove(struct i802_bss *bss, const u8 *addr,
+					 int deauth, u16 reason_code)
 {
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	struct nl_msg *msg;
@@ -7701,6 +7804,14 @@ static int wpa_driver_nl80211_sta_remove(struct i802_bss *bss, const u8 *addr)
 	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX,
 		    if_nametoindex(bss->ifname));
 	NLA_PUT(msg, NL80211_ATTR_MAC, ETH_ALEN, addr);
+	if (deauth == 0)
+		NLA_PUT_U8(msg, NL80211_ATTR_MGMT_SUBTYPE,
+			   WLAN_FC_STYPE_DISASSOC);
+	else if (deauth == 1)
+		NLA_PUT_U8(msg, NL80211_ATTR_MGMT_SUBTYPE,
+			   WLAN_FC_STYPE_DEAUTH);
+	if (reason_code)
+		NLA_PUT_U16(msg, NL80211_ATTR_REASON_CODE, reason_code);
 
 	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
 	wpa_printf(MSG_DEBUG, "nl80211: sta_remove -> DEL_STATION %s " MACSTR
@@ -8685,6 +8796,88 @@ nla_put_failure:
 }
 
 
+static int nl80211_set_key_mgmt_offload(
+			  struct wpa_driver_associate_params *params,
+			  struct wpa_driver_capa *capa,
+			  struct nl_msg *msg)
+{
+	int offload_key_mgmt = 0;
+	int pass_psk = 0;
+
+	if (!params->req_key_mgmt_offload)
+		return 0;
+
+	wpa_printf(MSG_DEBUG,
+		  "nl80211: set key mgmt offload, suite %d, support 0x%x, psk 0x%p",
+		  params->key_mgmt_suite, capa->key_mgmt_offload_support,
+		  params->psk);
+
+	if ((params->key_mgmt_suite == WPA_KEY_MGMT_PSK) &&
+		  (capa->key_mgmt_offload_support &
+		   WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_PSK) &&
+		  params->psk) {
+		offload_key_mgmt = 1;
+		pass_psk = 1;
+	}
+
+	if ((params->key_mgmt_suite == WPA_KEY_MGMT_PSK_SHA256) &&
+		  (capa->key_mgmt_offload_support &
+		   WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_PSK) &&
+		  (capa->key_derive_offload_support &
+		   WPA_DRIVER_KEY_DERIVE_OFFLOAD_SUPPORT_SHA256) &&
+		  params->psk) {
+		offload_key_mgmt = 1;
+		pass_psk = 1;
+	}
+
+	if ((params->key_mgmt_suite == WPA_KEY_MGMT_FT_PSK) &&
+		  (capa->key_mgmt_offload_support &
+		   WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_FT_PSK) &&
+		  params->psk) {
+		offload_key_mgmt = 1;
+		pass_psk = 1;
+	}
+
+	if ((params->key_mgmt_suite == WPA_KEY_MGMT_IEEE8021X) &&
+		  (capa->key_mgmt_offload_support &
+		   WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_PMKSA))
+		offload_key_mgmt = 1;
+
+	if ((params->key_mgmt_suite == WPA_KEY_MGMT_IEEE8021X_SHA256) &&
+		  (capa->key_mgmt_offload_support &
+		   WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_PMKSA) &&
+		  (capa->key_derive_offload_support &
+		   WPA_DRIVER_KEY_DERIVE_OFFLOAD_SUPPORT_SHA256))
+		offload_key_mgmt = 1;
+
+	if ((params->key_mgmt_suite == WPA_KEY_MGMT_FT_IEEE8021X) &&
+		  (capa->key_mgmt_offload_support &
+		   WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_FT_802_1X))
+		offload_key_mgmt = 1;
+
+	if (params->mgmt_frame_protection ==
+		  MGMT_FRAME_PROTECTION_REQUIRED)
+		if (!(capa->key_derive_offload_support &
+		    WPA_DRIVER_KEY_DERIVE_OFFLOAD_SUPPORT_IGTK))
+			offload_key_mgmt = 0;
+
+	if (offload_key_mgmt) {
+		NLA_PUT_FLAG(msg, NL80211_ATTR_OFFLOAD_KEY_MGMT);
+		if (pass_psk) {
+			wpa_hexdump(MSG_DEBUG, " * PSK", params->psk,
+				  NL80211_KEY_LEN_PSK);
+			NLA_PUT(msg, NL80211_ATTR_PSK, NL80211_KEY_LEN_PSK,
+				  params->psk);
+		}
+	}
+
+	return 0;
+
+nla_put_failure:
+	return -1;
+}
+
+
 static int nl80211_connect_common(struct wpa_driver_nl80211_data *drv,
 				  struct wpa_driver_associate_params *params,
 				  struct nl_msg *msg)
@@ -8905,6 +9098,10 @@ static int wpa_driver_nl80211_try_connect(
 
 skip_auth_type:
 	ret = nl80211_set_conn_keys(params, msg);
+	if (ret)
+		goto nla_put_failure;
+
+	ret = nl80211_set_key_mgmt_offload(params, &drv->capa, msg);
 	if (ret)
 		goto nla_put_failure;
 
@@ -9686,7 +9883,7 @@ static int i802_sta_deauth(void *priv, const u8 *own_addr, const u8 *addr,
 	struct ieee80211_mgmt mgmt;
 
 	if (drv->device_ap_sme)
-		return wpa_driver_nl80211_sta_remove(bss, addr);
+		return wpa_driver_nl80211_sta_remove(bss, addr, 1, reason);
 
 	memset(&mgmt, 0, sizeof(mgmt));
 	mgmt.frame_control = IEEE80211_FC(WLAN_FC_TYPE_MGMT,
@@ -9710,7 +9907,7 @@ static int i802_sta_disassoc(void *priv, const u8 *own_addr, const u8 *addr,
 	struct ieee80211_mgmt mgmt;
 
 	if (drv->device_ap_sme)
-		return wpa_driver_nl80211_sta_remove(bss, addr);
+		return wpa_driver_nl80211_sta_remove(bss, addr, 0, reason);
 
 	memset(&mgmt, 0, sizeof(mgmt));
 	mgmt.frame_control = IEEE80211_FC(WLAN_FC_TYPE_MGMT,
@@ -11801,7 +11998,7 @@ static int driver_nl80211_send_mlme(void *priv, const u8 *data,
 static int driver_nl80211_sta_remove(void *priv, const u8 *addr)
 {
 	struct i802_bss *bss = priv;
-	return wpa_driver_nl80211_sta_remove(bss, addr);
+	return wpa_driver_nl80211_sta_remove(bss, addr, -1, 0);
 }
 
 
@@ -12352,6 +12549,47 @@ nla_put_failure:
 }
 
 
+static int nl80211_key_mgmt_set_pmk(void *priv, const u8 *pmk,
+				    size_t pmk_len)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+	int ret;
+
+	wpa_printf(MSG_DEBUG, "nl80211: Key management set PMK");
+
+	if (NULL == pmk)
+		return -EINVAL;
+	wpa_hexdump(MSG_DEBUG, "  * PMK", pmk, NL80211_KEY_LEN_PMK);
+
+	if (!(drv->capa.key_mgmt_offload_support &
+		  WPA_DRIVER_KEY_MGMT_OFFLOAD_SUPPORT_PMKSA))
+		return 0;
+
+	msg = nlmsg_alloc();
+	if (!msg)
+		return -ENOMEM;
+
+	nl80211_cmd(drv, msg, 0, NL80211_CMD_KEY_MGMT_SET_PMK);
+	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, drv->ifindex);
+	NLA_PUT(msg, NL80211_ATTR_PMK, NL80211_KEY_LEN_PMK, pmk);
+	NLA_PUT_U32(msg, NL80211_ATTR_PMK_LEN, pmk_len);
+
+	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
+	if (ret) {
+		wpa_printf(MSG_DEBUG, "nl80211: Key management set PMK failed, "
+			  "err=%d (%s)", ret, strerror(-ret));
+	}
+
+	return ret;
+
+nla_put_failure:
+	nlmsg_free(msg);
+	return -ENOBUFS;
+}
+
+
 const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.name = "nl80211",
 	.desc = "Linux nl80211/cfg80211",
@@ -12443,4 +12681,5 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.vendor_cmd = nl80211_vendor_cmd,
 	.set_qos_map = nl80211_set_qos_map,
 	.set_wowlan = nl80211_set_wowlan,
+	.key_mgmt_set_pmk = nl80211_key_mgmt_set_pmk,
 };

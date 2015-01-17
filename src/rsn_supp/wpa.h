@@ -70,6 +70,7 @@ struct wpa_sm_ctx {
 #endif /* CONFIG_TDLS */
 	void (*set_rekey_offload)(void *ctx, const u8 *kek, const u8 *kck,
 				  const u8 *replay_ctr);
+	int (*key_mgmt_set_pmk)(void *ctx, const u8 *pmk, size_t pmk_len);
 };
 
 
@@ -146,6 +147,10 @@ void wpa_sm_update_replay_ctr(struct wpa_sm *sm, const u8 *replay_ctr);
 void wpa_sm_pmksa_cache_flush(struct wpa_sm *sm, void *network_ctx);
 
 int wpa_sm_get_p2p_ip_addr(struct wpa_sm *sm, u8 *buf);
+
+void wpa_sm_set_rx_replay_ctr(struct wpa_sm *sm, u8 *rx_replay_counter);
+
+void wpa_sm_set_ptk_kck_kek(struct wpa_sm *sm, u8 *ptk_kck, u8 *ptk_kek);
 
 #else /* CONFIG_NO_WPA */
 
@@ -298,6 +303,15 @@ static inline void wpa_sm_update_replay_ctr(struct wpa_sm *sm,
 
 static inline void wpa_sm_pmksa_cache_flush(struct wpa_sm *sm,
 					    void *network_ctx)
+{
+}
+
+static inline void wpa_sm_set_rx_replay_ctr(struct wpa_sm *sm,
+					    u8 *rx_replay_counter)
+{
+}
+
+void wpa_sm_set_ptk_kck_kek(struct wpa_sm *sm, u8 *ptk_kck, u8 *ptk_kek)
 {
 }
 

@@ -4976,6 +4976,7 @@ static void p2p_ctrl_flush(struct wpa_supplicant *wpa_s)
 {
 	os_memset(wpa_s->p2p_auth_invite, 0, ETH_ALEN);
 	wpa_s->force_long_sd = 0;
+	wpas_p2p_stop_find(wpa_s);
 	if (wpa_s->global->p2p)
 		p2p_flush(wpa_s->global->p2p);
 }
@@ -6520,6 +6521,8 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strcmp(buf, "PMKSA") == 0) {
 		reply_len = wpa_sm_pmksa_cache_list(wpa_s->wpa, reply,
 						    reply_size);
+	} else if (os_strcmp(buf, "PMKSA_FLUSH") == 0) {
+		wpa_sm_pmksa_cache_flush(wpa_s->wpa, NULL);
 	} else if (os_strncmp(buf, "SET ", 4) == 0) {
 		if (wpa_supplicant_ctrl_iface_set(wpa_s, buf + 4))
 			reply_len = -1;

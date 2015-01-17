@@ -320,10 +320,12 @@ void radio_work_done(struct wpa_radio_work *work);
 void radio_remove_works(struct wpa_supplicant *wpa_s,
 			const char *type, int remove_all);
 void radio_work_check_next(struct wpa_supplicant *wpa_s);
-int radio_work_pending(struct wpa_supplicant *wpa_s, const char *type);
+struct wpa_radio_work *
+radio_work_pending(struct wpa_supplicant *wpa_s, const char *type);
 
 struct wpa_connect_work {
 	unsigned int sme:1;
+	unsigned int bss_removed:1;
 	struct wpa_bss *bss;
 	struct wpa_ssid *ssid;
 };
@@ -600,6 +602,7 @@ struct wpa_supplicant {
 	struct wps_context *wps;
 	int wps_success; /* WPS success event received */
 	struct wps_er *wps_er;
+	unsigned int wps_run;
 	int blacklist_cleared;
 
 	struct wpabuf *pending_eapol_rx;
@@ -750,6 +753,7 @@ struct wpa_supplicant {
 	unsigned int p2p_go_vht:1;
 	unsigned int user_initiated_pd:1;
 	unsigned int p2p_go_group_formation_completed:1;
+	unsigned int group_formation_reported:1;
 	unsigned int waiting_presence_resp;
 	int p2p_first_connection_timeout;
 	unsigned int p2p_nfc_tag_enabled:1;

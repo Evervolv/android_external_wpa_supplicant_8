@@ -949,6 +949,13 @@ int p2p_find(struct p2p_data *p2p, unsigned int timeout,
 	     const u8 *dev_id, unsigned int search_delay);
 
 /**
+ * p2p_notify_scan_trigger_status - Indicate scan trigger status
+ * @p2p: P2P module context from p2p_init()
+ * @status: 0 on success, -1 on failure
+ */
+void p2p_notify_scan_trigger_status(struct p2p_data *p2p, int status);
+
+/**
  * p2p_stop_find - Stop P2P Find (Device Discovery)
  * @p2p: P2P module context from p2p_init()
  */
@@ -1690,6 +1697,20 @@ void p2p_set_client_discoverability(struct p2p_data *p2p, int enabled);
  * @enabled: Whether managed P2P Device operations will be enabled
  */
 void p2p_set_managed_oper(struct p2p_data *p2p, int enabled);
+
+/**
+ * p2p_config_get_random_social - Return a random social channel
+ * @p2p: P2P config
+ * @op_class: Selected operating class
+ * @op_channel: Selected social channel
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function is used before p2p_init is called. A random social channel
+ * from supports bands 2.4 GHz (channels 1,6,11) and 60 GHz (channel 2) is
+ * returned on success.
+ */
+int p2p_config_get_random_social(struct p2p_config *p2p, u8 *op_class,
+				 u8 *op_channel);
 
 int p2p_set_listen_channel(struct p2p_data *p2p, u8 reg_class, u8 channel,
 			   u8 forced);

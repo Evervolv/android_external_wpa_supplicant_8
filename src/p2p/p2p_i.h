@@ -101,10 +101,10 @@ struct p2p_device {
 	unsigned int flags;
 
 	int status; /* enum p2p_status_code */
-	struct os_reltime go_neg_wait_started;
 	unsigned int wait_count;
 	unsigned int connect_reqs;
 	unsigned int invitation_reqs;
+	unsigned int sd_reqs;
 
 	u16 ext_listen_period;
 	u16 ext_listen_interval;
@@ -260,9 +260,16 @@ struct p2p_data {
 	 */
 	struct p2p_device *invite_peer;
 
+	/**
+	 * last_p2p_find_oper - Pointer to last pre-find operation peer
+	 */
+	struct p2p_device *last_p2p_find_oper;
+
 	const u8 *invite_go_dev_addr;
 	u8 invite_go_dev_addr_buf[ETH_ALEN];
 	int invite_dev_pw_id;
+
+	unsigned int retry_invite_req;
 
 	/**
 	 * sd_peer - Pointer to Service Discovery peer
@@ -783,6 +790,7 @@ void p2p_stop_listen_for_freq(struct p2p_data *p2p, int freq);
 int p2p_prepare_channel(struct p2p_data *p2p, struct p2p_device *dev,
 			unsigned int force_freq, unsigned int pref_freq,
 			int go);
+void p2p_go_neg_wait_timeout(void *eloop_ctx, void *timeout_ctx);
 void p2p_dbg(struct p2p_data *p2p, const char *fmt, ...)
 PRINTF_FORMAT(2, 3);
 void p2p_info(struct p2p_data *p2p, const char *fmt, ...)

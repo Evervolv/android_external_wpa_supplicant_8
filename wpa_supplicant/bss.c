@@ -174,6 +174,31 @@ static void wpa_bss_anqp_free(struct wpa_bss_anqp *anqp)
 }
 
 
+static void wpa_bss_update_pending_connect(struct wpa_supplicant *wpa_s,
+					   struct wpa_bss *old_bss,
+					   struct wpa_bss *new_bss)
+{
+	struct wpa_radio_work *work;
+	struct wpa_connect_work *cwork;
+
+	work = radio_work_pending(wpa_s, "sme-connect");
+	if (!work)
+		work = radio_work_pending(wpa_s, "connect");
+	if (!work)
+		return;
+
+	cwork = work->ctx;
+	if (cwork->bss != old_bss)
+		return;
+
+	wpa_printf(MSG_DEBUG,
+		   "Update BSS pointer for the pending connect radio work");
+	cwork->bss = new_bss;
+	if (!new_bss)
+		cwork->bss_removed = 1;
+}
+
+
 static void wpa_bss_remove(struct wpa_supplicant *wpa_s, struct wpa_bss *bss,
 			   const char *reason)
 {
@@ -190,6 +215,7 @@ static void wpa_bss_remove(struct wpa_supplicant *wpa_s, struct wpa_bss *bss,
 			}
 		}
 	}
+	wpa_bss_update_pending_connect(wpa_s, bss, NULL);
 	dl_list_del(&bss->list);
 	dl_list_del(&bss->list_id);
 	wpa_s->num_bss--;
@@ -280,8 +306,9 @@ static int wpa_bss_known(struct wpa_supplicant *wpa_s, struct wpa_bss *bss)
 static int wpa_bss_in_use(struct wpa_supplicant *wpa_s, struct wpa_bss *bss)
 {
 	return bss == wpa_s->current_bss ||
-		os_memcmp(bss->bssid, wpa_s->bssid, ETH_ALEN) == 0 ||
-		os_memcmp(bss->bssid, wpa_s->pending_bssid, ETH_ALEN) == 0;
+		(!is_zero_ether_addr(bss->bssid) &&
+		 (os_memcmp(bss->bssid, wpa_s->bssid, ETH_ALEN) == 0 ||
+		  os_memcmp(bss->bssid, wpa_s->pending_bssid, ETH_ALEN) == 0));
 }
 
 
@@ -541,6 +568,7 @@ wpa_bss_update(struct wpa_supplicant *wpa_s, struct wpa_bss *bss,
 			}
 			if (wpa_s->current_bss == bss)
 				wpa_s->current_bss = nbss;
+			wpa_bss_update_pending_connect(wpa_s, bss, nbss);
 			bss = nbss;
 			os_memcpy(bss + 1, res + 1,
 				  res->ie_len + res->beacon_ie_len);
