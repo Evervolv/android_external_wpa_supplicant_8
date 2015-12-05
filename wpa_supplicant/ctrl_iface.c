@@ -28,6 +28,8 @@
 #include "rsn_supp/pmksa_cache.h"
 #include "l2_packet/l2_packet.h"
 #include "wps/wps.h"
+#include "fst/fst.h"
+#include "fst/fst_ctrl_iface.h"
 #include "config.h"
 #include "wpa_supplicant_i.h"
 #include "driver_i.h"
@@ -2134,45 +2136,6 @@ static int wpa_supplicant_ctrl_iface_blacklist(struct wpa_supplicant *wpa_s,
 }
 
 
-static const char * debug_level_str(int level)
-{
-	switch (level) {
-	case MSG_EXCESSIVE:
-		return "EXCESSIVE";
-	case MSG_MSGDUMP:
-		return "MSGDUMP";
-	case MSG_DEBUG:
-		return "DEBUG";
-	case MSG_INFO:
-		return "INFO";
-	case MSG_WARNING:
-		return "WARNING";
-	case MSG_ERROR:
-		return "ERROR";
-	default:
-		return "?";
-	}
-}
-
-
-static int str_to_debug_level(const char *s)
-{
-	if (os_strcasecmp(s, "EXCESSIVE") == 0)
-		return MSG_EXCESSIVE;
-	if (os_strcasecmp(s, "MSGDUMP") == 0)
-		return MSG_MSGDUMP;
-	if (os_strcasecmp(s, "DEBUG") == 0)
-		return MSG_DEBUG;
-	if (os_strcasecmp(s, "INFO") == 0)
-		return MSG_INFO;
-	if (os_strcasecmp(s, "WARNING") == 0)
-		return MSG_WARNING;
-	if (os_strcasecmp(s, "ERROR") == 0)
-		return MSG_ERROR;
-	return -1;
-}
-
-
 static int wpa_supplicant_ctrl_iface_log_level(struct wpa_supplicant *wpa_s,
 					       char *cmd, char *buf,
 					       size_t buflen)
@@ -2205,7 +2168,7 @@ static int wpa_supplicant_ctrl_iface_log_level(struct wpa_supplicant *wpa_s,
 		}
 	}
 
-	if (cmd && os_strlen(cmd)) {
+	if (os_strlen(cmd)) {
 		int level = str_to_debug_level(cmd);
 		if (level < 0)
 			return -1;
@@ -2582,6 +2545,14 @@ static int wpa_supplicant_ctrl_iface_scan_result(
 		pos += ret;
 	}
 #endif /* CONFIG_HS20 */
+#ifdef CONFIG_FST
+	if (wpa_bss_get_ie(bss, WLAN_EID_MULTI_BAND)) {
+		ret = os_snprintf(pos, end - pos, "[FST]");
+		if (os_snprintf_error(end - pos, ret))
+			return -1;
+		pos += ret;
+	}
+#endif /* CONFIG_FST */
 
 	ret = os_snprintf(pos, end - pos, "\t%s",
 			  wpa_ssid_txt(bss->ssid, bss->ssid_len));
@@ -2773,6 +2744,8 @@ static int wpa_supplicant_ctrl_iface_select_network(
 		}
 	}
 
+	wpa_s->scan_min_time.sec = 0;
+	wpa_s->scan_min_time.usec = 0;
 	wpa_supplicant_select_network(wpa_s, ssid);
 
 	return 0;
@@ -2810,6 +2783,8 @@ static int wpa_supplicant_ctrl_iface_enable_network(
 			return 0;
 		}
 	}
+	wpa_s->scan_min_time.sec = 0;
+	wpa_s->scan_min_time.usec = 0;
 	wpa_supplicant_enable_network(wpa_s, ssid);
 
 	return 0;
@@ -3064,19 +3039,19 @@ static int wpa_supplicant_ctrl_iface_get_network(
 	*name++ = '\0';
 
 	id = atoi(cmd);
-	wpa_printf(MSG_DEBUG, "CTRL_IFACE: GET_NETWORK id=%d name='%s'",
+	wpa_printf(MSG_EXCESSIVE, "CTRL_IFACE: GET_NETWORK id=%d name='%s'",
 		   id, name);
 
 	ssid = wpa_config_get_network(wpa_s->conf, id);
 	if (ssid == NULL) {
-		wpa_printf(MSG_DEBUG, "CTRL_IFACE: Could not find network "
+		wpa_printf(MSG_EXCESSIVE, "CTRL_IFACE: Could not find network "
 			   "id=%d", id);
 		return -1;
 	}
 
 	value = wpa_config_get_no_key(ssid, name);
 	if (value == NULL) {
-		wpa_printf(MSG_DEBUG, "CTRL_IFACE: Failed to get network "
+		wpa_printf(MSG_EXCESSIVE, "CTRL_IFACE: Failed to get network "
 			   "variable '%s'", name);
 		return -1;
 	}
@@ -3094,7 +3069,8 @@ static int wpa_supplicant_ctrl_iface_get_network(
 
 
 static int wpa_supplicant_ctrl_iface_dup_network(
-	struct wpa_supplicant *wpa_s, char *cmd)
+	struct wpa_supplicant *wpa_s, char *cmd,
+	struct wpa_supplicant *dst_wpa_s)
 {
 	struct wpa_ssid *ssid_s, *ssid_d;
 	char *name, *id, *value;
@@ -3113,8 +3089,10 @@ static int wpa_supplicant_ctrl_iface_dup_network(
 
 	id_s = atoi(cmd);
 	id_d = atoi(id);
-	wpa_printf(MSG_DEBUG, "CTRL_IFACE: DUP_NETWORK id=%d -> %d name='%s'",
-		   id_s, id_d, name);
+
+	wpa_printf(MSG_DEBUG,
+		   "CTRL_IFACE: DUP_NETWORK ifname=%s->%s id=%d->%d name='%s'",
+		   wpa_s->ifname, dst_wpa_s->ifname, id_s, id_d, name);
 
 	ssid_s = wpa_config_get_network(wpa_s->conf, id_s);
 	if (ssid_s == NULL) {
@@ -3123,7 +3101,7 @@ static int wpa_supplicant_ctrl_iface_dup_network(
 		return -1;
 	}
 
-	ssid_d = wpa_config_get_network(wpa_s->conf, id_d);
+	ssid_d = wpa_config_get_network(dst_wpa_s->conf, id_d);
 	if (ssid_d == NULL) {
 		wpa_printf(MSG_DEBUG, "CTRL_IFACE: Could not find "
 			   "network id=%d", id_d);
@@ -3137,7 +3115,7 @@ static int wpa_supplicant_ctrl_iface_dup_network(
 		return -1;
 	}
 
-	ret = wpa_supplicant_ctrl_iface_update_network(wpa_s, ssid_d, name,
+	ret = wpa_supplicant_ctrl_iface_update_network(dst_wpa_s, ssid_d, name,
 						       value);
 
 	os_free(value);
@@ -4299,6 +4277,15 @@ static int print_bss_info(struct wpa_supplicant *wpa_s, struct wpa_bss *bss,
 			return 0;
 		pos += ret;
 	}
+
+#ifdef CONFIG_FST
+	if (mask & WPA_BSS_MASK_FST) {
+		ret = fst_ctrl_iface_mb_info(bss->bssid, pos, end - pos);
+		if (ret < 0 || ret >= end - pos)
+			return 0;
+		pos += ret;
+	}
+#endif /* CONFIG_FST */
 
 	if (mask & WPA_BSS_MASK_DELIM) {
 		ret = os_snprintf(pos, end - pos, "====\n");
@@ -5535,7 +5522,7 @@ static int p2p_ctrl_group_add_persistent(struct wpa_supplicant *wpa_s,
 	}
 
 	return wpas_p2p_group_add_persistent(wpa_s, ssid, 0, freq, 0, ht40, vht,
-					     NULL, 0);
+					     NULL, 0, 0);
 }
 
 
@@ -7956,6 +7943,19 @@ static int wpas_ctrl_iface_mac_rand_scan(struct wpa_supplicant *wpa_s,
 }
 
 
+static int wpas_ctrl_cmd_debug_level(const char *cmd)
+{
+	if (os_strcmp(cmd, "PING") == 0 ||
+	    os_strncmp(cmd, "BSS ", 4) == 0 ||
+	    os_strncmp(cmd, "GET_NETWORK ", 12) == 0 ||
+	    os_strncmp(cmd, "STATUS", 6) == 0 ||
+	    os_strncmp(cmd, "STA ", 4) == 0 ||
+	    os_strncmp(cmd, "STA-", 4) == 0)
+		return MSG_EXCESSIVE;
+	return MSG_DEBUG;
+}
+
+
 char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 					 char *buf, size_t *resp_len)
 {
@@ -7979,9 +7979,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		wpa_hexdump_ascii_key(MSG_DEBUG, "RX ctrl_iface",
 				      (const u8 *) buf, os_strlen(buf));
 	} else {
-		int level = MSG_DEBUG;
-		if (os_strcmp(buf, "PING") == 0)
-			level = MSG_EXCESSIVE;
+		int level = wpas_ctrl_cmd_debug_level(buf);
 		wpa_dbg(wpa_s, level, "Control interface command '%s'", buf);
 	}
 
@@ -8420,7 +8418,8 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		reply_len = wpa_supplicant_ctrl_iface_get_network(
 			wpa_s, buf + 12, reply, reply_size);
 	} else if (os_strncmp(buf, "DUP_NETWORK ", 12) == 0) {
-		if (wpa_supplicant_ctrl_iface_dup_network(wpa_s, buf + 12))
+		if (wpa_supplicant_ctrl_iface_dup_network(wpa_s, buf + 12,
+							  wpa_s))
 			reply_len = -1;
 	} else if (os_strcmp(buf, "LIST_CREDS") == 0) {
 		reply_len = wpa_supplicant_ctrl_iface_list_creds(
@@ -9015,6 +9014,41 @@ static int wpas_global_ctrl_iface_set(struct wpa_global *global, char *cmd)
 }
 
 
+static int wpas_global_ctrl_iface_dup_network(struct wpa_global *global,
+					      char *cmd)
+{
+	struct wpa_supplicant *wpa_s[2]; /* src, dst */
+	char *p;
+	unsigned int i;
+
+	/* cmd: "<src ifname> <dst ifname> <src network id> <dst network id>
+	 * <variable name> */
+
+	for (i = 0; i < ARRAY_SIZE(wpa_s) ; i++) {
+		p = os_strchr(cmd, ' ');
+		if (p == NULL)
+			return -1;
+		*p = '\0';
+
+		wpa_s[i] = global->ifaces;
+		for (; wpa_s[i]; wpa_s[i] = wpa_s[i]->next) {
+			if (os_strcmp(cmd, wpa_s[i]->ifname) == 0)
+				break;
+		}
+
+		if (!wpa_s[i]) {
+			wpa_printf(MSG_DEBUG,
+				   "CTRL_IFACE: Could not find iface=%s", cmd);
+			return -1;
+		}
+
+		cmd = p + 1;
+	}
+
+	return wpa_supplicant_ctrl_iface_dup_network(wpa_s[0], cmd, wpa_s[1]);
+}
+
+
 #ifndef CONFIG_NO_CONFIG_WRITE
 static int wpas_global_ctrl_iface_save_config(struct wpa_global *global)
 {
@@ -9096,6 +9130,59 @@ static int wpas_global_ctrl_iface_status(struct wpa_global *global,
 }
 
 
+#ifdef CONFIG_FST
+
+static int wpas_global_ctrl_iface_fst_attach(struct wpa_global *global,
+					     char *cmd, char *buf,
+					     size_t reply_size)
+{
+	char ifname[IFNAMSIZ + 1];
+	struct fst_iface_cfg cfg;
+	struct wpa_supplicant *wpa_s;
+	struct fst_wpa_obj iface_obj;
+
+	if (!fst_parse_attach_command(cmd, ifname, sizeof(ifname), &cfg)) {
+		wpa_s = wpa_supplicant_get_iface(global, ifname);
+		if (wpa_s) {
+			if (wpa_s->fst) {
+				wpa_printf(MSG_INFO, "FST: Already attached");
+				return -1;
+			}
+			fst_wpa_supplicant_fill_iface_obj(wpa_s, &iface_obj);
+			wpa_s->fst = fst_attach(ifname, wpa_s->own_addr,
+						&iface_obj, &cfg);
+			if (wpa_s->fst)
+				return os_snprintf(buf, reply_size, "OK\n");
+		}
+	}
+
+	return -1;
+}
+
+
+static int wpas_global_ctrl_iface_fst_detach(struct wpa_global *global,
+					     char *cmd, char *buf,
+					     size_t reply_size)
+{
+	char ifname[IFNAMSIZ + 1];
+	struct wpa_supplicant *wpa_s;
+
+	if (!fst_parse_detach_command(cmd, ifname, sizeof(ifname))) {
+		wpa_s = wpa_supplicant_get_iface(global, ifname);
+		if (wpa_s) {
+			if (!fst_iface_detach(ifname)) {
+				wpa_s->fst = NULL;
+				return os_snprintf(buf, reply_size, "OK\n");
+			}
+		}
+	}
+
+	return -1;
+}
+
+#endif /* CONFIG_FST */
+
+
 char * wpa_supplicant_global_ctrl_iface_process(struct wpa_global *global,
 						char *buf, size_t *resp_len)
 {
@@ -9147,6 +9234,18 @@ char * wpa_supplicant_global_ctrl_iface_process(struct wpa_global *global,
 	} else if (os_strcmp(buf, "INTERFACES") == 0) {
 		reply_len = wpa_supplicant_global_iface_interfaces(
 			global, reply, reply_size);
+#ifdef CONFIG_FST
+	} else if (os_strncmp(buf, "FST-ATTACH ", 11) == 0) {
+		reply_len = wpas_global_ctrl_iface_fst_attach(global, buf + 11,
+							      reply,
+							      reply_size);
+	} else if (os_strncmp(buf, "FST-DETACH ", 11) == 0) {
+		reply_len = wpas_global_ctrl_iface_fst_detach(global, buf + 11,
+							      reply,
+							      reply_size);
+	} else if (os_strncmp(buf, "FST-MANAGER ", 12) == 0) {
+		reply_len = fst_ctrl_iface_receive(buf + 12, reply, reply_size);
+#endif /* CONFIG_FST */
 	} else if (os_strcmp(buf, "TERMINATE") == 0) {
 		wpa_supplicant_terminate_proc(global);
 	} else if (os_strcmp(buf, "SUSPEND") == 0) {
@@ -9167,6 +9266,9 @@ char * wpa_supplicant_global_ctrl_iface_process(struct wpa_global *global,
 #endif /* CONFIG_P2P */
 			reply_len = -1;
 		}
+	} else if (os_strncmp(buf, "DUP_NETWORK ", 12) == 0) {
+		if (wpas_global_ctrl_iface_dup_network(global, buf + 12))
+			reply_len = -1;
 #ifndef CONFIG_NO_CONFIG_WRITE
 	} else if (os_strcmp(buf, "SAVE_CONFIG") == 0) {
 		if (wpas_global_ctrl_iface_save_config(global))

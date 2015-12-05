@@ -593,6 +593,8 @@ struct wpa_supplicant {
 	} scan_req, last_scan_req;
 	enum wpa_states scan_prev_wpa_state;
 	struct os_reltime scan_trigger_time, scan_start_time;
+	/* Minimum freshness requirement for connection purposes */
+	struct os_reltime scan_min_time;
 	int scan_runs; /* number of scan runs since WPS was started */
 	int *next_scan_freqs;
 	int *manual_scan_freqs;
@@ -977,6 +979,12 @@ struct wpa_supplicant {
 	u8 last_tspecs_count;
 
 	struct rrm_data rrm;
+
+#ifdef CONFIG_FST
+	struct fst_iface *fst;
+	const struct wpabuf *fst_ies;
+	struct wpabuf *received_mb_ies;
+#endif /* CONFIG_FST */
 };
 
 
@@ -1149,4 +1157,14 @@ int get_shared_radio_freqs(struct wpa_supplicant *wpa_s,
 			   int *freq_array, unsigned int len);
 
 void wpas_network_reenabled(void *eloop_ctx, void *timeout_ctx);
+
+#ifdef CONFIG_FST
+
+struct fst_wpa_obj;
+
+void fst_wpa_supplicant_fill_iface_obj(struct wpa_supplicant *wpa_s,
+				       struct fst_wpa_obj *iface_obj);
+
+#endif /* CONFIG_FST */
+
 #endif /* WPA_SUPPLICANT_I_H */

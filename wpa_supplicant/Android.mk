@@ -315,6 +315,22 @@ L_CFLAGS += -DCONFIG_INTERWORKING
 NEED_GAS=y
 endif
 
+ifdef CONFIG_FST
+L_CFLAGS += -DCONFIG_FST
+OBJS += src/fst/fst.c
+OBJS += src/fst/fst_session.c
+OBJS += src/fst/fst_iface.c
+OBJS += src/fst/fst_group.c
+OBJS += src/fst/fst_ctrl_aux.c
+ifdef CONFIG_FST_TEST
+L_CFLAGS += -DCONFIG_FST_TEST
+endif
+ifdef CONFIG_CTRL_IFACE
+OBJS += src/fst/fst_ctrl_iface.c
+endif
+endif
+
+
 include $(LOCAL_PATH)/src/drivers/drivers.mk
 
 ifdef CONFIG_AP
@@ -1551,6 +1567,7 @@ include $(BUILD_EXECUTABLE)
 ########################
 include $(CLEAR_VARS)
 LOCAL_MODULE := wpa_supplicant
+LOCAL_CLANG := false
 ifdef CONFIG_DRIVER_CUSTOM
 LOCAL_STATIC_LIBRARIES := libCustomWifi
 endif

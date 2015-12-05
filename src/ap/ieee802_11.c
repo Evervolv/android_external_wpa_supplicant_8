@@ -23,6 +23,7 @@
 #include "radius/radius_client.h"
 #include "p2p/p2p.h"
 #include "wps/wps.h"
+#include "fst/fst.h"
 #include "hostapd.h"
 #include "beacon.h"
 #include "ieee802_11_auth.h"
@@ -1535,6 +1536,14 @@ static u16 check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 		sta->hs20_ie = NULL;
 #endif /* CONFIG_HS20 */
 
+#ifdef CONFIG_FST
+	wpabuf_free(sta->mb_ies);
+	if (hapd->iface->fst)
+		sta->mb_ies = mb_ies_by_info(&elems.mb_ies);
+	else
+		sta->mb_ies = NULL;
+#endif /* CONFIG_FST */
+
 	return WLAN_STATUS_SUCCESS;
 }
 
@@ -1622,6 +1631,14 @@ static void send_assoc_resp(struct hostapd_data *hapd, struct sta_info *sta,
 	p = hostapd_eid_bss_max_idle_period(hapd, p);
 	if (sta->qos_map_enabled)
 		p = hostapd_eid_qos_map_set(hapd, p);
+
+#ifdef CONFIG_FST
+	if (hapd->iface->fst_ies) {
+		os_memcpy(p, wpabuf_head(hapd->iface->fst_ies),
+			  wpabuf_len(hapd->iface->fst_ies));
+		p += wpabuf_len(hapd->iface->fst_ies);
+	}
+#endif /* CONFIG_FST */
 
 #ifdef CONFIG_IEEE80211AC
 	if (hapd->conf->vendor_vht && (sta->flags & WLAN_STA_VENDOR_VHT))
@@ -2101,6 +2118,15 @@ static int handle_action(struct hostapd_data *hapd,
 		ieee802_11_rx_wnm_action_ap(hapd, mgmt, len);
 		return 1;
 #endif /* CONFIG_WNM */
+#ifdef CONFIG_FST
+	case WLAN_ACTION_FST:
+		if (hapd->iface->fst)
+			fst_rx_action(hapd->iface->fst, mgmt, len);
+		else
+			wpa_printf(MSG_DEBUG,
+				   "FST: Ignore FST Action frame - no FST attached");
+		return 1;
+#endif /* CONFIG_FST */
 	case WLAN_ACTION_PUBLIC:
 	case WLAN_ACTION_PROTECTED_DUAL:
 #ifdef CONFIG_IEEE80211N

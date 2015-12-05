@@ -279,6 +279,7 @@ extern "C" {
 #define WPA_BSS_MASK_MESH_SCAN		BIT(18)
 #define WPA_BSS_MASK_SNR		BIT(19)
 #define WPA_BSS_MASK_EST_THROUGHPUT	BIT(20)
+#define WPA_BSS_MASK_FST		BIT(21)
 
 
 /* VENDOR_ELEM_* frame id values */
@@ -314,6 +315,20 @@ enum wpa_vendor_elem_frame {
  * interface need to use matching path configuration.
  */
 struct wpa_ctrl * wpa_ctrl_open(const char *ctrl_path);
+
+/**
+ * wpa_ctrl_open2 - Open a control interface to wpa_supplicant/hostapd
+ * @ctrl_path: Path for UNIX domain sockets; ignored if UDP sockets are used.
+ * @cli_path: Path for client UNIX domain sockets; ignored if UDP socket
+ *            is used.
+ * Returns: Pointer to abstract control interface data or %NULL on failure
+ *
+ * This function is used to open a control interface to wpa_supplicant/hostapd
+ * when the socket path for client need to be specified explicitly. Default
+ * ctrl_path is usually /var/run/wpa_supplicant or /var/run/hostapd and client
+ * socket path is /tmp.
+ */
+struct wpa_ctrl * wpa_ctrl_open2(const char *ctrl_path, const char *cli_path);
 
 
 /**

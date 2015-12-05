@@ -41,6 +41,7 @@ struct hapd_interfaces {
 
 	size_t count;
 	int global_ctrl_sock;
+	struct wpa_ctrl_dst *global_ctrl_dst;
 	char *global_iface_path;
 	char *global_iface_name;
 #ifndef CONFIG_NATIVE_WINDOWS
@@ -308,6 +309,10 @@ struct hostapd_iface {
 
 	unsigned int wait_channel_update:1;
 	unsigned int cac_started:1;
+#ifdef CONFIG_FST
+	struct fst_iface *fst;
+	const struct wpabuf *fst_ies;
+#endif /* CONFIG_FST */
 
 	/*
 	 * When set, indicates that the driver will handle the AP
@@ -466,5 +471,13 @@ void hostapd_event_ch_switch(struct hostapd_data *hapd, int freq, int ht,
 const struct hostapd_eap_user *
 hostapd_get_eap_user(struct hostapd_data *hapd, const u8 *identity,
 		     size_t identity_len, int phase2);
+
+struct hostapd_data * hostapd_get_iface(struct hapd_interfaces *interfaces,
+					const char *ifname);
+
+#ifdef CONFIG_FST
+void fst_hostapd_fill_iface_obj(struct hostapd_data *hapd,
+				struct fst_wpa_obj *iface_obj);
+#endif /* CONFIG_FST */
 
 #endif /* HOSTAPD_H */

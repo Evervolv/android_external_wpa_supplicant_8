@@ -749,6 +749,33 @@ void wpa_msg_no_global(void *ctx, int level, const char *fmt, ...)
 	bin_clear_free(buf, buflen);
 }
 
+
+void wpa_msg_global_only(void *ctx, int level, const char *fmt, ...)
+{
+	va_list ap;
+	char *buf;
+	int buflen;
+	int len;
+
+	va_start(ap, fmt);
+	buflen = vsnprintf(NULL, 0, fmt, ap) + 1;
+	va_end(ap);
+
+	buf = os_malloc(buflen);
+	if (buf == NULL) {
+		wpa_printf(MSG_ERROR, "%s: Failed to allocate message buffer",
+			   __func__);
+		return;
+	}
+	va_start(ap, fmt);
+	len = vsnprintf(buf, buflen, fmt, ap);
+	va_end(ap);
+	wpa_printf(level, "%s", buf);
+	if (wpa_msg_cb)
+		wpa_msg_cb(ctx, level, WPA_MSG_ONLY_GLOBAL, buf, len);
+	os_free(buf);
+}
+
 #endif /* CONFIG_NO_WPA_MSG */
 
 
@@ -792,3 +819,42 @@ void hostapd_logger(void *ctx, const u8 *addr, unsigned int module, int level,
 	bin_clear_free(buf, buflen);
 }
 #endif /* CONFIG_NO_HOSTAPD_LOGGER */
+
+
+const char * debug_level_str(int level)
+{
+	switch (level) {
+	case MSG_EXCESSIVE:
+		return "EXCESSIVE";
+	case MSG_MSGDUMP:
+		return "MSGDUMP";
+	case MSG_DEBUG:
+		return "DEBUG";
+	case MSG_INFO:
+		return "INFO";
+	case MSG_WARNING:
+		return "WARNING";
+	case MSG_ERROR:
+		return "ERROR";
+	default:
+		return "?";
+	}
+}
+
+
+int str_to_debug_level(const char *s)
+{
+	if (os_strcasecmp(s, "EXCESSIVE") == 0)
+		return MSG_EXCESSIVE;
+	if (os_strcasecmp(s, "MSGDUMP") == 0)
+		return MSG_MSGDUMP;
+	if (os_strcasecmp(s, "DEBUG") == 0)
+		return MSG_DEBUG;
+	if (os_strcasecmp(s, "INFO") == 0)
+		return MSG_INFO;
+	if (os_strcasecmp(s, "WARNING") == 0)
+		return MSG_WARNING;
+	if (os_strcasecmp(s, "ERROR") == 0)
+		return MSG_ERROR;
+	return -1;
+}

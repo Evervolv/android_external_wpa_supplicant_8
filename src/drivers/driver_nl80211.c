@@ -1878,6 +1878,11 @@ static int nl80211_mgmt_subscribe_non_ap(struct i802_bss *bss)
 			ret = -1;
 	}
 #endif /* CONFIG_TDLS */
+#ifdef CONFIG_FST
+	/* FST Action frames */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x12", 1) < 0)
+		ret = -1;
+#endif /* CONFIG_FST */
 
 	/* FT Action frames */
 	if (nl80211_register_action_frame(bss, (u8 *) "\x06", 1) < 0)
@@ -3253,7 +3258,7 @@ static int wpa_driver_nl80211_set_acl(void *priv,
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	struct nl_msg *msg;
-	struct nlattr *acl;
+	struct nl_msg *acl;
 	unsigned int i;
 	int ret;
 
@@ -3266,23 +3271,26 @@ static int wpa_driver_nl80211_set_acl(void *priv,
 	wpa_printf(MSG_DEBUG, "nl80211: Set %s ACL (num_mac_acl=%u)",
 		   params->acl_policy ? "Accept" : "Deny", params->num_mac_acl);
 
-	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_SET_MAC_ACL)) ||
-	    nla_put_u32(msg, NL80211_ATTR_ACL_POLICY, params->acl_policy ?
-			NL80211_ACL_POLICY_DENY_UNLESS_LISTED :
-			NL80211_ACL_POLICY_ACCEPT_UNLESS_LISTED) ||
-	    (acl = nla_nest_start(msg, NL80211_ATTR_MAC_ADDRS)) == NULL) {
-		nlmsg_free(msg);
+	acl = nlmsg_alloc();
+	if (!acl)
 		return -ENOMEM;
-	}
-
 	for (i = 0; i < params->num_mac_acl; i++) {
-		if (nla_put(msg, i + 1, ETH_ALEN, params->mac_acl[i].addr)) {
-			nlmsg_free(msg);
+		if (nla_put(acl, i + 1, ETH_ALEN, params->mac_acl[i].addr)) {
+			nlmsg_free(acl);
 			return -ENOMEM;
 		}
 	}
 
-	nla_nest_end(msg, acl);
+	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_SET_MAC_ACL)) ||
+	    nla_put_u32(msg, NL80211_ATTR_ACL_POLICY, params->acl_policy ?
+			NL80211_ACL_POLICY_DENY_UNLESS_LISTED :
+			NL80211_ACL_POLICY_ACCEPT_UNLESS_LISTED) ||
+	    nla_put_nested(msg, NL80211_ATTR_MAC_ADDRS, acl)) {
+		nlmsg_free(msg);
+		nlmsg_free(acl);
+		return -ENOMEM;
+	}
+	nlmsg_free(acl);
 
 	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
 	if (ret) {
@@ -5674,8 +5682,8 @@ static void *i802_init(struct hostapd_data *hapd,
 	struct wpa_driver_nl80211_data *drv;
 	struct i802_bss *bss;
 	size_t i;
-	char brname[IFNAMSIZ];
-	int ifindex, br_ifindex;
+	char master_ifname[IFNAMSIZ];
+	int ifindex, br_ifindex = 0;
 	int br_added = 0;
 
 	bss = wpa_driver_nl80211_drv_init(hapd, params->ifname,
@@ -5686,15 +5694,21 @@ static void *i802_init(struct hostapd_data *hapd,
 
 	drv = bss->drv;
 
-	if (linux_br_get(brname, params->ifname) == 0) {
+	if (linux_br_get(master_ifname, params->ifname) == 0) {
 		wpa_printf(MSG_DEBUG, "nl80211: Interface %s is in bridge %s",
-			   params->ifname, brname);
-		br_ifindex = if_nametoindex(brname);
-		os_strlcpy(bss->brname, brname, IFNAMSIZ);
+			   params->ifname, master_ifname);
+		br_ifindex = if_nametoindex(master_ifname);
+		os_strlcpy(bss->brname, master_ifname, IFNAMSIZ);
+	} else if ((params->num_bridge == 0 || !params->bridge[0]) &&
+		   linux_master_get(master_ifname, params->ifname) == 0) {
+		wpa_printf(MSG_DEBUG, "nl80211: Interface %s is in master %s",
+			params->ifname, master_ifname);
+		/* start listening for EAPOL on the master interface */
+		add_ifidx(drv, if_nametoindex(master_ifname));
 	} else {
-		brname[0] = '\0';
-		br_ifindex = 0;
+		master_ifname[0] = '\0';
 	}
+
 	bss->br_ifindex = br_ifindex;
 
 	for (i = 0; i < params->num_bridge; i++) {
@@ -5714,7 +5728,7 @@ static void *i802_init(struct hostapd_data *hapd,
 		if (i802_check_bridge(drv, bss, params->bridge[0],
 				      params->ifname) < 0)
 			goto failed;
-		if (os_strcmp(params->bridge[0], brname) != 0)
+		if (os_strcmp(params->bridge[0], master_ifname) != 0)
 			br_added = 1;
 	}
 

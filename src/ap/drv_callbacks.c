@@ -18,6 +18,7 @@
 #include "crypto/random.h"
 #include "p2p/p2p.h"
 #include "wps/wps.h"
+#include "fst/fst.h"
 #include "wnm_ap.h"
 #include "hostapd.h"
 #include "ieee802_11.h"
@@ -154,6 +155,14 @@ int hostapd_notif_assoc(struct hostapd_data *hapd, const u8 *addr,
 	} else
 		sta->hs20_ie = NULL;
 #endif /* CONFIG_HS20 */
+
+#ifdef CONFIG_FST
+	wpabuf_free(sta->mb_ies);
+	if (hapd->iface->fst)
+		sta->mb_ies = mb_ies_by_info(&elems.mb_ies);
+	else
+		sta->mb_ies = NULL;
+#endif /* CONFIG_FST */
 
 	if (hapd->conf->wpa) {
 		if (ie == NULL || ielen == 0) {
@@ -751,6 +760,13 @@ static void hostapd_action_rx(struct hostapd_data *hapd,
 		ieee802_11_rx_wnm_action_ap(hapd, mgmt, drv_mgmt->frame_len);
 	}
 #endif /* CONFIG_WNM */
+#ifdef CONFIG_FST
+	if (mgmt->u.action.category == WLAN_ACTION_FST && hapd->iface->fst) {
+		fst_rx_action(hapd->iface->fst, mgmt, drv_mgmt->frame_len);
+		return;
+	}
+#endif /* CONFIG_FST */
+
 }
 
 

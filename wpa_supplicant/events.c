@@ -23,6 +23,7 @@
 #include "eap_peer/eap.h"
 #include "ap/hostapd.h"
 #include "p2p/p2p.h"
+#include "fst/fst.h"
 #include "wnm_sta.h"
 #include "notify.h"
 #include "common/ieee802_11_defs.h"
@@ -1038,6 +1039,19 @@ static struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 		 */
 #endif /* CONFIG_P2P */
 
+		if (os_reltime_before(&bss->last_update, &wpa_s->scan_min_time))
+		{
+			struct os_reltime diff;
+
+			os_reltime_sub(&wpa_s->scan_min_time,
+				       &bss->last_update, &diff);
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"   skip - scan result not recent enough (%u.%06u seconds too old)",
+				(unsigned int) diff.sec,
+				(unsigned int) diff.usec);
+			continue;
+		}
+
 		/* Matching configuration found */
 		return ssid;
 	}
@@ -2000,6 +2014,19 @@ static int wpa_supplicant_event_associnfo(struct wpa_supplicant *wpa_s,
 	if (wpa_found || rsn_found)
 		wpa_s->ap_ies_from_associnfo = 1;
 
+#ifdef CONFIG_FST
+	wpabuf_free(wpa_s->received_mb_ies);
+	wpa_s->received_mb_ies = NULL;
+	if (wpa_s->fst) {
+		struct mb_ies_info mb_ies;
+
+		wpa_printf(MSG_DEBUG, "Looking for MB IE");
+		if (!mb_ies_info_by_ies(&mb_ies, data->assoc_info.resp_ies,
+					data->assoc_info.resp_ies_len))
+			wpa_s->received_mb_ies = mb_ies_by_info(&mb_ies);
+	}
+#endif /* CONFIG_FST */
+
 	if (wpa_s->assoc_freq && data->assoc_info.freq &&
 	    wpa_s->assoc_freq != data->assoc_info.freq) {
 		wpa_printf(MSG_DEBUG, "Operating frequency changed from "
@@ -2372,7 +2399,10 @@ static void wpa_supplicant_event_disassoc_finish(struct wpa_supplicant *wpa_s,
 			"try to re-connect");
 		wpa_s->reassociate = 0;
 		wpa_s->disconnected = 1;
-		wpa_supplicant_cancel_sched_scan(wpa_s);
+#ifdef ANDROID
+		if (!wpa_s->pno)
+#endif
+			wpa_supplicant_cancel_sched_scan(wpa_s);
 	}
 	bssid = wpa_s->bssid;
 	if (is_zero_ether_addr(bssid))
@@ -3120,6 +3150,13 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 							 rssi);
 		return;
 	}
+
+#ifdef CONFIG_FST
+	if (mgmt->u.action.category == WLAN_ACTION_FST && wpa_s->fst) {
+		fst_rx_action(wpa_s->fst, mgmt, len);
+		return;
+	}
+#endif /* CONFIG_FST */
 
 	wpas_p2p_rx_action(wpa_s, mgmt->da, mgmt->sa, mgmt->bssid,
 			   category, payload, plen, freq);

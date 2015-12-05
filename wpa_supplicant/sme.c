@@ -438,6 +438,21 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_HS20 */
 
+#ifdef CONFIG_FST
+	if (wpa_s->fst_ies) {
+		int fst_ies_len = wpabuf_len(wpa_s->fst_ies);
+
+		if (wpa_s->sme.assoc_req_ie_len + fst_ies_len <=
+		    sizeof(wpa_s->sme.assoc_req_ie)) {
+			os_memcpy(wpa_s->sme.assoc_req_ie +
+				  wpa_s->sme.assoc_req_ie_len,
+				  wpabuf_head(wpa_s->fst_ies),
+				  fst_ies_len);
+			wpa_s->sme.assoc_req_ie_len += fst_ies_len;
+		}
+	}
+#endif /* CONFIG_FST */
+
 	ext_capab_len = wpas_build_ext_capab(wpa_s, ext_capab,
 					     sizeof(ext_capab));
 	if (ext_capab_len > 0) {
@@ -583,7 +598,8 @@ static void sme_auth_start_cb(struct wpa_radio_work *work, int deinit)
 	wpa_s->connect_work = work;
 
 	if (cwork->bss_removed ||
-	    !wpas_valid_bss_ssid(wpa_s, cwork->bss, cwork->ssid)) {
+	    !wpas_valid_bss_ssid(wpa_s, cwork->bss, cwork->ssid) ||
+	    wpas_network_disabled(wpa_s, cwork->ssid)) {
 		wpa_dbg(wpa_s, MSG_DEBUG, "SME: BSS/SSID entry for authentication not valid anymore - drop connection attempt");
 		wpas_connect_work_done(wpa_s);
 		return;
