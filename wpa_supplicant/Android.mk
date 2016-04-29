@@ -49,6 +49,10 @@ ifeq ($(TARGET_ARCH),arm)
 L_CFLAGS += -mabi=aapcs-linux
 endif
 
+# TODO(davidben): Remove this once wpa_supplicant is updated to correctly
+# condition SSL_get_client_random, etc., on BoringSSL.
+L_CFLAGS += -DBORINGSSL_SUPPRESS_ACCESSORS
+
 INCLUDES = $(LOCAL_PATH)
 INCLUDES += $(LOCAL_PATH)/src
 INCLUDES += $(LOCAL_PATH)/src/common
