@@ -1612,7 +1612,7 @@ static const char *network_fields[] = {
 #ifdef CONFIG_HS20
 	"update_identifier",
 #endif /* CONFIG_HS20 */
-	"mac_addr", "pbss"
+	"mac_addr", "pbss", "wps_disabled"
 };
 
 
@@ -2172,6 +2172,13 @@ static int wpa_cli_cmd_p2p_group_add(struct wpa_ctrl *ctrl, int argc,
 					char *argv[])
 {
 	return wpa_cli_cmd(ctrl, "P2P_GROUP_ADD", 0, argc, argv);
+}
+
+
+static int wpa_cli_cmd_p2p_group_member(struct wpa_ctrl *ctrl, int argc,
+					char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "P2P_GROUP_MEMBER", 1, argc, argv);
 }
 
 
@@ -3253,6 +3260,9 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	  "<ifname> = remove P2P group interface (terminate group if GO)" },
 	{ "p2p_group_add", wpa_cli_cmd_p2p_group_add, NULL, cli_cmd_flag_none,
 	  "[ht40] = add a new P2P group (local end as GO)" },
+	{ "p2p_group_member", wpa_cli_cmd_p2p_group_member, NULL,
+	  cli_cmd_flag_none,
+	  "<dev_addr> = Get peer interface address on local GO using peer Device Address" },
 	{ "p2p_prov_disc", wpa_cli_cmd_p2p_prov_disc,
 	  wpa_cli_complete_p2p_peer, cli_cmd_flag_none,
 	  "<addr> <method> = request provisioning discovery" },
@@ -3455,8 +3465,7 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	},
 	{ "neighbor_rep_request",
 	  wpa_cli_cmd_neighbor_rep_request, NULL, cli_cmd_flag_none,
-	  "[ssid=<SSID>] = Trigger request to AP for neighboring AP report "
-	  "(with optional given SSID, default: current SSID)"
+	  "[ssid=<SSID>] [lci] [civic] = Trigger request to AP for neighboring AP report (with optional given SSID in hex or enclosed in double quotes, default: current SSID; with optional LCI and location civic request)"
 	},
 	{ "erp_flush", wpa_cli_cmd_erp_flush, NULL, cli_cmd_flag_none,
 	  "= flush ERP keys" },
@@ -3768,6 +3777,10 @@ static void wpa_cli_action_process(const char *msg)
 			wpa_cli_connected = 0;
 			wpa_cli_exec(action_file, ifname, "DISCONNECTED");
 		}
+	} else if (str_match(pos, AP_EVENT_ENABLED)) {
+		wpa_cli_exec(action_file, ctrl_ifname, pos);
+	} else if (str_match(pos, AP_EVENT_DISABLED)) {
+		wpa_cli_exec(action_file, ctrl_ifname, pos);
 	} else if (str_match(pos, MESH_GROUP_STARTED)) {
 		wpa_cli_exec(action_file, ctrl_ifname, pos);
 	} else if (str_match(pos, MESH_GROUP_REMOVED)) {

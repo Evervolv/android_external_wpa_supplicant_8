@@ -818,8 +818,9 @@ int radius_msg_verify_msg_auth(struct radius_msg *msg, const u8 *secret,
 		os_memcpy(msg->hdr->authenticator, req_auth,
 			  sizeof(msg->hdr->authenticator));
 	}
-	hmac_md5(secret, secret_len, wpabuf_head(msg->buf),
-		 wpabuf_len(msg->buf), auth);
+	if (hmac_md5(secret, secret_len, wpabuf_head(msg->buf),
+		     wpabuf_len(msg->buf), auth) < 0)
+		return 1;
 	os_memcpy(attr + 1, orig, MD5_MAC_LEN);
 	if (req_auth) {
 		os_memcpy(msg->hdr->authenticator, orig_authenticator,
@@ -862,8 +863,8 @@ int radius_msg_verify(struct radius_msg *msg, const u8 *secret,
 	len[2] = wpabuf_len(msg->buf) - sizeof(struct radius_hdr);
 	addr[3] = secret;
 	len[3] = secret_len;
-	md5_vector(4, addr, len, hash);
-	if (os_memcmp_const(hash, msg->hdr->authenticator, MD5_MAC_LEN) != 0) {
+	if (md5_vector(4, addr, len, hash) < 0 ||
+	    os_memcmp_const(hash, msg->hdr->authenticator, MD5_MAC_LEN) != 0) {
 		wpa_printf(MSG_INFO, "Response Authenticator invalid!");
 		return 1;
 	}
@@ -1017,7 +1018,10 @@ static u8 * decrypt_ms_key(const u8 *key, size_t len,
 			addr[1] = pos - MD5_MAC_LEN;
 			elen[1] = MD5_MAC_LEN;
 		}
-		md5_vector(first ? 3 : 2, addr, elen, hash);
+		if (md5_vector(first ? 3 : 2, addr, elen, hash) < 0) {
+			os_free(plain);
+			return NULL;
+		}
 		first = 0;
 
 		for (i = 0; i < MD5_MAC_LEN; i++)
@@ -1199,8 +1203,10 @@ int radius_msg_add_mppe_keys(struct radius_msg *msg,
 	vhdr = (struct radius_attr_vendor *) pos;
 	vhdr->vendor_type = RADIUS_VENDOR_ATTR_MS_MPPE_SEND_KEY;
 	pos = (u8 *) (vhdr + 1);
-	if (os_get_random((u8 *) &salt, sizeof(salt)) < 0)
+	if (os_get_random((u8 *) &salt, sizeof(salt)) < 0) {
+		os_free(buf);
 		return 0;
+	}
 	salt |= 0x8000;
 	WPA_PUT_BE16(pos, salt);
 	pos += 2;

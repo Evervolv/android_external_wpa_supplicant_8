@@ -179,6 +179,7 @@ int hostapd_build_ap_extra_ies(struct hostapd_data *hapd,
 
 	add_buf(&beacon, hapd->conf->vendor_elements);
 	add_buf(&proberesp, hapd->conf->vendor_elements);
+	add_buf(&assocresp, hapd->conf->assocresp_elements);
 
 	*beacon_ret = beacon;
 	*proberesp_ret = proberesp;
@@ -362,7 +363,8 @@ int hostapd_sta_add(struct hostapd_data *hapd,
 		    u16 listen_interval,
 		    const struct ieee80211_ht_capabilities *ht_capab,
 		    const struct ieee80211_vht_capabilities *vht_capab,
-		    u32 flags, u8 qosinfo, u8 vht_opmode, int set)
+		    u32 flags, u8 qosinfo, u8 vht_opmode, int supp_p2p_ps,
+		    int set)
 {
 	struct hostapd_sta_add_params params;
 
@@ -384,6 +386,7 @@ int hostapd_sta_add(struct hostapd_data *hapd,
 	params.vht_opmode = vht_opmode;
 	params.flags = hostapd_sta_flags_to_drv(flags);
 	params.qosinfo = qosinfo;
+	params.support_p2p_ps = supp_p2p_ps;
 	params.set = set;
 	return hapd->driver->sta_add(hapd->drv_priv, &params);
 }

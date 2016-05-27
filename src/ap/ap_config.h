@@ -557,6 +557,7 @@ struct hostapd_bss_config {
 #endif /* CONFIG_RADIUS_TEST */
 
 	struct wpabuf *vendor_elements;
+	struct wpabuf *assocresp_elements;
 
 	unsigned int sae_anti_clogging_threshold;
 	int *sae_groups;
@@ -572,7 +573,7 @@ struct hostapd_bss_config {
 #define MESH_ENABLED BIT(0)
 	int mesh;
 
-	int radio_measurements;
+	u8 radio_measurements[RRM_CAPABILITIES_IE_LEN];
 
 	int vendor_vht;
 
@@ -693,6 +694,9 @@ struct hostapd_config {
 	} *acs_chan_bias;
 	unsigned int num_acs_chan_bias;
 #endif /* CONFIG_ACS */
+
+	struct wpabuf *lci;
+	struct wpabuf *civic;
 };
 
 

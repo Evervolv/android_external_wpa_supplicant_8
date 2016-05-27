@@ -874,6 +874,7 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 			break;
 		case CNF_ACPT:
 			wpa_mesh_set_plink_state(wpa_s, sta, PLINK_CNF_RCVD);
+			eloop_cancel_timeout(plink_timer, wpa_s, sta);
 			eloop_register_timeout(
 				conf->dot11MeshConfirmTimeout / 1000,
 				(conf->dot11MeshConfirmTimeout % 1000) * 1000,
@@ -933,6 +934,8 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 						   PLINK_CLOSE, reason);
 			break;
 		case OPN_ACPT:
+			if (conf->security & MESH_CONF_SEC_AMPE)
+				mesh_rsn_derive_mtk(wpa_s, sta);
 			mesh_mpm_plink_estab(wpa_s, sta);
 			mesh_mpm_send_plink_action(wpa_s, sta,
 						   PLINK_CONFIRM, 0);

@@ -39,9 +39,6 @@ void wpa_supplicant_update_scan_int(struct wpa_supplicant *wpa_s, int sec);
 void scan_only_handler(struct wpa_supplicant *wpa_s,
 		       struct wpa_scan_results *scan_res);
 int wpas_scan_scheduled(struct wpa_supplicant *wpa_s);
-int wpa_supplicant_start_sched_scan(struct wpa_supplicant *wpa_s,
-				    struct wpa_driver_scan_params *params);
-int wpa_supplicant_stop_sched_scan(struct wpa_supplicant *wpa_s);
 struct wpa_driver_scan_params *
 wpa_scan_clone_params(const struct wpa_driver_scan_params *src);
 void wpa_scan_free_params(struct wpa_driver_scan_params *params);
@@ -54,5 +51,10 @@ int wpas_mac_addr_rand_scan_set(struct wpa_supplicant *wpa_s,
 				unsigned int type, const u8 *addr,
 				const u8 *mask);
 int wpas_abort_ongoing_scan(struct wpa_supplicant *wpa_s);
+void filter_scan_res(struct wpa_supplicant *wpa_s,
+		     struct wpa_scan_results *res);
+void scan_snr(struct wpa_scan_res *res);
+void scan_est_throughput(struct wpa_supplicant *wpa_s,
+			 struct wpa_scan_res *res);
 
 #endif /* SCAN_H */

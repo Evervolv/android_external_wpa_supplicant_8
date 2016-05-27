@@ -43,6 +43,7 @@
 #include "ieee802_11.h"
 #include "dfs.h"
 #include "mbo_ap.h"
+#include "rrm.h"
 
 
 u8 * hostapd_eid_supp_rates(struct hostapd_data *hapd, u8 *eid)
@@ -140,6 +141,7 @@ u16 hostapd_own_capab_info(struct hostapd_data *hapd)
 	int capab = WLAN_CAPABILITY_ESS;
 	int privacy;
 	int dfs;
+	int i;
 
 	/* Check if any of configured channels require DFS */
 	dfs = hostapd_is_dfs_required(hapd->iface);
@@ -187,8 +189,12 @@ u16 hostapd_own_capab_info(struct hostapd_data *hapd)
 	    (hapd->iconf->spectrum_mgmt_required || dfs))
 		capab |= WLAN_CAPABILITY_SPECTRUM_MGMT;
 
-	if (hapd->conf->radio_measurements)
-		capab |= IEEE80211_CAP_RRM;
+	for (i = 0; i < RRM_CAPABILITIES_IE_LEN; i++) {
+		if (hapd->conf->radio_measurements[i]) {
+			capab |= IEEE80211_CAP_RRM;
+			break;
+		}
+	}
 
 	return capab;
 }
@@ -1221,7 +1227,7 @@ static void handle_auth(struct hostapd_data *hapd,
 				WLAN_STA_AUTHORIZED);
 
 		if (hostapd_sta_add(hapd, sta->addr, 0, 0, 0, 0, 0,
-				    NULL, NULL, sta->flags, 0, 0, 0)) {
+				    NULL, NULL, sta->flags, 0, 0, 0, 0)) {
 			hostapd_logger(hapd, sta->addr,
 				       HOSTAPD_MODULE_IEEE80211,
 				       HOSTAPD_LEVEL_NOTICE,
@@ -1743,6 +1749,12 @@ static u16 check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 	ap_copy_sta_supp_op_classes(sta, elems.supp_op_classes,
 				    elems.supp_op_classes_len);
 
+	if ((sta->capability & WLAN_CAPABILITY_RADIO_MEASUREMENT) &&
+	    elems.rrm_enabled &&
+	    elems.rrm_enabled_len >= sizeof(sta->rrm_enabled_capa))
+		os_memcpy(sta->rrm_enabled_capa, elems.rrm_enabled,
+			  sizeof(sta->rrm_enabled_capa));
+
 	return WLAN_STATUS_SUCCESS;
 }
 
@@ -1805,7 +1817,8 @@ static int add_associated_sta(struct hostapd_data *hapd,
 			    sta->flags & WLAN_STA_HT ? &ht_cap : NULL,
 			    sta->flags & WLAN_STA_VHT ? &vht_cap : NULL,
 			    sta->flags | WLAN_STA_ASSOC, sta->qosinfo,
-			    sta->vht_opmode, sta->added_unassoc)) {
+			    sta->vht_opmode, sta->p2p_ie ? 1 : 0,
+			    sta->added_unassoc)) {
 		hostapd_logger(hapd, sta->addr,
 			       HOSTAPD_MODULE_IEEE80211, HOSTAPD_LEVEL_NOTICE,
 			       "Could not %s STA to kernel driver",
@@ -1947,6 +1960,14 @@ static u16 send_assoc_resp(struct hostapd_data *hapd, struct sta_info *sta,
 
 	p = hostapd_eid_mbo(hapd, p, buf + sizeof(buf) - p);
 
+	if (hapd->conf->assocresp_elements &&
+	    (size_t) (buf + sizeof(buf) - p) >=
+	    wpabuf_len(hapd->conf->assocresp_elements)) {
+		os_memcpy(p, wpabuf_head(hapd->conf->assocresp_elements),
+			  wpabuf_len(hapd->conf->assocresp_elements));
+		p += wpabuf_len(hapd->conf->assocresp_elements);
+	}
+
 	send_len += p - reply->u.assoc_resp.variable;
 
 	if (hostapd_drv_send_mlme(hapd, reply, send_len, 0) < 0) {
@@ -2087,6 +2108,12 @@ static void handle_assoc(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_MBO */
 
+	/*
+	 * sta->capability is used in check_assoc_ies() for RRM enabled
+	 * capability element.
+	 */
+	sta->capability = capab_info;
+
 	/* followed by SSID and Supported rates; and HT capabilities if 802.11n
 	 * is used */
 	resp = check_assoc_ies(hapd, sta, pos, left, reassoc);
@@ -2100,7 +2127,6 @@ static void handle_assoc(struct hostapd_data *hapd,
 		goto fail;
 	}
 
-	sta->capability = capab_info;
 	sta->listen_interval = listen_interval;
 
 	if (hapd->iface->current_mode->mode == HOSTAPD_MODE_IEEE80211G)
@@ -2467,6 +2493,9 @@ static int handle_action(struct hostapd_data *hapd,
 				return 1;
 		}
 		break;
+	case WLAN_ACTION_RADIO_MEASUREMENT:
+		hostapd_handle_radio_measurement(hapd, (const u8 *) mgmt, len);
+		return 1;
 	}
 
 	hostapd_logger(hapd, mgmt->sa, HOSTAPD_MODULE_IEEE80211,
@@ -3012,6 +3041,8 @@ void hostapd_client_poll_ok(struct hostapd_data *hapd, const u8 *addr)
 	}
 	if (sta == NULL)
 		return;
+	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POLL_OK MACSTR,
+		MAC2STR(sta->addr));
 	if (!(sta->flags & WLAN_STA_PENDING_POLL))
 		return;
 

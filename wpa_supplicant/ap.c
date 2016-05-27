@@ -214,6 +214,13 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 	if (wpa_supplicant_conf_ap_ht(wpa_s, ssid, conf))
 		return -1;
 
+	if (ssid->pbss > 1) {
+		wpa_printf(MSG_ERROR, "Invalid pbss value(%d) for AP mode",
+			   ssid->pbss);
+		return -1;
+	}
+	bss->pbss = ssid->pbss;
+
 #ifdef CONFIG_ACS
 	if (ssid->acs) {
 		/* Setting channel to 0 in order to enable ACS */
@@ -287,7 +294,10 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 
 	if (wpa_key_mgmt_wpa_psk(ssid->key_mgmt))
 		bss->wpa = ssid->proto;
-	bss->wpa_key_mgmt = ssid->key_mgmt;
+	if (ssid->key_mgmt == DEFAULT_KEY_MGMT)
+		bss->wpa_key_mgmt = WPA_KEY_MGMT_PSK;
+	else
+		bss->wpa_key_mgmt = ssid->key_mgmt;
 	bss->wpa_pairwise = ssid->pairwise_cipher;
 	if (ssid->psk_set) {
 		bin_clear_free(bss->ssid.wpa_psk, sizeof(*bss->ssid.wpa_psk));
@@ -296,6 +306,7 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 			return -1;
 		os_memcpy(bss->ssid.wpa_psk->psk, ssid->psk, PMK_LEN);
 		bss->ssid.wpa_psk->group = 1;
+		bss->ssid.wpa_psk_set = 1;
 	} else if (ssid->passphrase) {
 		bss->ssid.wpa_passphrase = os_strdup(ssid->passphrase);
 	} else if (ssid->wep_key_len[0] || ssid->wep_key_len[1] ||
@@ -409,6 +420,8 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 	     !(bss->wpa & 2)))
 		goto no_wps; /* WPS2 does not allow WPA/TKIP-only
 			      * configuration */
+	if (ssid->wps_disabled)
+		goto no_wps;
 	bss->eap_server = 1;
 
 	if (!ssid->ignore_broadcast_ssid)
@@ -452,8 +465,6 @@ no_wps:
 		bss->vendor_elements =
 			wpabuf_dup(wpa_s->conf->ap_vendor_elements);
 	}
-
-	bss->pbss = ssid->pbss;
 
 	return 0;
 }
@@ -1363,7 +1374,6 @@ int wpas_ap_stop_ap(struct wpa_supplicant *wpa_s)
 	hapd = wpa_s->ap_iface->bss[0];
 	return hostapd_ctrl_iface_stop_ap(hapd);
 }
-#endif /* CONFIG_CTRL_IFACE */
 
 
 int wpas_ap_pmksa_cache_list(struct wpa_supplicant *wpa_s, char *buf,
@@ -1416,6 +1426,7 @@ void wpas_ap_pmksa_cache_flush(struct wpa_supplicant *wpa_s)
 	if (wpa_s->ifmsh)
 		hostapd_ctrl_iface_pmksa_flush(wpa_s->ifmsh->bss[0]);
 }
+#endif /* CONFIG_CTRL_IFACE */
 
 
 #ifdef NEED_AP_MLME

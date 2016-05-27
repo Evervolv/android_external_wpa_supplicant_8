@@ -1143,6 +1143,81 @@ static int hostapd_cli_cmd_pmksa_flush(struct wpa_ctrl *ctrl, int argc,
 }
 
 
+static int hostapd_cli_cmd_set_neighbor(struct wpa_ctrl *ctrl, int argc,
+					char *argv[])
+{
+	char cmd[2048];
+	int res;
+
+	if (argc < 3 || argc > 5) {
+		printf("Invalid set_neighbor command: needs 3-5 arguments\n");
+		return -1;
+	}
+
+	res = os_snprintf(cmd, sizeof(cmd), "SET_NEIGHBOR %s %s %s %s %s",
+			  argv[0], argv[1], argv[2], argc >= 4 ? argv[3] : "",
+			  argc == 5 ? argv[4] : "");
+	if (os_snprintf_error(sizeof(cmd), res)) {
+		printf("Too long SET_NEIGHBOR command.\n");
+		return -1;
+	}
+	return wpa_ctrl_command(ctrl, cmd);
+}
+
+
+static int hostapd_cli_cmd_remove_neighbor(struct wpa_ctrl *ctrl, int argc,
+					   char *argv[])
+{
+	char cmd[400];
+	int res;
+
+	if (argc != 2) {
+		printf("Invalid remove_neighbor command: needs 2 arguments\n");
+		return -1;
+	}
+
+	res = os_snprintf(cmd, sizeof(cmd), "REMOVE_NEIGHBOR %s %s",
+			  argv[0], argv[1]);
+	if (os_snprintf_error(sizeof(cmd), res)) {
+		printf("Too long REMOVE_NEIGHBOR command.\n");
+		return -1;
+	}
+	return wpa_ctrl_command(ctrl, cmd);
+}
+
+
+static int hostapd_cli_cmd_req_lci(struct wpa_ctrl *ctrl, int argc,
+				   char *argv[])
+{
+	char cmd[256];
+	int res;
+
+	if (argc != 1) {
+		printf("Invalid req_lci command - requires destination address\n");
+		return -1;
+	}
+
+	res = os_snprintf(cmd, sizeof(cmd), "REQ_LCI %s", argv[0]);
+	if (os_snprintf_error(sizeof(cmd), res)) {
+		printf("Too long REQ_LCI command.\n");
+		return -1;
+	}
+	return wpa_ctrl_command(ctrl, cmd);
+}
+
+
+static int hostapd_cli_cmd_req_range(struct wpa_ctrl *ctrl, int argc,
+				     char *argv[])
+{
+	if (argc < 4) {
+		printf("Invalid req_range command: needs at least 4 arguments - dest address, randomization interval, min AP count, and 1 to 16 AP addresses\n");
+		return -1;
+	}
+
+	return hostapd_cli_cmd(ctrl, "REQ_RANGE", 4, argc, argv);
+}
+
+
 struct hostapd_cli_cmd {
 	const char *cmd;
 	int (*handler)(struct wpa_ctrl *ctrl, int argc, char *argv[]);
@@ -1204,6 +1279,10 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	{ "log_level", hostapd_cli_cmd_log_level },
 	{ "pmksa", hostapd_cli_cmd_pmksa },
 	{ "pmksa_flush", hostapd_cli_cmd_pmksa_flush },
+	{ "set_neighbor", hostapd_cli_cmd_set_neighbor },
+	{ "remove_neighbor", hostapd_cli_cmd_remove_neighbor },
+	{ "req_lci", hostapd_cli_cmd_req_lci },
+	{ "req_range", hostapd_cli_cmd_req_range },
 	{ NULL, NULL }
 };
 
