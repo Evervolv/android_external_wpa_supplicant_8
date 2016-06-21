@@ -12,6 +12,7 @@
 #ifdef CONFIG_MESH
 /* needed for mesh_plink_state enum */
 #include "common/defs.h"
+#include "common/wpa_common.h"
 #endif /* CONFIG_MESH */
 
 #include "list.h"
@@ -81,11 +82,19 @@ struct sta_info {
 	u16 my_lid;
 	u16 mpm_close_reason;
 	int mpm_retries;
-	u8 my_nonce[32];
-	u8 peer_nonce[32];
+	u8 my_nonce[WPA_NONCE_LEN];
+	u8 peer_nonce[WPA_NONCE_LEN];
 	u8 aek[32];	/* SHA256 digest length */
-	u8 mtk[16];
-	u8 mgtk[16];
+	u8 mtk[WPA_TK_MAX_LEN];
+	size_t mtk_len;
+	u8 mgtk_rsc[6];
+	u8 mgtk_key_id;
+	u8 mgtk[WPA_TK_MAX_LEN];
+	size_t mgtk_len;
+	u8 igtk_rsc[6];
+	u8 igtk[WPA_TK_MAX_LEN];
+	size_t igtk_len;
+	u16 igtk_key_id;
 	u8 sae_auth_retry;
 #endif /* CONFIG_MESH */
 

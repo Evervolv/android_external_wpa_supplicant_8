@@ -66,9 +66,11 @@ void wpa_supplicant_mesh_iface_deinit(struct wpa_supplicant *wpa_s,
 }
 
 
-static struct mesh_conf * mesh_config_create(struct wpa_ssid *ssid)
+static struct mesh_conf * mesh_config_create(struct wpa_supplicant *wpa_s,
+					     struct wpa_ssid *ssid)
 {
 	struct mesh_conf *conf;
+	int cipher;
 
 	conf = os_zalloc(sizeof(struct mesh_conf));
 	if (!conf)
@@ -82,6 +84,33 @@ static struct mesh_conf * mesh_config_create(struct wpa_ssid *ssid)
 			MESH_CONF_SEC_AMPE;
 	else
 		conf->security |= MESH_CONF_SEC_NONE;
+	conf->ieee80211w = ssid->ieee80211w;
+	if (conf->ieee80211w == MGMT_FRAME_PROTECTION_DEFAULT) {
+		if (wpa_s->drv_enc & WPA_DRIVER_CAPA_ENC_BIP)
+			conf->ieee80211w = wpa_s->conf->pmf;
+		else
+			conf->ieee80211w = NO_MGMT_FRAME_PROTECTION;
+	}
+
+	cipher = wpa_pick_pairwise_cipher(ssid->pairwise_cipher, 0);
+	if (cipher < 0 || cipher == WPA_CIPHER_TKIP) {
+		wpa_msg(wpa_s, MSG_INFO, "mesh: Invalid pairwise cipher");
+		os_free(conf);
+		return NULL;
+	}
+	conf->pairwise_cipher = cipher;
+
+	cipher = wpa_pick_group_cipher(ssid->group_cipher);
+	if (cipher < 0 || cipher == WPA_CIPHER_TKIP ||
+	    cipher == WPA_CIPHER_GTK_NOT_USED) {
+		wpa_msg(wpa_s, MSG_INFO, "mesh: Invalid group cipher");
+		os_free(conf);
+		return NULL;
+	}
+
+	conf->group_cipher = cipher;
+	if (conf->ieee80211w != NO_MGMT_FRAME_PROTECTION)
+		conf->mgmt_group_cipher = WPA_CIPHER_AES_128_CMAC;
 
 	/* defaults */
 	conf->mesh_pp_id = MESH_PATH_PROTOCOL_HWMP;
@@ -175,19 +204,13 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 		wpa_s->conf->dot11RSNASAERetransPeriod;
 	os_strlcpy(bss->conf->iface, wpa_s->ifname, sizeof(bss->conf->iface));
 
-	mconf = mesh_config_create(ssid);
+	mconf = mesh_config_create(wpa_s, ssid);
 	if (!mconf)
 		goto out_free;
 	ifmsh->mconf = mconf;
 
 	/* need conf->hw_mode for supported rates. */
-	if (ssid->frequency == 0) {
-		conf->hw_mode = HOSTAPD_MODE_IEEE80211G;
-		conf->channel = 1;
-	} else {
-		conf->hw_mode = ieee80211_freq_to_chan(ssid->frequency,
-						       &conf->channel);
-	}
+	conf->hw_mode = ieee80211_freq_to_chan(ssid->frequency, &conf->channel);
 	if (conf->hw_mode == NUM_HOSTAPD_MODES) {
 		wpa_printf(MSG_ERROR, "Unsupported mesh mode frequency: %d MHz",
 			   ssid->frequency);
@@ -341,15 +364,9 @@ int wpa_supplicant_join_mesh(struct wpa_supplicant *wpa_s,
 
 	wpa_supplicant_mesh_deinit(wpa_s);
 
-	if (ssid->key_mgmt & WPA_KEY_MGMT_SAE) {
-		wpa_s->pairwise_cipher = WPA_CIPHER_CCMP;
-		wpa_s->group_cipher = WPA_CIPHER_CCMP;
-		wpa_s->mgmt_group_cipher = 0;
-	} else {
-		wpa_s->pairwise_cipher = WPA_CIPHER_NONE;
-		wpa_s->group_cipher = WPA_CIPHER_NONE;
-		wpa_s->mgmt_group_cipher = 0;
-	}
+	wpa_s->pairwise_cipher = WPA_CIPHER_NONE;
+	wpa_s->group_cipher = WPA_CIPHER_NONE;
+	wpa_s->mgmt_group_cipher = 0;
 
 	os_memset(&params, 0, sizeof(params));
 	params.meshid = ssid->ssid;
@@ -407,6 +424,12 @@ int wpa_supplicant_join_mesh(struct wpa_supplicant *wpa_s,
 		goto out;
 	}
 
+	if (ssid->key_mgmt & WPA_KEY_MGMT_SAE) {
+		wpa_s->pairwise_cipher = wpa_s->mesh_rsn->pairwise_cipher;
+		wpa_s->group_cipher = wpa_s->mesh_rsn->group_cipher;
+		wpa_s->mgmt_group_cipher = wpa_s->mesh_rsn->mgmt_group_cipher;
+	}
+
 	if (wpa_s->ifmsh) {
 		params.ies = wpa_s->ifmsh->mconf->rsn_ie;
 		params.ie_len = wpa_s->ifmsh->mconf->rsn_ie_len;
@@ -417,7 +440,7 @@ int wpa_supplicant_join_mesh(struct wpa_supplicant *wpa_s,
 		wpa_ssid_txt(ssid->ssid, ssid->ssid_len));
 	ret = wpa_drv_join_mesh(wpa_s, &params);
 	if (ret)
-		wpa_msg(wpa_s, MSG_ERROR, "mesh join error=%d\n", ret);
+		wpa_msg(wpa_s, MSG_ERROR, "mesh join error=%d", ret);
 
 	/* hostapd sets the interface down until we associate */
 	wpa_drv_set_operstate(wpa_s, 1);
@@ -591,7 +614,7 @@ int wpas_mesh_add_interface(struct wpa_supplicant *wpa_s, char *ifname,
 	if (!mesh_wpa_s) {
 		wpa_printf(MSG_ERROR,
 			   "mesh: Failed to create new wpa_supplicant interface");
-		wpa_supplicant_remove_iface(wpa_s->global, wpa_s, 0);
+		wpa_drv_if_remove(wpa_s, WPA_IF_MESH, ifname);
 		return -1;
 	}
 	mesh_wpa_s->mesh_if_created = 1;

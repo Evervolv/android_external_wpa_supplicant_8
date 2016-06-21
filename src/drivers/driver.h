@@ -3560,6 +3560,19 @@ struct wpa_driver_ops {
 	 * Returns: 0 on success or -1 on failure
 	 */
 	int (*configure_data_frame_filters)(void *priv, u32 filter_flags);
+
+	/**
+	 * get_ext_capab - Get extended capabilities for the specified interface
+	 * @priv: Private driver interface data
+	 * @type: Interface type for which to get extended capabilities
+	 * @ext_capab: Extended capabilities fetched
+	 * @ext_capab_mask: Extended capabilities mask
+	 * @ext_capab_len: Length of the extended capabilities
+	 * Returns: 0 on success or -1 on failure
+	 */
+	int (*get_ext_capab)(void *priv, enum wpa_driver_if_type type,
+			     const u8 **ext_capab, const u8 **ext_capab_mask,
+			     unsigned int *ext_capab_len);
 };
 
 
@@ -4429,6 +4442,12 @@ union wpa_event_data {
 		 * status_code - Status Code from (Re)association Response
 		 */
 		u16 status_code;
+
+		/**
+		 * timed_out - Whether failure is due to timeout (etc.) rather
+		 * than explicit rejection response from the AP.
+		 */
+		int timed_out;
 	} assoc_reject;
 
 	struct timeout_event {
