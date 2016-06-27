@@ -25,6 +25,7 @@
 
 #include "utils/common.h"
 #include "utils/eloop.h"
+#include "utils/module_tests.h"
 #include "common/version.h"
 #include "common/ieee802_11_defs.h"
 #include "common/ctrl_iface_common.h"
@@ -1590,8 +1591,8 @@ static u16 ipv4_hdr_checksum(const void *buf, size_t len)
 #define HWSIM_PACKETLEN 1500
 #define HWSIM_IP_LEN (HWSIM_PACKETLEN - sizeof(struct ether_header))
 
-void hostapd_data_test_rx(void *ctx, const u8 *src_addr, const u8 *buf,
-			  size_t len)
+static void hostapd_data_test_rx(void *ctx, const u8 *src_addr, const u8 *buf,
+				 size_t len)
 {
 	struct hostapd_data *hapd = ctx;
 	const struct ether_header *eth;
@@ -1778,8 +1779,6 @@ done:
 static int hostapd_ctrl_test_alloc_fail(struct hostapd_data *hapd, char *cmd)
 {
 #ifdef WPA_TRACE_BFD
-	extern char wpa_trace_fail_func[256];
-	extern unsigned int wpa_trace_fail_after;
 	char *pos;
 
 	wpa_trace_fail_after = atoi(cmd);
@@ -1803,9 +1802,6 @@ static int hostapd_ctrl_get_alloc_fail(struct hostapd_data *hapd,
 				       char *buf, size_t buflen)
 {
 #ifdef WPA_TRACE_BFD
-	extern char wpa_trace_fail_func[256];
-	extern unsigned int wpa_trace_fail_after;
-
 	return os_snprintf(buf, buflen, "%u:%s", wpa_trace_fail_after,
 			   wpa_trace_fail_func);
 #else /* WPA_TRACE_BFD */
@@ -1817,8 +1813,6 @@ static int hostapd_ctrl_get_alloc_fail(struct hostapd_data *hapd,
 static int hostapd_ctrl_test_fail(struct hostapd_data *hapd, char *cmd)
 {
 #ifdef WPA_TRACE_BFD
-	extern char wpa_trace_test_fail_func[256];
-	extern unsigned int wpa_trace_test_fail_after;
 	char *pos;
 
 	wpa_trace_test_fail_after = atoi(cmd);
@@ -1842,9 +1836,6 @@ static int hostapd_ctrl_get_fail(struct hostapd_data *hapd,
 				 char *buf, size_t buflen)
 {
 #ifdef WPA_TRACE_BFD
-	extern char wpa_trace_test_fail_func[256];
-	extern unsigned int wpa_trace_test_fail_after;
-
 	return os_snprintf(buf, buflen, "%u:%s", wpa_trace_test_fail_after,
 			   wpa_trace_test_fail_func);
 #else /* WPA_TRACE_BFD */
@@ -2087,7 +2078,7 @@ static int hostapd_ctrl_iface_req_lci(struct hostapd_data *hapd,
 }
 
 
-int hostapd_ctrl_iface_req_range(struct hostapd_data *hapd, char *cmd)
+static int hostapd_ctrl_iface_req_range(struct hostapd_data *hapd, char *cmd)
 {
 	u8 addr[ETH_ALEN];
 	char *token, *context = NULL;
@@ -3349,7 +3340,6 @@ static void hostapd_global_ctrl_iface_receive(int sock, void *eloop_ctx,
 			reply_len = -1;
 #ifdef CONFIG_MODULE_TESTS
 	} else if (os_strcmp(buf, "MODULE_TESTS") == 0) {
-		int hapd_module_tests(void);
 		if (hapd_module_tests() < 0)
 			reply_len = -1;
 #endif /* CONFIG_MODULE_TESTS */

@@ -15,6 +15,7 @@
 #include "utils/common.h"
 #include "utils/eloop.h"
 #include "utils/uuid.h"
+#include "utils/module_tests.h"
 #include "common/version.h"
 #include "common/ieee802_11_defs.h"
 #include "common/ieee802_11_common.h"
@@ -420,7 +421,6 @@ static int wpa_supplicant_ctrl_iface_set(struct wpa_supplicant *wpa_s,
 #ifdef CONFIG_TDLS
 #ifdef CONFIG_TDLS_TESTING
 	} else if (os_strcasecmp(cmd, "tdls_testing") == 0) {
-		extern unsigned int tdls_testing;
 		tdls_testing = strtol(value, NULL, 0);
 		wpa_printf(MSG_DEBUG, "TDLS: tdls_testing=0x%x", tdls_testing);
 #endif /* CONFIG_TDLS_TESTING */
@@ -7137,7 +7137,6 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 
 #ifdef CONFIG_TDLS
 #ifdef CONFIG_TDLS_TESTING
-	extern unsigned int tdls_testing;
 	tdls_testing = 0;
 #endif /* CONFIG_TDLS_TESTING */
 	wpa_drv_tdls_oper(wpa_s, TDLS_ENABLE, NULL);
@@ -7895,7 +7894,8 @@ static u16 ipv4_hdr_checksum(const void *buf, size_t len)
 #define HWSIM_PACKETLEN 1500
 #define HWSIM_IP_LEN (HWSIM_PACKETLEN - sizeof(struct ether_header))
 
-void wpas_data_test_rx(void *ctx, const u8 *src_addr, const u8 *buf, size_t len)
+static void wpas_data_test_rx(void *ctx, const u8 *src_addr, const u8 *buf,
+			      size_t len)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 	const struct ether_header *eth;
@@ -8071,8 +8071,6 @@ done:
 static int wpas_ctrl_test_alloc_fail(struct wpa_supplicant *wpa_s, char *cmd)
 {
 #ifdef WPA_TRACE_BFD
-	extern char wpa_trace_fail_func[256];
-	extern unsigned int wpa_trace_fail_after;
 	char *pos;
 
 	wpa_trace_fail_after = atoi(cmd);
@@ -8095,9 +8093,6 @@ static int wpas_ctrl_get_alloc_fail(struct wpa_supplicant *wpa_s,
 				    char *buf, size_t buflen)
 {
 #ifdef WPA_TRACE_BFD
-	extern char wpa_trace_fail_func[256];
-	extern unsigned int wpa_trace_fail_after;
-
 	return os_snprintf(buf, buflen, "%u:%s", wpa_trace_fail_after,
 			   wpa_trace_fail_func);
 #else /* WPA_TRACE_BFD */
@@ -8109,8 +8104,6 @@ static int wpas_ctrl_get_alloc_fail(struct wpa_supplicant *wpa_s,
 static int wpas_ctrl_test_fail(struct wpa_supplicant *wpa_s, char *cmd)
 {
 #ifdef WPA_TRACE_BFD
-	extern char wpa_trace_test_fail_func[256];
-	extern unsigned int wpa_trace_test_fail_after;
 	char *pos;
 
 	wpa_trace_test_fail_after = atoi(cmd);
@@ -8133,9 +8126,6 @@ static int wpas_ctrl_get_fail(struct wpa_supplicant *wpa_s,
 				    char *buf, size_t buflen)
 {
 #ifdef WPA_TRACE_BFD
-	extern char wpa_trace_test_fail_func[256];
-	extern unsigned int wpa_trace_test_fail_after;
-
 	return os_snprintf(buf, buflen, "%u:%s", wpa_trace_test_fail_after,
 			   wpa_trace_test_fail_func);
 #else /* WPA_TRACE_BFD */
@@ -10032,7 +10022,6 @@ char * wpa_supplicant_global_ctrl_iface_process(struct wpa_global *global,
 							  reply_size);
 #ifdef CONFIG_MODULE_TESTS
 	} else if (os_strcmp(buf, "MODULE_TESTS") == 0) {
-		int wpas_module_tests(void);
 		if (wpas_module_tests() < 0)
 			reply_len = -1;
 #endif /* CONFIG_MODULE_TESTS */
