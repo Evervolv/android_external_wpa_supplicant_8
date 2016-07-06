@@ -59,7 +59,7 @@ int BinderManager::registerInterface(struct wpa_supplicant *wpa_s)
 	if (iface_object_map_.find(iface_key) != iface_object_map_.end())
 		return 1;
 
-	iface_object_map_[iface_key] = new Iface(wpa_s);
+	iface_object_map_[iface_key] = new Iface(wpa_s->global, wpa_s->ifname);
 	if (!iface_object_map_[iface_key].get())
 		return 1;
 

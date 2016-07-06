@@ -16,6 +16,7 @@ import fi.w1.wpa_supplicant.IIface;
  * Interface exposed by the wpa_supplicant binder service registered
  * with the service manager with name: fi.w1.wpa_supplicant.
  */
+@utf8InCpp
 interface ISupplicant {
 	/* Error values returned by the service to RPC method calls. */
 	const int ERROR_INVALID_ARGS = 1;
@@ -45,7 +46,7 @@ interface ISupplicant {
 	 *
 	 * @param ifname Name of the network interface, e.g., wlan0
 	 */
-	void RemoveInterface(in @utf8InCpp String ifname);
+	void RemoveInterface(in String ifname);
 
 	/**
 	 * Gets a binder object for the interface corresponding to ifname
@@ -55,5 +56,5 @@ interface ISupplicant {
 	 *
 	 * @return Binder object representing the interface.
 	 */
-	IIface GetInterface(in @utf8InCpp String ifname);
+	IIface GetInterface(in String ifname);
 }

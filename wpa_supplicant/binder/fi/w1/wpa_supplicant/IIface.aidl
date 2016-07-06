@@ -12,5 +12,17 @@ package fi.w1.wpa_supplicant;
 /**
  * Interface exposed by wpa_supplicant for each network interface it controls.
  */
+@utf8InCpp
 interface IIface {
+	/* Error values returned by the service to RPC method calls. */
+	const int ERROR_INVALID_ARGS = 1;
+	const int ERROR_UNKNOWN = 2;
+	const int ERROR_IFACE_UNKNOWN = 3;
+
+	/**
+	 * Retrieves the name of the iface this object controls.
+	 *
+	 * @return Name of the network interface, e.g., wlan0
+	 */
+	String GetName();
 }
