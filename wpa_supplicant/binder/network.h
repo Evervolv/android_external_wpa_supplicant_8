@@ -17,6 +17,7 @@
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
+#include "../config.h"
 #include "../wpa_supplicant_i.h"
 }
 
