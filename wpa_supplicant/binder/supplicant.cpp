@@ -22,9 +22,9 @@ android::binder::Status Supplicant::CreateInterface(
 
 	/* Check if required Ifname argument is missing */
 	if (!params.getString(android::String16("Ifname"), &ifname))
-		return android::binder::Status::fromServiceSpecificError(
-		    ERROR_INVALID_ARGS,
-		    android::String8("Ifname missing in params."));
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    "Ifname missing in params.");
 	/* Retrieve the remaining params from the dictionary */
 	params.getString(android::String16("Driver"), &driver);
 	params.getString(android::String16("ConfigFile"), &confname);
@@ -38,8 +38,7 @@ android::binder::Status Supplicant::CreateInterface(
 		wpa_global_, android::String8(ifname).string()) != NULL)
 		return android::binder::Status::fromServiceSpecificError(
 		    ERROR_IFACE_EXISTS,
-		    android::String8("wpa_supplicant already controls this "
-				     "interface."));
+		    "wpa_supplicant already controls this interface.");
 
 	android::binder::Status status;
 	struct wpa_supplicant *wpa_s = NULL;
@@ -57,9 +56,8 @@ android::binder::Status Supplicant::CreateInterface(
 	 * BinderManager when |wpa_supplicant_add_iface| is called. */
 	if (!wpa_s || !wpa_s->binder_object_key) {
 		status = android::binder::Status::fromServiceSpecificError(
-		    ERROR_UNKNOWN,
-		    android::String8(
-			"wpa_supplicant couldn't grab this interface."));
+		    ERROR_GENERIC,
+		    "wpa_supplicant couldn't grab this interface.");
 	} else {
 		BinderManager *binder_manager = BinderManager::getInstance();
 
@@ -68,9 +66,8 @@ android::binder::Status Supplicant::CreateInterface(
 			wpa_s->binder_object_key, aidl_return))
 			status =
 			    android::binder::Status::fromServiceSpecificError(
-				ERROR_UNKNOWN,
-				android::String8("wpa_supplicant encountered a "
-						 "binder error."));
+				ERROR_GENERIC,
+				"wpa_supplicant encountered a binder error.");
 		else
 			status = android::binder::Status::ok();
 	}
@@ -89,13 +86,11 @@ android::binder::Status Supplicant::RemoveInterface(const std::string &ifname)
 	if (!wpa_s || !wpa_s->binder_object_key)
 		return android::binder::Status::fromServiceSpecificError(
 		    ERROR_IFACE_UNKNOWN,
-		    android::String8("wpa_supplicant does not control this "
-				     "interface."));
+		    "wpa_supplicant does not control this interface.");
 	if (wpa_supplicant_remove_iface(wpa_global_, wpa_s, 0))
 		return android::binder::Status::fromServiceSpecificError(
-		    ERROR_UNKNOWN,
-		    android::String8(
-			"wpa_supplicant couldn't remove this interface."));
+		    ERROR_GENERIC,
+		    "wpa_supplicant couldn't remove this interface.");
 	return android::binder::Status::ok();
 }
 
@@ -109,17 +104,15 @@ android::binder::Status Supplicant::GetInterface(
 	if (!wpa_s || !wpa_s->binder_object_key)
 		return android::binder::Status::fromServiceSpecificError(
 		    ERROR_IFACE_UNKNOWN,
-		    android::String8(
-			"wpa_supplicant does not control this interface."));
+		    "wpa_supplicant does not control this interface.");
 
 	BinderManager *binder_manager = BinderManager::getInstance();
 	if (!binder_manager ||
 	    binder_manager->getIfaceBinderObjectByKey(
 		wpa_s->binder_object_key, aidl_return))
 		return android::binder::Status::fromServiceSpecificError(
-		    ERROR_UNKNOWN,
-		    android::String8(
-			"wpa_supplicant encountered a binder error."));
+		    ERROR_GENERIC,
+		    "wpa_supplicant encountered a binder error.");
 
 	return android::binder::Status::ok();
 }
