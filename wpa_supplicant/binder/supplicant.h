@@ -35,16 +35,30 @@ public:
 	Supplicant(struct wpa_global *global);
 	~Supplicant() override = default;
 
+	// Binder methods exposed in aidl.
 	android::binder::Status CreateInterface(
 	    const android::os::PersistableBundle &params,
-	    android::sp<fi::w1::wpa_supplicant::IIface> *aidl_return) override;
+	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
+	    override;
 	android::binder::Status
 	RemoveInterface(const std::string &ifname) override;
 	android::binder::Status GetInterface(
 	    const std::string &ifname,
-	    android::sp<fi::w1::wpa_supplicant::IIface> *aidl_return) override;
+	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
+	    override;
+	android::binder::Status
+	SetDebugParams(int level, bool show_timestamp, bool show_keys) override;
+	android::binder::Status GetDebugLevel(int *level_out) override;
+	android::binder::Status
+	GetDebugShowTimestamp(bool *show_timestamp_out) override;
+	android::binder::Status GetDebugShowKeys(bool *show_keys_out) override;
 
 private:
+	int convertDebugLevelToInternalLevel(
+	    int external_level, int *internal_level);
+	int convertDebugLevelToExternalLevel(
+	    int internal_level, int *external_level);
+
 	/* Raw pointer to the global structure maintained by the core. */
 	struct wpa_global *wpa_global_;
 	/* All the callback objects registered by the clients. */
