@@ -9,7 +9,7 @@
 
 package fi.w1.wpa_supplicant;
 
-import android.os.PersistableBundle;
+import fi.w1.wpa_supplicant.ParcelableIfaceParams;
 import fi.w1.wpa_supplicant.IIface;
 
 /**
@@ -39,19 +39,12 @@ interface ISupplicant {
 	/**
 	 * Registers a wireless interface in wpa_supplicant.
 	 *
-	 * @param args A dictionary with arguments used to add the interface to
-	 *             wpa_supplicant.
-	 * The dictionary may contain the following entries:
-	 *   Ifname(String) Name of the network interface to control, e.g.,
-	 *   wlan0.
-	 *   BridgeIfname(String) Name of the bridge interface to control, e.g.,
-	 *   br0.
-	 *   Driver(String) Driver name which the interface uses, e.g., nl80211.
-	 *   ConfigFile(String) Configuration file path.
+	 * @param params Instance of |ParcelableIfaceParams| containing the
+	 *        parameters of the interface.
 	 *
 	 * @return Binder object representing the interface.
 	 */
-	IIface CreateInterface(in PersistableBundle args);
+	IIface CreateInterface(in ParcelableIfaceParams params);
 
 	/**
 	 * Deregisters a wireless interface from wpa_supplicant.
