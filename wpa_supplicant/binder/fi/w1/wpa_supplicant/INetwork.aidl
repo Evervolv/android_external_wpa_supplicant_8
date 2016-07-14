@@ -9,6 +9,8 @@
 
 package fi.w1.wpa_supplicant;
 
+import fi.w1.wpa_supplicant.INetworkCallback;
+
 /**
  * Interface exposed by wpa_supplicant for each network configuration it controls.
  * A network is wpa_supplicant's way of representing the configuration parameters of a Wifi
@@ -38,4 +40,14 @@ interface INetwork {
 	 * @return Name of the network interface, e.g., wlan0
 	 */
 	String GetInterfaceName();
+
+	/**
+	 * Register for callbacks from this network.
+	 *
+	 * These callbacks are invoked for events that are specific to this network.
+	 *
+	 * @param callback Binder object reference to a |INetworkCallback|
+	 *        instance.
+	 */
+	void RegisterCallback(in INetworkCallback callback);
 }

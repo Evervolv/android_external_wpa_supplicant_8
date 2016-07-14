@@ -201,6 +201,52 @@ int BinderManager::getNetworkBinderObjectByIfnameAndNetworkId(
 }
 
 /**
+ * Add a new |ISupplicantCallback| binder object reference to our
+ * global callback list.
+ *
+ * @param callback Binder reference of the |ISupplicantCallback| object.
+ *
+ * @return 0 on success, 1 on failure.
+ */
+int BinderManager::addSupplicantCallbackBinderObject(
+    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback> &callback)
+{
+	return 0;
+}
+/**
+ * Add a new |IIfaceCallback| binder object reference to our
+ * interface callback list.
+ *
+ * @param ifname Name of the corresponding interface.
+ * @param callback Binder reference of the |IIfaceCallback| object.
+ *
+ * @return 0 on success, 1 on failure.
+ */
+int BinderManager::addIfaceCallbackBinderObject(
+    const std::string &ifname,
+    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
+{
+	return 0;
+}
+
+/**
+ * Add a new |INetworkCallback| binder object reference to our
+ * network callback list.
+ *
+ * @param ifname Name of the corresponding interface.
+ * @param network_id ID of the corresponding network.
+ * @param callback Binder reference of the |INetworkCallback| object.
+ *
+ * @return 0 on success, 1 on failure.
+ */
+int BinderManager::addNetworkCallbackBinderObject(
+    const std::string &ifname, int network_id,
+    const android::sp<fi::w1::wpa_supplicant::INetworkCallback> &callback)
+{
+	return 0;
+}
+
+/**
  * Creates a unique key for the network using the provided |ifname| and
  * |network_id| to be used
  * in the internal map of |INetwork| objects.

@@ -120,6 +120,25 @@ android::binder::Status Iface::GetNetwork(
 	return android::binder::Status::ok();
 }
 
+android::binder::Status Iface::RegisterCallback(
+    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (!wpa_s) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_IFACE_INVALID,
+		    "wpa_supplicant does not control this interface.");
+	}
+	BinderManager *binder_manager = BinderManager::getInstance();
+	if (!binder_manager ||
+	    binder_manager->addIfaceCallbackBinderObject(ifname_, callback)) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC,
+		    "wpa_supplicant encountered a binder error.");
+	}
+	return android::binder::Status::ok();
+}
+
 /**
  * Retrieve the underlying |wpa_supplicant| struct pointer for
  * this iface.

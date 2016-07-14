@@ -46,6 +46,9 @@ public:
 	    int network_id,
 	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object_out)
 	    override;
+	android::binder::Status RegisterCallback(
+	    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
+	    override;
 
 private:
 	struct wpa_supplicant *retrieveIfacePtr();
