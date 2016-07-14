@@ -7,6 +7,8 @@
  * See README for more details.
  */
 
+#include <algorithm>
+
 #include <binder/IServiceManager.h>
 
 #include "binder_manager.h"
@@ -40,6 +42,7 @@ int BinderManager::registerBinderService(struct wpa_global *global)
 	// Create the main binder service object and register with system
 	// ServiceManager.
 	supplicant_object_ = new Supplicant(global);
+
 	android::String16 service_name(binder_constants::kServiceName);
 	android::defaultServiceManager()->addService(
 	    service_name, android::IInterface::asBinder(supplicant_object_));
@@ -69,6 +72,9 @@ int BinderManager::registerInterface(struct wpa_supplicant *wpa_s)
 	if (!iface_object_map_[ifname].get())
 		return 1;
 
+	// Initialize the vector of callbacks for this object.
+	iface_callbacks_map_[ifname] =
+	    std::vector<android::sp<fi::w1::wpa_supplicant::IIfaceCallback>>();
 	return 0;
 }
 
@@ -85,11 +91,28 @@ int BinderManager::unregisterInterface(struct wpa_supplicant *wpa_s)
 		return 1;
 
 	const std::string ifname(wpa_s->ifname);
+
 	if (iface_object_map_.find(ifname) == iface_object_map_.end())
 		return 1;
 
-	/* Delete the corresponding iface object from our map. */
+	// Delete the corresponding iface object from our map.
 	iface_object_map_.erase(ifname);
+
+	// Delete all callbacks registered for this object.
+	auto iface_callback_map_iter = iface_callbacks_map_.find(ifname);
+	if (iface_callback_map_iter == iface_callbacks_map_.end())
+		return 1;
+	const auto &iface_callback_list = iface_callback_map_iter->second;
+	for (const auto &callback : iface_callback_list) {
+		if (android::IInterface::asBinder(callback)->unlinkToDeath(
+			nullptr, callback.get()) != android::OK) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Error deregistering for death notification for "
+			    "iface callback object");
+		}
+	}
+	iface_callbacks_map_.erase(iface_callback_map_iter);
 	return 0;
 }
 
@@ -120,6 +143,9 @@ int BinderManager::registerNetwork(
 	if (!network_object_map_[network_key].get())
 		return 1;
 
+	// Initialize the vector of callbacks for this object.
+	network_callbacks_map_[network_key] = std::vector<
+	    android::sp<fi::w1::wpa_supplicant::INetworkCallback>>();
 	return 0;
 }
 
@@ -145,13 +171,31 @@ int BinderManager::unregisterNetwork(
 	if (network_object_map_.find(network_key) == network_object_map_.end())
 		return 1;
 
-	/* Delete the corresponding network object from our map. */
+	// Delete the corresponding network object from our map.
 	network_object_map_.erase(network_key);
+
+	// Delete all callbacks registered for this object.
+	auto network_callback_map_iter =
+	    network_callbacks_map_.find(network_key);
+	if (network_callback_map_iter == network_callbacks_map_.end())
+		return 1;
+	const auto &network_callback_list = network_callback_map_iter->second;
+	for (const auto &callback : network_callback_list) {
+		if (android::IInterface::asBinder(callback)->unlinkToDeath(
+			nullptr, callback.get()) != android::OK) {
+			wpa_printf(
+			    MSG_ERROR, "Error deregistering for death "
+				       "notification for "
+				       "network callback object");
+		}
+	}
+	network_callbacks_map_.erase(network_callback_map_iter);
 	return 0;
 }
 
 /**
- * Retrieve the |IIface| binder object reference using the provided ifname.
+ * Retrieve the |IIface| binder object reference using the provided
+ * ifname.
  *
  * @param ifname Name of the corresponding interface.
  * @param iface_object Binder reference corresponding to the iface.
@@ -165,16 +209,17 @@ int BinderManager::getIfaceBinderObjectByIfname(
 	if (ifname.empty() || !iface_object)
 		return 1;
 
-	if (iface_object_map_.find(ifname) == iface_object_map_.end())
+	auto iface_object_iter = iface_object_map_.find(ifname);
+	if (iface_object_iter == iface_object_map_.end())
 		return 1;
 
-	*iface_object = iface_object_map_[ifname];
+	*iface_object = iface_object_iter->second;
 	return 0;
 }
 
 /**
- * Retrieve the |INetwork| binder object reference using the provided ifname
- * and network_id.
+ * Retrieve the |INetwork| binder object reference using the provided
+ * ifname and network_id.
  *
  * @param ifname Name of the corresponding interface.
  * @param network_id ID of the corresponding network.
@@ -193,10 +238,11 @@ int BinderManager::getNetworkBinderObjectByIfnameAndNetworkId(
 	const std::string network_key =
 	    getNetworkObjectMapKey(ifname, network_id);
 
-	if (network_object_map_.find(network_key) == network_object_map_.end())
+	auto network_object_iter = network_object_map_.find(network_key);
+	if (network_object_iter == network_object_map_.end())
 		return 1;
 
-	*network_object = network_object_map_[network_key];
+	*network_object = network_object_iter->second;
 	return 0;
 }
 
@@ -211,7 +257,13 @@ int BinderManager::getNetworkBinderObjectByIfnameAndNetworkId(
 int BinderManager::addSupplicantCallbackBinderObject(
     const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback> &callback)
 {
-	return 0;
+	// Register for death notification before we add it to our list.
+	auto on_binder_died_fctor = std::bind(
+	    &BinderManager::removeSupplicantCallbackBinderObject, this,
+	    std::placeholders::_1);
+	return registerForDeathAndAddCallbackBinderObjectToList<
+	    fi::w1::wpa_supplicant::ISupplicantCallback>(
+	    callback, on_binder_died_fctor, supplicant_callbacks_);
 }
 /**
  * Add a new |IIfaceCallback| binder object reference to our
@@ -226,7 +278,21 @@ int BinderManager::addIfaceCallbackBinderObject(
     const std::string &ifname,
     const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
 {
-	return 0;
+	if (ifname.empty())
+		return 1;
+
+	auto iface_callback_map_iter = iface_callbacks_map_.find(ifname);
+	if (iface_callback_map_iter == iface_callbacks_map_.end())
+		return 1;
+	auto &iface_callback_list = iface_callback_map_iter->second;
+
+	// Register for death notification before we add it to our list.
+	auto on_binder_died_fctor = std::bind(
+	    &BinderManager::removeIfaceCallbackBinderObject, this, ifname,
+	    std::placeholders::_1);
+	return registerForDeathAndAddCallbackBinderObjectToList<
+	    fi::w1::wpa_supplicant::IIfaceCallback>(
+	    callback, on_binder_died_fctor, iface_callback_list);
 }
 
 /**
@@ -243,13 +309,30 @@ int BinderManager::addNetworkCallbackBinderObject(
     const std::string &ifname, int network_id,
     const android::sp<fi::w1::wpa_supplicant::INetworkCallback> &callback)
 {
-	return 0;
+	if (ifname.empty() || network_id < 0)
+		return 1;
+
+	// Generate the key to be used to lookup the network.
+	const std::string network_key =
+	    getNetworkObjectMapKey(ifname, network_id);
+	auto network_callback_map_iter =
+	    network_callbacks_map_.find(network_key);
+	if (network_callback_map_iter == network_callbacks_map_.end())
+		return 1;
+	auto &network_callback_list = network_callback_map_iter->second;
+
+	// Register for death notification before we add it to our list.
+	auto on_binder_died_fctor = std::bind(
+	    &BinderManager::removeNetworkCallbackBinderObject, this, ifname,
+	    network_id, std::placeholders::_1);
+	return registerForDeathAndAddCallbackBinderObjectToList<
+	    fi::w1::wpa_supplicant::INetworkCallback>(
+	    callback, on_binder_died_fctor, network_callback_list);
 }
 
 /**
  * Creates a unique key for the network using the provided |ifname| and
- * |network_id| to be used
- * in the internal map of |INetwork| objects.
+ * |network_id| to be used in the internal map of |INetwork| objects.
  * This is of the form |ifname|_|network_id|. For ex: "wlan0_1".
  *
  * @param ifname Name of the corresponding interface.
@@ -259,5 +342,116 @@ const std::string
 BinderManager::getNetworkObjectMapKey(const std::string &ifname, int network_id)
 {
 	return ifname + "_" + std::to_string(network_id);
+}
+
+/**
+ * Removes the provided |ISupplicantCallback| binder object reference
+ * from our global callback list.
+ *
+ * @param callback Binder reference of the |ISupplicantCallback| object.
+ */
+void BinderManager::removeSupplicantCallbackBinderObject(
+    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback> &callback)
+{
+	supplicant_callbacks_.erase(
+	    std::remove(
+		supplicant_callbacks_.begin(), supplicant_callbacks_.end(),
+		callback),
+	    supplicant_callbacks_.end());
+}
+
+/**
+ * Removes the provided |IIfaceCallback| binder object reference from
+ * our interface callback list.
+ *
+ * @param ifname Name of the corresponding interface.
+ * @param callback Binder reference of the |IIfaceCallback| object.
+ */
+void BinderManager::removeIfaceCallbackBinderObject(
+    const std::string &ifname,
+    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
+{
+	if (ifname.empty())
+		return;
+
+	auto iface_callback_map_iter = iface_callbacks_map_.find(ifname);
+	if (iface_callback_map_iter == iface_callbacks_map_.end())
+		return;
+
+	auto &iface_callback_list = iface_callback_map_iter->second;
+	iface_callback_list.erase(
+	    std::remove(
+		iface_callback_list.begin(), iface_callback_list.end(),
+		callback),
+	    iface_callback_list.end());
+}
+
+/**
+ * Removes the provided |INetworkCallback| binder object reference from
+ * our network callback list.
+ *
+ * @param ifname Name of the corresponding interface.
+ * @param network_id ID of the corresponding network.
+ * @param callback Binder reference of the |INetworkCallback| object.
+ */
+void BinderManager::removeNetworkCallbackBinderObject(
+    const std::string &ifname, int network_id,
+    const android::sp<fi::w1::wpa_supplicant::INetworkCallback> &callback)
+{
+	if (ifname.empty() || network_id < 0)
+		return;
+
+	// Generate the key to be used to lookup the network.
+	const std::string network_key =
+	    getNetworkObjectMapKey(ifname, network_id);
+
+	auto network_callback_map_iter =
+	    network_callbacks_map_.find(network_key);
+	if (network_callback_map_iter == network_callbacks_map_.end())
+		return;
+
+	auto &network_callback_list = network_callback_map_iter->second;
+	network_callback_list.erase(
+	    std::remove(
+		network_callback_list.begin(), network_callback_list.end(),
+		callback),
+	    network_callback_list.end());
+}
+
+/**
+ * Add callback to the corresponding list after linking to death on the
+ * corresponding binder object reference.
+ *
+ * @param callback Binder reference of the |INetworkCallback| object.
+ *
+ * @return 0 on success, 1 on failure.
+ */
+template <class CallbackType>
+int BinderManager::registerForDeathAndAddCallbackBinderObjectToList(
+    const android::sp<CallbackType> &callback,
+    const std::function<void(const android::sp<CallbackType> &)>
+	&on_binder_died_fctor,
+    std::vector<android::sp<CallbackType>> &callback_list)
+{
+	auto death_notifier = new CallbackObjectDeathNotifier<CallbackType>(
+	    callback, on_binder_died_fctor);
+	// Use the |callback.get()| as cookie so that we don't need to
+	// store a reference to this |CallbackObjectDeathNotifier| instance
+	// to use in |unlinkToDeath| later.
+	// NOTE: This may cause an immediate callback if the object is already dead,
+	// so add it to the list before we register for callback!
+	callback_list.push_back(callback);
+	if (android::IInterface::asBinder(callback)->linkToDeath(
+		death_notifier, callback.get()) != android::OK) {
+		wpa_printf(
+		    MSG_ERROR, "Error registering for death notification for "
+			       "supplicant callback object");
+		callback_list.erase(
+		    std::remove(
+			callback_list.begin(), callback_list.end(), callback),
+		    callback_list.end());
+		return 1;
+	}
+	return 0;
 }
 } // namespace wpa_supplicant_binder
