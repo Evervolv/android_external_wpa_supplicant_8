@@ -12,6 +12,17 @@
 
 namespace wpa_supplicant_binder {
 
+#define RETURN_IF_IFACE_INVALID(wpa_s)                                         \
+	{                                                                      \
+		if (!wpa_s) {                                                  \
+			return android::binder::Status::                       \
+			    fromServiceSpecificError(                          \
+				ERROR_IFACE_INVALID, "wpa_supplicant does "    \
+						     "not control this "       \
+						     "interface.");            \
+		}                                                              \
+	} // #define RETURN_IF_IFACE_INVALID(wpa_s)
+
 Iface::Iface(struct wpa_global *wpa_global, const char ifname[])
     : wpa_global_(wpa_global), ifname_(ifname)
 {
@@ -21,13 +32,7 @@ android::binder::Status Iface::GetName(std::string *iface_name_out)
 {
 	// We could directly return the name we hold, but let's verify
 	// if the underlying iface still exists.
-	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
-	if (!wpa_s) {
-		return android::binder::Status::fromServiceSpecificError(
-		    ERROR_IFACE_INVALID,
-		    "wpa_supplicant does not control this interface.");
-	}
-
+	RETURN_IF_IFACE_INVALID(retrieveIfacePtr());
 	*iface_name_out = ifname_;
 	return android::binder::Status::ok();
 }
@@ -36,11 +41,7 @@ android::binder::Status Iface::AddNetwork(
     android::sp<fi::w1::wpa_supplicant::INetwork> *network_object_out)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
-	if (!wpa_s) {
-		return android::binder::Status::fromServiceSpecificError(
-		    ERROR_IFACE_INVALID,
-		    "wpa_supplicant does not control this interface.");
-	}
+	RETURN_IF_IFACE_INVALID(wpa_s);
 
 	struct wpa_ssid *ssid = wpa_supplicant_add_network(wpa_s);
 	if (!ssid) {
@@ -62,11 +63,7 @@ android::binder::Status Iface::AddNetwork(
 android::binder::Status Iface::RemoveNetwork(int network_id)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
-	if (!wpa_s) {
-		return android::binder::Status::fromServiceSpecificError(
-		    ERROR_IFACE_INVALID,
-		    "wpa_supplicant does not control this interface.");
-	}
+	RETURN_IF_IFACE_INVALID(wpa_s);
 
 	int result = wpa_supplicant_remove_network(wpa_s, network_id);
 	if (result == -1) {
@@ -88,11 +85,7 @@ android::binder::Status Iface::GetNetwork(
     android::sp<fi::w1::wpa_supplicant::INetwork> *network_object_out)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
-	if (!wpa_s) {
-		return android::binder::Status::fromServiceSpecificError(
-		    ERROR_IFACE_INVALID,
-		    "wpa_supplicant does not control this interface.");
-	}
+	RETURN_IF_IFACE_INVALID(wpa_s);
 
 	struct wpa_ssid *ssid = wpa_config_get_network(wpa_s->conf, network_id);
 	if (!ssid) {
@@ -116,11 +109,8 @@ android::binder::Status Iface::RegisterCallback(
     const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
-	if (!wpa_s) {
-		return android::binder::Status::fromServiceSpecificError(
-		    ERROR_IFACE_INVALID,
-		    "wpa_supplicant does not control this interface.");
-	}
+	RETURN_IF_IFACE_INVALID(wpa_s);
+
 	BinderManager *binder_manager = BinderManager::getInstance();
 	if (!binder_manager ||
 	    binder_manager->addIfaceCallbackBinderObject(ifname_, callback)) {
