@@ -233,6 +233,17 @@ android::binder::Status Network::Enable(bool no_connect)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (wpa_ssid->disabled == 2) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC,
+		    "Cannot use Select with persistent P2P group");
+	}
+
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	wpa_s->scan_min_time.sec = 0;
+	wpa_s->scan_min_time.usec = 0;
+	wpa_supplicant_select_network(wpa_s, wpa_ssid);
 	return android::binder::Status::ok();
 }
 
@@ -240,6 +251,15 @@ android::binder::Status Network::Disable()
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (wpa_ssid->disabled == 2) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC,
+		    "Cannot use Disable with persistent P2P group");
+	}
+
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	wpa_supplicant_disable_network(wpa_s, wpa_ssid);
 	return android::binder::Status::ok();
 }
 
@@ -247,6 +267,21 @@ android::binder::Status Network::Select()
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (wpa_ssid->disabled == 2) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC,
+		    "Cannot use Enable with persistent P2P group");
+	}
+
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (no_connect) {
+		wpa_ssid->disabled = 0;
+	} else {
+		wpa_s->scan_min_time.sec = 0;
+		wpa_s->scan_min_time.usec = 0;
+		wpa_supplicant_enable_network(wpa_s, wpa_ssid);
+	}
 	return android::binder::Status::ok();
 }
 
@@ -258,11 +293,19 @@ android::binder::Status Network::Select()
  */
 struct wpa_ssid *Network::retrieveNetworkPtr()
 {
-	wpa_supplicant *wpa_s = wpa_supplicant_get_iface(
-	    (struct wpa_global *)wpa_global_, ifname_.c_str());
+	wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s)
 		return nullptr;
 	return wpa_config_get_network(wpa_s->conf, network_id_);
 }
 
+/**
+ * Retrieve the underlying |wpa_supplicant| struct pointer for
+ * this network.
+ */
+struct wpa_supplicant *Network::retrieveIfacePtr()
+{
+	return wpa_supplicant_get_iface(
+	    (struct wpa_global *)wpa_global_, ifname_.c_str());
+}
 } // namespace wpa_supplicant_binder
