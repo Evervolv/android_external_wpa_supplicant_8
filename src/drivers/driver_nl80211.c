@@ -3468,6 +3468,17 @@ static int nl80211_put_beacon_int(struct nl_msg *msg, int beacon_int)
 }
 
 
+static int nl80211_put_dtim_period(struct nl_msg *msg, int dtim_period)
+{
+	if (dtim_period > 0) {
+		wpa_printf(MSG_DEBUG, "  * dtim_period=%d", dtim_period);
+		return nla_put_u32(msg, NL80211_ATTR_DTIM_PERIOD, dtim_period);
+	}
+
+	return 0;
+}
+
+
 static int wpa_driver_nl80211_set_ap(void *priv,
 				     struct wpa_driver_ap_params *params)
 {
@@ -3504,7 +3515,7 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 	    nla_put(msg, NL80211_ATTR_BEACON_TAIL, params->tail_len,
 		    params->tail) ||
 	    nl80211_put_beacon_int(msg, params->beacon_int) ||
-	    nla_put_u32(msg, NL80211_ATTR_DTIM_PERIOD, params->dtim_period) ||
+	    nl80211_put_dtim_period(msg, params->dtim_period) ||
 	    nla_put(msg, NL80211_ATTR_SSID, params->ssid_len, params->ssid))
 		goto fail;
 	if (params->proberesp && params->proberesp_len) {
@@ -3695,7 +3706,7 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 					   "nl80211: Frequency set succeeded for ht2040 coex");
 				bss->bandwidth = params->freq->bandwidth;
 			}
-		} else if (!beacon_set) {
+		} else if (!beacon_set && params->freq) {
 			/*
 			 * cfg80211 updates the driver on frequence change in AP
 			 * mode only at the point when beaconing is started, so
@@ -3777,6 +3788,12 @@ static int nl80211_put_freq_params(struct nl_msg *msg,
 		wpa_printf(MSG_DEBUG, "  * channel_type=%d", ct);
 		if (nla_put_u32(msg, NL80211_ATTR_WIPHY_CHANNEL_TYPE, ct))
 			return -ENOBUFS;
+	} else {
+		wpa_printf(MSG_DEBUG, "  * channel_type=%d",
+			   NL80211_CHAN_NO_HT);
+		if (nla_put_u32(msg, NL80211_ATTR_WIPHY_CHANNEL_TYPE,
+				NL80211_CHAN_NO_HT))
+			return -ENOBUFS;
 	}
 	return 0;
 }
@@ -3839,11 +3856,11 @@ static u32 sta_flags_nl80211(int flags)
 static u32 sta_plink_state_nl80211(enum mesh_plink_state state)
 {
 	switch (state) {
-	case PLINK_LISTEN:
+	case PLINK_IDLE:
 		return NL80211_PLINK_LISTEN;
-	case PLINK_OPEN_SENT:
+	case PLINK_OPN_SNT:
 		return NL80211_PLINK_OPN_SNT;
-	case PLINK_OPEN_RCVD:
+	case PLINK_OPN_RCVD:
 		return NL80211_PLINK_OPN_RCVD;
 	case PLINK_CNF_RCVD:
 		return NL80211_PLINK_CNF_RCVD;
@@ -4032,6 +4049,15 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 			if (!(params->flags & WPA_STA_ASSOCIATED))
 				upd.mask |= BIT(NL80211_STA_FLAG_ASSOCIATED);
 		}
+#ifdef CONFIG_MESH
+	} else {
+		if (params->plink_state == PLINK_ESTAB && params->peer_aid) {
+			ret = nla_put_u16(msg, NL80211_ATTR_MESH_PEER_AID,
+					  params->peer_aid);
+			if (ret)
+				goto fail;
+		}
+#endif /* CONFIG_MESH */
 	}
 
 	wpa_printf(MSG_DEBUG, "  * flags set=0x%x mask=0x%x",
@@ -8391,7 +8417,8 @@ static int nl80211_join_mesh(struct i802_bss *bss,
 	    nl80211_put_freq_params(msg, &params->freq) ||
 	    nl80211_put_basic_rates(msg, params->basic_rates) ||
 	    nl80211_put_mesh_id(msg, params->meshid, params->meshid_len) ||
-	    nl80211_put_beacon_int(msg, params->beacon_int))
+	    nl80211_put_beacon_int(msg, params->beacon_int) ||
+	    nl80211_put_dtim_period(msg, params->dtim_period))
 		goto fail;
 
 	wpa_printf(MSG_DEBUG, "  * flags=%08X", params->flags);
@@ -9117,6 +9144,89 @@ static int nl80211_set_prob_oper_freq(void *priv, unsigned int freq)
 	return 0;
 }
 
+
+static int nl80211_p2p_lo_start(void *priv, unsigned int freq,
+				unsigned int period, unsigned int interval,
+				unsigned int count, const u8 *device_types,
+				size_t dev_types_len,
+				const u8 *ies, size_t ies_len)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+	struct nlattr *container;
+	int ret;
+
+	wpa_printf(MSG_DEBUG,
+		   "nl80211: Start P2P Listen offload: freq=%u, period=%u, interval=%u, count=%u",
+		   freq, period, interval, count);
+
+	if (!(drv->capa.flags & WPA_DRIVER_FLAGS_P2P_LISTEN_OFFLOAD))
+		return -1;
+
+	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_VENDOR)) ||
+	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_QCA) ||
+	    nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD,
+			QCA_NL80211_VENDOR_SUBCMD_P2P_LISTEN_OFFLOAD_START))
+		goto fail;
+
+	container = nla_nest_start(msg, NL80211_ATTR_VENDOR_DATA);
+	if (!container)
+		goto fail;
+
+	if (nla_put_u32(msg, QCA_WLAN_VENDOR_ATTR_P2P_LISTEN_OFFLOAD_CHANNEL,
+			freq) ||
+	    nla_put_u32(msg, QCA_WLAN_VENDOR_ATTR_P2P_LISTEN_OFFLOAD_PERIOD,
+			period) ||
+	    nla_put_u32(msg, QCA_WLAN_VENDOR_ATTR_P2P_LISTEN_OFFLOAD_INTERVAL,
+			interval) ||
+	    nla_put_u32(msg, QCA_WLAN_VENDOR_ATTR_P2P_LISTEN_OFFLOAD_COUNT,
+			count) ||
+	    nla_put(msg, QCA_WLAN_VENDOR_ATTR_P2P_LISTEN_OFFLOAD_DEVICE_TYPES,
+		    dev_types_len, device_types) ||
+	    nla_put(msg, QCA_WLAN_VENDOR_ATTR_P2P_LISTEN_OFFLOAD_VENDOR_IE,
+		    ies_len, ies))
+		goto fail;
+
+	nla_nest_end(msg, container);
+	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
+	msg = NULL;
+	if (ret) {
+		wpa_printf(MSG_DEBUG,
+			   "nl80211: Failed to send P2P Listen offload vendor command");
+		goto fail;
+	}
+
+	return 0;
+
+fail:
+	nlmsg_free(msg);
+	return -1;
+}
+
+
+static int nl80211_p2p_lo_stop(void *priv)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+
+	wpa_printf(MSG_DEBUG, "nl80211: Stop P2P Listen offload");
+
+	if (!(drv->capa.flags & WPA_DRIVER_FLAGS_P2P_LISTEN_OFFLOAD))
+		return -1;
+
+	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_VENDOR)) ||
+	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_QCA) ||
+	    nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD,
+			QCA_NL80211_VENDOR_SUBCMD_P2P_LISTEN_OFFLOAD_STOP)) {
+		nlmsg_free(msg);
+		return -1;
+	}
+
+	return send_and_recv_msgs(drv, msg, NULL, NULL);
+}
+
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 
 
@@ -9338,9 +9448,6 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.vendor_cmd = nl80211_vendor_cmd,
 	.set_qos_map = nl80211_set_qos_map,
 	.set_wowlan = nl80211_set_wowlan,
-#ifdef CONFIG_DRIVER_NL80211_QCA
-	.roaming = nl80211_roaming,
-#endif /* CONFIG_DRIVER_NL80211_QCA */
 	.set_mac_addr = nl80211_set_mac_addr,
 #ifdef CONFIG_MESH
 	.init_mesh = wpa_driver_nl80211_init_mesh,
@@ -9355,10 +9462,13 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.del_tx_ts = nl80211_del_ts,
 	.get_ifindex = nl80211_get_ifindex,
 #ifdef CONFIG_DRIVER_NL80211_QCA
+	.roaming = nl80211_roaming,
 	.do_acs = wpa_driver_do_acs,
 	.set_band = nl80211_set_band,
 	.get_pref_freq_list = nl80211_get_pref_freq_list,
 	.set_prob_oper_freq = nl80211_set_prob_oper_freq,
+	.p2p_lo_start = nl80211_p2p_lo_start,
+	.p2p_lo_stop = nl80211_p2p_lo_stop,
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 	.configure_data_frame_filters = nl80211_configure_data_frame_filters,
 	.get_ext_capab = nl80211_get_ext_capab,

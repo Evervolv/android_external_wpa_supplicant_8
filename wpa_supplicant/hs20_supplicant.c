@@ -205,8 +205,8 @@ void hs20_put_anqp_req(u32 stypes, const u8 *payload, size_t payload_len,
 }
 
 
-struct wpabuf * hs20_build_anqp_req(u32 stypes, const u8 *payload,
-				    size_t payload_len)
+static struct wpabuf * hs20_build_anqp_req(u32 stypes, const u8 *payload,
+					   size_t payload_len)
 {
 	struct wpabuf *buf;
 
@@ -320,7 +320,7 @@ int hs20_get_icon(struct wpa_supplicant *wpa_s, const u8 *bssid,
 		return -1;
 
 	b64 = base64_encode(&icon->image[offset], size, &b64_size);
-	if (buf_len >= b64_size) {
+	if (b64 && buf_len >= b64_size) {
 		os_memcpy(reply, b64, b64_size);
 		reply_size = b64_size;
 	} else {
@@ -436,14 +436,14 @@ static int hs20_process_icon_binary_file(struct wpa_supplicant *wpa_s,
 			icon->image_len = slen;
 			hs20_remove_duplicate_icons(wpa_s, icon);
 			wpa_msg(wpa_s, MSG_INFO,
-				"RX-HS20-ICON " MACSTR " %s %u",
+				RX_HS20_ICON MACSTR " %s %u",
 				MAC2STR(sa), icon->file_name,
 				(unsigned int) icon->image_len);
 			return 0;
 		}
 	}
 
-	wpa_msg(wpa_s, MSG_INFO, "RX-HS20-ANQP " MACSTR " Icon Binary File",
+	wpa_msg(wpa_s, MSG_INFO, RX_HS20_ANQP MACSTR " Icon Binary File",
 		MAC2STR(sa));
 
 	if (slen < 4) {
@@ -506,7 +506,7 @@ static int hs20_process_icon_binary_file(struct wpa_supplicant *wpa_s,
 	}
 	fclose(f);
 
-	wpa_msg(wpa_s, MSG_INFO, "RX-HS20-ANQP-ICON %s", fname);
+	wpa_msg(wpa_s, MSG_INFO, RX_HS20_ANQP_ICON "%s", fname);
 	return 0;
 }
 
@@ -570,7 +570,7 @@ void hs20_parse_rx_hs20_anqp_resp(struct wpa_supplicant *wpa_s,
 
 	switch (subtype) {
 	case HS20_STYPE_CAPABILITY_LIST:
-		wpa_msg(wpa_s, MSG_INFO, "RX-HS20-ANQP " MACSTR
+		wpa_msg(wpa_s, MSG_INFO, RX_HS20_ANQP MACSTR
 			" HS Capability List", MAC2STR(sa));
 		wpa_hexdump_ascii(MSG_DEBUG, "HS Capability List", pos, slen);
 		if (anqp) {
@@ -580,7 +580,7 @@ void hs20_parse_rx_hs20_anqp_resp(struct wpa_supplicant *wpa_s,
 		}
 		break;
 	case HS20_STYPE_OPERATOR_FRIENDLY_NAME:
-		wpa_msg(wpa_s, MSG_INFO, "RX-HS20-ANQP " MACSTR
+		wpa_msg(wpa_s, MSG_INFO, RX_HS20_ANQP MACSTR
 			" Operator Friendly Name", MAC2STR(sa));
 		wpa_hexdump_ascii(MSG_DEBUG, "oper friendly name", pos, slen);
 		if (anqp) {
@@ -596,7 +596,7 @@ void hs20_parse_rx_hs20_anqp_resp(struct wpa_supplicant *wpa_s,
 				"Metrics value from " MACSTR, MAC2STR(sa));
 			break;
 		}
-		wpa_msg(wpa_s, MSG_INFO, "RX-HS20-ANQP " MACSTR
+		wpa_msg(wpa_s, MSG_INFO, RX_HS20_ANQP MACSTR
 			" WAN Metrics %02x:%u:%u:%u:%u:%u", MAC2STR(sa),
 			pos[0], WPA_GET_LE32(pos + 1), WPA_GET_LE32(pos + 5),
 			pos[9], pos[10], WPA_GET_LE16(pos + 11));
@@ -606,7 +606,7 @@ void hs20_parse_rx_hs20_anqp_resp(struct wpa_supplicant *wpa_s,
 		}
 		break;
 	case HS20_STYPE_CONNECTION_CAPABILITY:
-		wpa_msg(wpa_s, MSG_INFO, "RX-HS20-ANQP " MACSTR
+		wpa_msg(wpa_s, MSG_INFO, RX_HS20_ANQP MACSTR
 			" Connection Capability", MAC2STR(sa));
 		wpa_hexdump_ascii(MSG_DEBUG, "conn capability", pos, slen);
 		if (anqp) {
@@ -616,7 +616,7 @@ void hs20_parse_rx_hs20_anqp_resp(struct wpa_supplicant *wpa_s,
 		}
 		break;
 	case HS20_STYPE_OPERATING_CLASS:
-		wpa_msg(wpa_s, MSG_INFO, "RX-HS20-ANQP " MACSTR
+		wpa_msg(wpa_s, MSG_INFO, RX_HS20_ANQP MACSTR
 			" Operating Class", MAC2STR(sa));
 		wpa_hexdump_ascii(MSG_DEBUG, "Operating Class", pos, slen);
 		if (anqp) {
@@ -626,7 +626,7 @@ void hs20_parse_rx_hs20_anqp_resp(struct wpa_supplicant *wpa_s,
 		}
 		break;
 	case HS20_STYPE_OSU_PROVIDERS_LIST:
-		wpa_msg(wpa_s, MSG_INFO, "RX-HS20-ANQP " MACSTR
+		wpa_msg(wpa_s, MSG_INFO, RX_HS20_ANQP MACSTR
 			" OSU Providers list", MAC2STR(sa));
 		wpa_s->num_prov_found++;
 		if (anqp) {
@@ -703,6 +703,8 @@ static void hs20_osu_fetch_done(struct wpa_supplicant *wpa_s)
 		 wpa_s->conf->osu_dir);
 	f = fopen(fname, "w");
 	if (f == NULL) {
+		wpa_msg(wpa_s, MSG_INFO,
+			"Could not write OSU provider information");
 		hs20_free_osu_prov(wpa_s);
 		wpa_s->fetch_anqp_in_progress = 0;
 		return;
@@ -1076,7 +1078,7 @@ static void hs20_osu_scan_res_handler(struct wpa_supplicant *wpa_s,
 }
 
 
-int hs20_fetch_osu(struct wpa_supplicant *wpa_s)
+int hs20_fetch_osu(struct wpa_supplicant *wpa_s, int skip_scan)
 {
 	if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED) {
 		wpa_printf(MSG_DEBUG, "HS 2.0: Cannot start fetch_osu - "
@@ -1107,7 +1109,16 @@ int hs20_fetch_osu(struct wpa_supplicant *wpa_s)
 	wpa_msg(wpa_s, MSG_INFO, "Starting OSU provisioning information fetch");
 	wpa_s->num_osu_scans = 0;
 	wpa_s->num_prov_found = 0;
-	hs20_start_osu_scan(wpa_s);
+	if (skip_scan) {
+		wpa_s->network_select = 0;
+		wpa_s->fetch_all_anqp = 1;
+		wpa_s->fetch_osu_info = 1;
+		wpa_s->fetch_osu_icon_in_progress = 0;
+
+		interworking_start_fetch_anqp(wpa_s);
+	} else {
+		hs20_start_osu_scan(wpa_s);
+	}
 
 	return 0;
 }
