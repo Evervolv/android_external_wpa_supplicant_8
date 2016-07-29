@@ -42,8 +42,10 @@ interface INetwork {
 	/** Max number of WEP keys param. */
 	const int WEP_KEYS_MAX_NUM = 4;
 
-	/** Max length of each WEP keys param. */
-	const int WEP_KEY_MAX_LEN = 16;
+	/** Length of each WEP40 keys param. */
+	const int WEP40_KEY_LEN = 5;
+	/** Length of each WEP104 keys param. */
+	const int WEP104_KEY_LEN = 13;
 
 	/** Possble mask of values for KeyMgmt param. */
 	const int KEY_MGMT_MASK_NONE = 0x01;
@@ -141,7 +143,8 @@ interface INetwork {
 
 	/**
 	 * Set WEP key for WEP network.
-	 * Max length of each key is |WEP_KEY_MAX_LEN|.
+	 * Length of each key should be either |WEP40_KEY_LEN| or
+	 * |WEP104_KEY_LEN|.
 	 *
 	 * @param key_idx Index of wep key to be set.
 	 *                Max of |WEP_KEYS_MAX_NUM| keys.
