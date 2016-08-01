@@ -48,15 +48,15 @@ interface INetwork {
 	const int WEP104_KEY_LEN = 13;
 
 	/** Possble mask of values for KeyMgmt param. */
-	const int KEY_MGMT_MASK_NONE = 0x01;
+	const int KEY_MGMT_MASK_WPA_EAP = 0x01;
 	const int KEY_MGMT_MASK_WPA_PSK = 0x02;
-	const int KEY_MGMT_MASK_WPA_EAP = 0x04;
-	const int KEY_MGMT_MASK_IEEE8021X = 0xFF;
+	const int KEY_MGMT_MASK_NONE = 0x04;
+	const int KEY_MGMT_MASK_IEEE8021X = 0x08;
 
 	/** Possble mask of values for Proto param. */
 	const int PROTO_MASK_WPA = 0x01;
 	const int PROTO_MASK_RSN = 0x02;
-	const int PROTO_MASK_OSEN = 0x04;
+	const int PROTO_MASK_OSEN = 0x08;
 
 	/** Possble mask of values for AuthAlg param. */
 	const int AUTH_ALG_MASK_OPEN = 0x01;
@@ -64,15 +64,15 @@ interface INetwork {
 	const int AUTH_ALG_MASK_LEAP = 0x04;
 
 	/** Possble mask of values for GroupCipher param. */
-	const int GROUP_CIPHER_MASK_WEP40 = 0x01;
-	const int GROUP_CIPHER_MASK_WEP104 = 0x02;
-	const int GROUP_CIPHER_MASK_TKIP = 0x04;
-	const int GROUP_CIPHER_MASK_CCMP = 0x08;
+	const int GROUP_CIPHER_MASK_WEP40 = 0x02;
+	const int GROUP_CIPHER_MASK_WEP104 = 0x04;
+	const int GROUP_CIPHER_MASK_TKIP = 0x08;
+	const int GROUP_CIPHER_MASK_CCMP = 0x10;
 
 	/** Possble mask of values for PairwiseCipher param. */
 	const int PAIRWISE_CIPHER_MASK_NONE = 0x01;
-	const int PAIRWISE_CIPHER_MASK_TKIP = 0x02;
-	const int PAIRWISE_CIPHER_MASK_CCMP = 0x04;
+	const int PAIRWISE_CIPHER_MASK_TKIP = 0x08;
+	const int PAIRWISE_CIPHER_MASK_CCMP = 0x10;
 
 	/**
 	 * Retrieves the ID allocated to this network by wpa_supplicant.
