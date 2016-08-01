@@ -133,6 +133,8 @@ void wpas_notify_state_changed(struct wpa_supplicant *wpa_s,
 		     wpa_ssid_txt(wpa_s->current_ssid->ssid,
 				  wpa_s->current_ssid->ssid_len) : "");
 #endif /* ANDROID */
+
+	wpas_binder_notify_state_changed(wpa_s);
 }
 
 
