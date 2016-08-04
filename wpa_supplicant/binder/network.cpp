@@ -113,6 +113,7 @@ android::binder::Status Network::SetSSID(const std::vector<uint8_t> &ssid)
 	}
 	wpa_hexdump_ascii(
 	    MSG_MSGDUMP, "SSID", wpa_ssid->ssid, wpa_ssid->ssid_len);
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -129,6 +130,9 @@ android::binder::Status Network::SetBSSID(const std::vector<uint8_t> &bssid)
 		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
 		    error_msg.c_str());
 	}
+	int prev_bssid_set = wpa_ssid->bssid_set;
+	u8 prev_bssid[ETH_ALEN];
+	os_memcpy(prev_bssid, wpa_ssid->bssid, ETH_ALEN);
 	// Empty array is used to clear out the BSSID value.
 	if (bssid.empty()) {
 		wpa_ssid->bssid_set = 0;
@@ -137,6 +141,11 @@ android::binder::Status Network::SetBSSID(const std::vector<uint8_t> &bssid)
 		os_memcpy(wpa_ssid->bssid, bssid.data(), ETH_ALEN);
 		wpa_ssid->bssid_set = 1;
 		wpa_hexdump(MSG_MSGDUMP, "BSSID", wpa_ssid->bssid, ETH_ALEN);
+	}
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if ((wpa_ssid->bssid_set != prev_bssid_set ||
+	     os_memcmp(wpa_ssid->bssid, prev_bssid, ETH_ALEN) != 0)) {
+		wpas_notify_network_bssid_set_changed(wpa_s, wpa_ssid);
 	}
 	return android::binder::Status::ok();
 }
@@ -147,6 +156,7 @@ android::binder::Status Network::SetScanSSID(bool enable)
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
 	wpa_ssid->scan_ssid = enable ? 1 : 0;
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -165,6 +175,7 @@ android::binder::Status Network::SetKeyMgmt(int32_t key_mgmt_mask)
 	}
 	wpa_ssid->key_mgmt = key_mgmt_mask;
 	wpa_printf(MSG_MSGDUMP, "key_mgmt: 0x%x", wpa_ssid->key_mgmt);
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -182,6 +193,7 @@ android::binder::Status Network::SetProto(int32_t proto_mask)
 	}
 	wpa_ssid->proto = proto_mask;
 	wpa_printf(MSG_MSGDUMP, "proto: 0x%x", wpa_ssid->proto);
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -200,6 +212,7 @@ android::binder::Status Network::SetAuthAlg(int32_t auth_alg_mask)
 	}
 	wpa_ssid->auth_alg = auth_alg_mask;
 	wpa_printf(MSG_MSGDUMP, "auth_alg: 0x%x", wpa_ssid->auth_alg);
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -218,6 +231,7 @@ android::binder::Status Network::SetGroupCipher(int32_t group_cipher_mask)
 	}
 	wpa_ssid->group_cipher = group_cipher_mask;
 	wpa_printf(MSG_MSGDUMP, "group_cipher: 0x%x", wpa_ssid->group_cipher);
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -237,6 +251,7 @@ android::binder::Status Network::SetPairwiseCipher(int32_t pairwise_cipher_mask)
 	wpa_ssid->pairwise_cipher = pairwise_cipher_mask;
 	wpa_printf(
 	    MSG_MSGDUMP, "pairwise_cipher: 0x%x", wpa_ssid->pairwise_cipher);
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -270,6 +285,7 @@ android::binder::Status Network::SetPskPassphrase(const std::string &psk)
 	wpa_hexdump_ascii_key(
 	    MSG_MSGDUMP, "PSK (ASCII passphrase)", (u8 *)wpa_ssid->passphrase,
 	    psk.size());
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -301,6 +317,7 @@ Network::SetWepKey(int key_idx, const std::vector<uint8_t> &wep_key)
 	wpa_hexdump_key(
 	    MSG_MSGDUMP, msg_dump_title.c_str(), wpa_ssid->wep_key[key_idx],
 	    wpa_ssid->wep_key_len[key_idx]);
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -318,6 +335,7 @@ android::binder::Status Network::SetWepTxKeyIdx(int32_t wep_tx_key_idx)
 		    error_msg.c_str());
 	}
 	wpa_ssid->wep_tx_keyidx = wep_tx_key_idx;
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -328,6 +346,7 @@ android::binder::Status Network::SetRequirePMF(bool enable)
 
 	wpa_ssid->ieee80211w =
 	    enable ? MGMT_FRAME_PROTECTION_REQUIRED : NO_MGMT_FRAME_PROTECTION;
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -548,5 +567,25 @@ int Network::isPskPassphraseValid(const std::string &psk)
 		return 1;
 	}
 	return 0;
+}
+
+/**
+ * Reset internal wpa_supplicant state machine state after params update (except
+ * bssid).
+ */
+void Network::resetInternalStateAfterParamsUpdate()
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+
+	wpa_sm_pmksa_cache_flush(wpa_s->wpa, wpa_ssid);
+
+	if (wpa_s->current_ssid == wpa_ssid || wpa_s->current_ssid == NULL) {
+		/*
+		 * Invalidate the EAP session cache if anything in the
+		 * current or previously used configuration changes.
+		 */
+		eapol_sm_invalidate_cached_session(wpa_s->eapol);
+	}
 }
 } // namespace wpa_supplicant_binder

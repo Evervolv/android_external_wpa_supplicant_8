@@ -17,8 +17,11 @@
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
-#include "../config.h"
-#include "../wpa_supplicant_i.h"
+#include "config.h"
+#include "wpa_supplicant_i.h"
+#include "notify.h"
+#include "eapol_supp/eapol_supp_sm.h"
+#include "rsn_supp/wpa.h"
 }
 
 namespace wpa_supplicant_binder {
@@ -84,6 +87,7 @@ private:
 	struct wpa_ssid *retrieveNetworkPtr();
 	struct wpa_supplicant *retrieveIfacePtr();
 	int isPskPassphraseValid(const std::string &psk);
+	void resetInternalStateAfterParamsUpdate();
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
 	// the lifetime of the process.
