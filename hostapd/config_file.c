@@ -636,8 +636,7 @@ hostapd_parse_radius_attr(const char *value)
 }
 
 
-static int hostapd_parse_das_client(struct hostapd_bss_config *bss,
-				    const char *val)
+static int hostapd_parse_das_client(struct hostapd_bss_config *bss, char *val)
 {
 	char *secret;
 
@@ -645,7 +644,7 @@ static int hostapd_parse_das_client(struct hostapd_bss_config *bss,
 	if (secret == NULL)
 		return -1;
 
-	secret++;
+	*secret++ = '\0';
 
 	if (hostapd_parse_ip_addr(val, &bss->radius_das_client_addr))
 		return -1;
@@ -2411,6 +2410,9 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		bss->radius_das_time_window = atoi(pos);
 	} else if (os_strcmp(buf, "radius_das_require_event_timestamp") == 0) {
 		bss->radius_das_require_event_timestamp = atoi(pos);
+	} else if (os_strcmp(buf, "radius_das_require_message_authenticator") ==
+		   0) {
+		bss->radius_das_require_message_authenticator = atoi(pos);
 #endif /* CONFIG_NO_RADIUS */
 	} else if (os_strcmp(buf, "auth_algs") == 0) {
 		bss->auth_algs = atoi(pos);

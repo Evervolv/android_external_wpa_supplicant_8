@@ -98,7 +98,7 @@ static unsigned int get_mka_param_body_len(const void *body)
 }
 
 
-static int get_mka_param_body_type(const void *body)
+static u8 get_mka_param_body_type(const void *body)
 {
 	const struct ieee802_1x_mka_hdr *hdr = body;
 	return hdr->type;
@@ -532,14 +532,16 @@ ieee802_1x_kay_create_live_peer(struct ieee802_1x_mka_participant *participant,
 	peer->sak_used = FALSE;
 	os_memcpy(&peer->sci, &participant->current_peer_sci,
 		  sizeof(peer->sci));
-	dl_list_add(&participant->live_peers, &peer->list);
 
 	secy_get_available_receive_sc(participant->kay, &sc_ch);
 
 	rxsc = ieee802_1x_kay_init_receive_sc(&peer->sci, sc_ch);
-	if (!rxsc)
+	if (!rxsc) {
+		os_free(peer);
 		return NULL;
+	}
 
+	dl_list_add(&participant->live_peers, &peer->list);
 	dl_list_add(&participant->rxsc_list, &rxsc->list);
 	secy_create_receive_sc(participant->kay, rxsc);
 
@@ -602,6 +604,11 @@ ieee802_1x_kay_move_live_peer(struct ieee802_1x_mka_participant *participant,
 			break;
 	}
 
+	rxsc = ieee802_1x_kay_init_receive_sc(&participant->current_peer_sci,
+					      sc_ch);
+	if (!rxsc)
+		return NULL;
+
 	os_memcpy(&peer->sci, &participant->current_peer_sci,
 		  sizeof(peer->sci));
 	peer->mn = mn;
@@ -617,10 +624,6 @@ ieee802_1x_kay_move_live_peer(struct ieee802_1x_mka_participant *participant,
 	dl_list_add_tail(&participant->live_peers, &peer->list);
 
 	secy_get_available_receive_sc(participant->kay, &sc_ch);
-
-	rxsc = ieee802_1x_kay_init_receive_sc(&peer->sci, sc_ch);
-	if (!rxsc)
-		return NULL;
 
 	dl_list_add(&participant->rxsc_list, &rxsc->list);
 	secy_create_receive_sc(participant->kay, rxsc);
@@ -916,7 +919,7 @@ ieee802_1x_mka_i_in_peerlist(struct ieee802_1x_mka_participant *participant,
 	struct ieee802_1x_mka_hdr *hdr;
 	size_t body_len;
 	size_t left_len;
-	int body_type;
+	u8 body_type;
 	u32 peer_mn;
 	be32 _peer_mn;
 	const u8 *peer_mi;
@@ -997,6 +1000,12 @@ static int ieee802_1x_mka_decode_live_peer_body(
 
 	hdr = (const struct ieee802_1x_mka_hdr *) peer_msg;
 	body_len = get_mka_param_body_len(hdr);
+	if (body_len % 16 != 0) {
+		wpa_printf(MSG_ERROR,
+			   "KaY: MKA Peer Packet Body Length (%zu bytes) should be a multiple of 16 octets",
+			   body_len);
+		return -1;
+	}
 
 	for (i = 0; i < body_len; i += MI_LEN + sizeof(peer_mn)) {
 		peer_mi = MKA_HDR_LEN + peer_msg + i;
@@ -1051,6 +1060,12 @@ ieee802_1x_mka_decode_potential_peer_body(
 
 	hdr = (struct ieee802_1x_mka_hdr *) peer_msg;
 	body_len = get_mka_param_body_len(hdr);
+	if (body_len % 16 != 0) {
+		wpa_printf(MSG_ERROR,
+			   "KaY: MKA Peer Packet Body Length (%zu bytes) should be a multiple of 16 octets",
+			   body_len);
+		return -1;
+	}
 
 	for (i = 0; i < body_len; i += MI_LEN + sizeof(peer_mn)) {
 		peer_mi = MKA_HDR_LEN + peer_msg + i;
@@ -1154,7 +1169,7 @@ ieee802_1x_mka_encode_sak_use_body(
 	u32 pn = 1;
 
 	length = ieee802_1x_mka_get_sak_use_length(participant);
-	body = wpabuf_put(buf, sizeof(struct ieee802_1x_mka_sak_use_body));
+	body = wpabuf_put(buf, length);
 
 	body->type = MKA_SAK_USE;
 	set_mka_param_body_len(body, length - MKA_HDR_LEN);
@@ -1759,7 +1774,7 @@ ieee802_1x_mka_decode_icv_body(struct ieee802_1x_mka_participant *participant,
 	struct ieee802_1x_mka_icv_body *body;
 	size_t body_len;
 	size_t left_len;
-	int body_type;
+	u8 body_type;
 	const u8 *pos;
 
 	pos = mka_msg;
@@ -2097,7 +2112,6 @@ ieee802_1x_kay_elect_key_server(struct ieee802_1x_mka_participant *participant)
 	struct ieee802_1x_kay_peer *key_server = NULL;
 	struct ieee802_1x_kay *kay = participant->kay;
 	Boolean i_is_key_server;
-	int i;
 
 	if (participant->is_obliged_key_server) {
 		participant->new_sak = TRUE;
@@ -2122,11 +2136,9 @@ ieee802_1x_kay_elect_key_server(struct ieee802_1x_mka_participant *participant)
 			key_server = peer;
 		} else if (peer->key_server_priority ==
 			   key_server->key_server_priority) {
-			for (i = 0; i < 6; i++) {
-				if (peer->sci.addr[i] <
-				    key_server->sci.addr[i])
-					key_server = peer;
-			}
+			if (os_memcmp(peer->sci.addr, key_server->sci.addr,
+				      ETH_ALEN) < 0)
+				key_server = peer;
 		}
 	}
 
@@ -2138,20 +2150,12 @@ ieee802_1x_kay_elect_key_server(struct ieee802_1x_mka_participant *participant)
 			i_is_key_server = TRUE;
 		} else if (kay->actor_priority
 					== key_server->key_server_priority) {
-			for (i = 0; i < 6; i++) {
-				if (kay->actor_sci.addr[i]
-					< key_server->sci.addr[i]) {
-					i_is_key_server = TRUE;
-				}
-			}
+			if (os_memcmp(kay->actor_sci.addr, key_server->sci.addr,
+				      ETH_ALEN) < 0)
+				i_is_key_server = TRUE;
 		}
-	}
-
-	if (!key_server && !i_is_key_server) {
-		participant->principal = FALSE;
-		participant->is_key_server = FALSE;
-		participant->is_elected = FALSE;
-		return 0;
+	} else if (participant->can_be_key_server) {
+		i_is_key_server = TRUE;
 	}
 
 	if (i_is_key_server) {
@@ -2172,9 +2176,7 @@ ieee802_1x_kay_elect_key_server(struct ieee802_1x_mka_participant *participant)
 		os_memcpy(&kay->key_server_sci, &kay->actor_sci,
 			  sizeof(kay->key_server_sci));
 		kay->key_server_priority = kay->actor_priority;
-	}
-
-	if (key_server) {
+	} else if (key_server) {
 		ieee802_1x_cp_set_electedself(kay->cp, FALSE);
 		if (os_memcmp(&kay->key_server_sci, &key_server->sci,
 			      sizeof(kay->key_server_sci))) {
@@ -2189,6 +2191,10 @@ ieee802_1x_kay_elect_key_server(struct ieee802_1x_mka_participant *participant)
 		os_memcpy(&kay->key_server_sci, &key_server->sci,
 			  sizeof(kay->key_server_sci));
 		kay->key_server_priority = key_server->key_server_priority;
+	} else {
+		participant->principal = FALSE;
+		participant->is_key_server = FALSE;
+		participant->is_elected = FALSE;
 	}
 
 	return 0;
@@ -2983,7 +2989,7 @@ static int ieee802_1x_kay_decode_mkpdu(struct ieee802_1x_kay *kay,
 	struct ieee802_1x_mka_hdr *hdr;
 	size_t body_len;
 	size_t left_len;
-	int body_type;
+	u8 body_type;
 	int i;
 	const u8 *pos;
 	Boolean my_included;
@@ -3024,9 +3030,12 @@ static int ieee802_1x_kay_decode_mkpdu(struct ieee802_1x_kay *kay,
 		}
 		if (ieee802_1x_kay_is_in_potential_peer(
 			    participant, participant->current_peer_id.mi)) {
-			ieee802_1x_kay_move_live_peer(
-				participant, participant->current_peer_id.mi,
-				be_to_host32(participant->current_peer_id.mn));
+			if (!ieee802_1x_kay_move_live_peer(
+				    participant,
+				    participant->current_peer_id.mi,
+				    be_to_host32(participant->
+						 current_peer_id.mn)))
+				return -1;
 			ieee802_1x_kay_elect_key_server(participant);
 			ieee802_1x_kay_decide_macsec_use(participant);
 		}
@@ -3060,7 +3069,8 @@ static int ieee802_1x_kay_decode_mkpdu(struct ieee802_1x_kay *kay,
 			goto next_para_set;
 
 		handled[body_type] = TRUE;
-		if (mak_body_handler[body_type].body_rx) {
+		if (body_type < ARRAY_SIZE(mak_body_handler) &&
+		    mak_body_handler[body_type].body_rx) {
 			mak_body_handler[body_type].body_rx
 				(participant, pos, left_len);
 		} else {
@@ -3320,7 +3330,7 @@ ieee802_1x_kay_create_mka(struct ieee802_1x_kay *kay, struct mka_key_name *ckn,
 	default:
 		participant->is_obliged_key_server = FALSE;
 		participant->can_be_key_server = TRUE;
-		participant->is_key_server = FALSE;
+		participant->is_key_server = TRUE;
 		participant->is_elected = FALSE;
 		break;
 	}
@@ -3428,6 +3438,7 @@ ieee802_1x_kay_delete_mka(struct ieee802_1x_kay *kay, struct mka_key_name *ckn)
 		return;
 	}
 
+	eloop_cancel_timeout(ieee802_1x_participant_timer, participant, NULL);
 	dl_list_del(&participant->list);
 
 	/* remove live peer */
