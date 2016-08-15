@@ -13,7 +13,6 @@
 namespace wpa_supplicant_binder {
 
 Supplicant::Supplicant(struct wpa_global *global) : wpa_global_(global) {}
-
 android::binder::Status Supplicant::CreateInterface(
     const fi::w1::wpa_supplicant::ParcelableIfaceParams &params,
     android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
@@ -116,8 +115,8 @@ android::binder::Status Supplicant::GetInterface(
 	return android::binder::Status::ok();
 }
 
-android::binder::Status
-Supplicant::SetDebugParams(int level, bool show_timestamp, bool show_keys)
+android::binder::Status Supplicant::SetDebugParams(
+    int level, bool show_timestamp, bool show_keys)
 {
 	int internal_level;
 	if (convertDebugLevelToInternalLevel(level, &internal_level)) {
@@ -148,8 +147,8 @@ android::binder::Status Supplicant::GetDebugLevel(int *level_out)
 	return android::binder::Status::ok();
 }
 
-android::binder::Status
-Supplicant::GetDebugShowTimestamp(bool *show_timestamp_out)
+android::binder::Status Supplicant::GetDebugShowTimestamp(
+    bool *show_timestamp_out)
 {
 	*show_timestamp_out = wpa_debug_timestamp ? true : false;
 	return android::binder::Status::ok();

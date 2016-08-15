@@ -41,66 +41,66 @@ public:
 
 	// Binder methods exposed in aidl.
 	android::binder::Status GetId(int *network_id_out) override;
-	android::binder::Status
-	GetInterfaceName(std::string *ifname_out) override;
+	android::binder::Status GetInterfaceName(
+	    std::string *ifname_out) override;
 	android::binder::Status RegisterCallback(
 	    const android::sp<fi::w1::wpa_supplicant::INetworkCallback>
 		&callback) override;
-	android::binder::Status
-	SetSSID(const std::vector<uint8_t> &ssid) override;
-	android::binder::Status
-	SetBSSID(const std::vector<uint8_t> &bssid) override;
+	android::binder::Status SetSSID(
+	    const std::vector<uint8_t> &ssid) override;
+	android::binder::Status SetBSSID(
+	    const std::vector<uint8_t> &bssid) override;
 	android::binder::Status SetScanSSID(bool enable) override;
 	android::binder::Status SetKeyMgmt(int32_t key_mgmt_mask) override;
 	android::binder::Status SetProto(int32_t proto_mask) override;
 	android::binder::Status SetAuthAlg(int32_t auth_alg_mask) override;
-	android::binder::Status
-	SetGroupCipher(int32_t group_cipher_mask) override;
-	android::binder::Status
-	SetPairwiseCipher(int32_t pairwise_cipher_mask) override;
-	android::binder::Status
-	SetPskPassphrase(const std::string &psk) override;
-	android::binder::Status
-	SetWepKey(int key_idx, const std::vector<uint8_t> &wep_key) override;
+	android::binder::Status SetGroupCipher(
+	    int32_t group_cipher_mask) override;
+	android::binder::Status SetPairwiseCipher(
+	    int32_t pairwise_cipher_mask) override;
+	android::binder::Status SetPskPassphrase(
+	    const std::string &psk) override;
+	android::binder::Status SetWepKey(
+	    int key_idx, const std::vector<uint8_t> &wep_key) override;
 	android::binder::Status SetWepTxKeyIdx(int32_t wep_tx_key_idx) override;
 	android::binder::Status SetRequirePMF(bool enable) override;
 	android::binder::Status SetEapMethod(int32_t method) override;
 	android::binder::Status SetEapPhase2Method(int32_t method) override;
-	android::binder::Status
-	SetEapIdentity(const std::vector<uint8_t> &identity) override;
-	android::binder::Status
-	SetEapAnonymousIdentity(const std::vector<uint8_t> &identity) override;
-	android::binder::Status
-	SetEapPassword(const std::vector<uint8_t> &password) override;
+	android::binder::Status SetEapIdentity(
+	    const std::vector<uint8_t> &identity) override;
+	android::binder::Status SetEapAnonymousIdentity(
+	    const std::vector<uint8_t> &identity) override;
+	android::binder::Status SetEapPassword(
+	    const std::vector<uint8_t> &password) override;
 	android::binder::Status SetEapCACert(const std::string &path) override;
 	android::binder::Status SetEapCAPath(const std::string &path) override;
-	android::binder::Status
-	SetEapClientCert(const std::string &path) override;
-	android::binder::Status
-	SetEapPrivateKey(const std::string &path) override;
-	android::binder::Status
-	SetEapSubjectMatch(const std::string &match) override;
-	android::binder::Status
-	SetEapAltSubjectMatch(const std::string &match) override;
+	android::binder::Status SetEapClientCert(
+	    const std::string &path) override;
+	android::binder::Status SetEapPrivateKey(
+	    const std::string &path) override;
+	android::binder::Status SetEapSubjectMatch(
+	    const std::string &match) override;
+	android::binder::Status SetEapAltSubjectMatch(
+	    const std::string &match) override;
 	android::binder::Status SetEapEngine(bool enable) override;
 	android::binder::Status SetEapEngineID(const std::string &id) override;
-	android::binder::Status
-	SetEapDomainSuffixMatch(const std::string &match) override;
+	android::binder::Status SetEapDomainSuffixMatch(
+	    const std::string &match) override;
 	android::binder::Status GetSSID(std::vector<uint8_t> *ssid) override;
 	android::binder::Status GetBSSID(std::vector<uint8_t> *bssid) override;
 	android::binder::Status GetScanSSID(bool *enable) override;
 	android::binder::Status GetKeyMgmt(int32_t *key_mgmt_mask) override;
 	android::binder::Status GetProto(int32_t *proto_mask) override;
 	android::binder::Status GetAuthAlg(int32_t *auth_alg_mask) override;
-	android::binder::Status
-	GetGroupCipher(int32_t *group_cipher_mask) override;
-	android::binder::Status
-	GetPairwiseCipher(int32_t *pairwise_cipher_mask) override;
+	android::binder::Status GetGroupCipher(
+	    int32_t *group_cipher_mask) override;
+	android::binder::Status GetPairwiseCipher(
+	    int32_t *pairwise_cipher_mask) override;
 	android::binder::Status GetPskPassphrase(std::string *psk) override;
-	android::binder::Status
-	GetWepKey(int key_idx, std::vector<uint8_t> *wep_key) override;
-	android::binder::Status
-	GetWepTxKeyIdx(int32_t *wep_tx_key_idx) override;
+	android::binder::Status GetWepKey(
+	    int key_idx, std::vector<uint8_t> *wep_key) override;
+	android::binder::Status GetWepTxKeyIdx(
+	    int32_t *wep_tx_key_idx) override;
 	android::binder::Status GetRequirePMF(bool *enable) override;
 	android::binder::Status Enable(bool no_connect) override;
 	android::binder::Status Disable() override;
@@ -140,6 +140,6 @@ private:
 	DISALLOW_COPY_AND_ASSIGN(Network);
 };
 
-} // namespace wpa_supplicant_binder
+}  // namespace wpa_supplicant_binder
 
-#endif // WPA_SUPPLICANT_BINDER_NETWORK_H
+#endif  // WPA_SUPPLICANT_BINDER_NETWORK_H

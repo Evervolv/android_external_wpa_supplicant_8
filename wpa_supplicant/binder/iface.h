@@ -63,6 +63,6 @@ private:
 	DISALLOW_COPY_AND_ASSIGN(Iface);
 };
 
-} // namespace wpa_supplicant_binder
+}  // namespace wpa_supplicant_binder
 
-#endif // WPA_SUPPLICANT_BINDER_IFACE_H
+#endif  // WPA_SUPPLICANT_BINDER_IFACE_H
