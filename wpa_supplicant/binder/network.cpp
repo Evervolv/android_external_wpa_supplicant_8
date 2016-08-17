@@ -108,8 +108,7 @@ android::binder::Status Network::SetSSID(const std::vector<uint8_t> &ssid)
 		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
 		    error_msg.c_str());
 	}
-
-	android::binder::Status status = setByteArrayKeyFieldAndResetState(
+	android::binder::Status status = setByteArrayFieldAndResetState(
 	    ssid.data(), ssid.size(), &(wpa_ssid->ssid), &(wpa_ssid->ssid_len),
 	    "ssid");
 	if (status.isOk() && wpa_ssid->passphrase) {
@@ -722,6 +721,38 @@ android::binder::Status Network::Select()
 	wpa_s->scan_min_time.sec = 0;
 	wpa_s->scan_min_time.usec = 0;
 	wpa_supplicant_select_network(wpa_s, wpa_ssid);
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SendNetworkResponse(
+    int type, const std::string &param)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (type < NETWORK_RSP_UNKNOWN || type > NETWORK_RSP_EXT_CERT_CHECK) {
+		const std::string error_msg =
+		    "Invalid network response type: " + std::to_string(type) +
+		    ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+
+	enum wpa_ctrl_req_type rtype = (enum wpa_ctrl_req_type)type;
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (wpa_supplicant_ctrl_rsp_handle(
+		wpa_s, wpa_ssid, rtype, param.c_str())) {
+		const std::string error_msg =
+		    "Failed handling network response: " +
+		    std::to_string(type) + ".";
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, error_msg.c_str());
+	}
+	eapol_sm_notify_ctrl_response(wpa_s->eapol);
+	wpa_hexdump_ascii(
+	    MSG_DEBUG, "network response param", (const u8 *)param.c_str(),
+	    param.size());
 	return android::binder::Status::ok();
 }
 

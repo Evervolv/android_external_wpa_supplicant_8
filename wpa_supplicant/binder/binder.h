@@ -33,6 +33,9 @@ int wpas_binder_register_network(
 int wpas_binder_unregister_network(
     struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
 int wpas_binder_notify_state_changed(struct wpa_supplicant *wpa_s);
+int wpas_binder_notify_network_request(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid,
+    enum wpa_ctrl_req_type rtype, const char *default_txt);
 #else  /* CONFIG_CTRL_IFACE_BINDER */
 static inline int wpas_binder_register_interface(struct wpa_supplicant *wpa_s)
 {
@@ -53,6 +56,12 @@ static inline int wpas_binder_unregister_network(
 	return 0;
 }
 static inline int wpas_binder_notify_state_changed(struct wpa_supplicant *wpa_s)
+{
+	return 0;
+}
+static inline int wpas_binder_notify_network_request(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid,
+    enum wpa_ctrl_req_type rtype, const char *default_txt)
 {
 	return 0;
 }
