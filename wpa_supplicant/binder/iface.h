@@ -19,6 +19,7 @@ extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
 #include "wpa_supplicant_i.h"
+#include "driver_i.h"
 }
 
 namespace wpa_supplicant_binder {
@@ -50,6 +51,13 @@ public:
 	android::binder::Status Reassociate() override;
 	android::binder::Status Reconnect() override;
 	android::binder::Status Disconnect() override;
+	android::binder::Status SetPowerSave(bool enable) override;
+	android::binder::Status InitiateTDLSDiscover(
+	    const std::vector<uint8_t> &mac_address) override;
+	android::binder::Status InitiateTDLSSetup(
+	    const std::vector<uint8_t> &mac_address) override;
+	android::binder::Status InitiateTDLSTeardown(
+	    const std::vector<uint8_t> &mac_address) override;
 
 private:
 	struct wpa_supplicant *retrieveIfacePtr();
