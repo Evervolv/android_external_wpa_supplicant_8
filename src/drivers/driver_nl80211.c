@@ -200,6 +200,10 @@ static int nl80211_leave_ibss(struct wpa_driver_nl80211_data *drv,
 
 static int i802_set_iface_flags(struct i802_bss *bss, int up);
 static int nl80211_set_param(void *priv, const char *param);
+#ifdef CONFIG_MESH
+static int nl80211_put_mesh_config(struct nl_msg *msg,
+				   struct wpa_driver_mesh_bss_params *params);
+#endif /* CONFIG_MESH */
 
 
 /* Converts nl80211_chan_width to a common format */
@@ -3480,6 +3484,37 @@ static int nl80211_put_dtim_period(struct nl_msg *msg, int dtim_period)
 }
 
 
+#ifdef CONFIG_MESH
+static int nl80211_set_mesh_config(void *priv,
+				   struct wpa_driver_mesh_bss_params *params)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+	int ret;
+
+	msg = nl80211_drv_msg(drv, 0, NL80211_CMD_SET_MESH_CONFIG);
+	if (!msg)
+		return -1;
+
+	ret = nl80211_put_mesh_config(msg, params);
+	if (ret < 0) {
+		nlmsg_free(msg);
+		return ret;
+	}
+
+	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
+	if (ret) {
+		wpa_printf(MSG_ERROR,
+			   "nl80211: Mesh config set failed: %d (%s)",
+			   ret, strerror(-ret));
+		return ret;
+	}
+	return 0;
+}
+#endif /* CONFIG_MESH */
+
+
 static int wpa_driver_nl80211_set_ap(void *priv,
 				     struct wpa_driver_ap_params *params)
 {
@@ -3493,6 +3528,9 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 	int smps_mode;
 	u32 suites[10], suite;
 	u32 ver;
+#ifdef CONFIG_MESH
+	struct wpa_driver_mesh_bss_params mesh_params;
+#endif /* CONFIG_MESH */
 
 	beacon_set = params->reenable ? 0 : bss->beacon_set;
 
@@ -3587,8 +3625,10 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 		goto fail;
 
 	if (params->key_mgmt_suites & WPA_KEY_MGMT_IEEE8021X_NO_WPA &&
-	    params->pairwise_ciphers & (WPA_CIPHER_WEP104 | WPA_CIPHER_WEP40) &&
-	    nla_put_flag(msg, NL80211_ATTR_CONTROL_PORT_NO_ENCRYPT))
+	    (!params->pairwise_ciphers ||
+	     params->pairwise_ciphers & (WPA_CIPHER_WEP104 | WPA_CIPHER_WEP40)) &&
+	    (nla_put_u16(msg, NL80211_ATTR_CONTROL_PORT_ETHERTYPE, ETH_P_PAE) ||
+	     nla_put_flag(msg, NL80211_ATTR_CONTROL_PORT_NO_ENCRYPT)))
 		goto fail;
 
 	wpa_printf(MSG_DEBUG, "nl80211: pairwise_ciphers=0x%x",
@@ -3716,6 +3756,18 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 			bss->bandwidth = params->freq->bandwidth;
 		}
 	}
+
+#ifdef CONFIG_MESH
+	if (is_mesh_interface(drv->nlmode) && params->ht_opmode != -1) {
+		os_memset(&mesh_params, 0, sizeof(mesh_params));
+		mesh_params.flags |= WPA_DRIVER_MESH_CONF_FLAG_HT_OP_MODE;
+		mesh_params.ht_opmode = params->ht_opmode;
+		ret = nl80211_set_mesh_config(priv, &mesh_params);
+		if (ret < 0)
+			return ret;
+	}
+#endif /* CONFIG_MESH */
+
 	return ret;
 fail:
 	nlmsg_free(msg);
@@ -4382,8 +4434,7 @@ static int nl80211_setup_ap(struct i802_bss *bss)
 				   "nl80211: Failed to subscribe for mgmt frames from SME driver - trying to run without it");
 
 	if (!drv->device_ap_sme && drv->use_monitor &&
-	    nl80211_create_monitor_interface(drv) &&
-	    !drv->device_ap_sme)
+	    nl80211_create_monitor_interface(drv))
 		return -1;
 
 	if (drv->device_ap_sme &&
@@ -4902,6 +4953,14 @@ static int nl80211_connect_common(struct wpa_driver_nl80211_data *drv,
 	}
 
 	if (nla_put_flag(msg, NL80211_ATTR_CONTROL_PORT))
+		return -1;
+
+	if (params->key_mgmt_suite == WPA_KEY_MGMT_IEEE8021X_NO_WPA &&
+	    (params->pairwise_suite == WPA_CIPHER_NONE ||
+	     params->pairwise_suite == WPA_CIPHER_WEP104 ||
+	     params->pairwise_suite == WPA_CIPHER_WEP40) &&
+	    (nla_put_u16(msg, NL80211_ATTR_CONTROL_PORT_ETHERTYPE, ETH_P_PAE) ||
+	     nla_put_flag(msg, NL80211_ATTR_CONTROL_PORT_NO_ENCRYPT)))
 		return -1;
 
 	if (params->mgmt_frame_protection == MGMT_FRAME_PROTECTION_REQUIRED &&
@@ -8404,6 +8463,46 @@ static int nl80211_put_mesh_id(struct nl_msg *msg, const u8 *mesh_id,
 }
 
 
+static int nl80211_put_mesh_config(struct nl_msg *msg,
+				   struct wpa_driver_mesh_bss_params *params)
+{
+	struct nlattr *container;
+
+	container = nla_nest_start(msg, NL80211_ATTR_MESH_CONFIG);
+	if (!container)
+		return -1;
+
+	if (((params->flags & WPA_DRIVER_MESH_CONF_FLAG_AUTO_PLINKS) &&
+	     nla_put_u32(msg, NL80211_MESHCONF_AUTO_OPEN_PLINKS,
+			 params->auto_plinks)) ||
+	    ((params->flags & WPA_DRIVER_MESH_CONF_FLAG_MAX_PEER_LINKS) &&
+	     nla_put_u16(msg, NL80211_MESHCONF_MAX_PEER_LINKS,
+			 params->max_peer_links)))
+		return -1;
+
+	/*
+	 * Set NL80211_MESHCONF_PLINK_TIMEOUT even if user mpm is used because
+	 * the timer could disconnect stations even in that case.
+	 */
+	if ((params->flags & WPA_DRIVER_MESH_CONF_FLAG_PEER_LINK_TIMEOUT) &&
+	    nla_put_u32(msg, NL80211_MESHCONF_PLINK_TIMEOUT,
+			params->peer_link_timeout)) {
+		wpa_printf(MSG_ERROR, "nl80211: Failed to set PLINK_TIMEOUT");
+		return -1;
+	}
+
+	if ((params->flags & WPA_DRIVER_MESH_CONF_FLAG_HT_OP_MODE) &&
+	    nla_put_u16(msg, NL80211_MESHCONF_HT_OPMODE, params->ht_opmode)) {
+		wpa_printf(MSG_ERROR, "nl80211: Failed to set HT_OP_MODE");
+		return -1;
+	}
+
+	nla_nest_end(msg, container);
+
+	return 0;
+}
+
+
 static int nl80211_join_mesh(struct i802_bss *bss,
 			     struct wpa_driver_mesh_join_params *params)
 {
@@ -8448,28 +8547,11 @@ static int nl80211_join_mesh(struct i802_bss *bss,
 		goto fail;
 	nla_nest_end(msg, container);
 
-	container = nla_nest_start(msg, NL80211_ATTR_MESH_CONFIG);
-	if (!container)
+	params->conf.flags |= WPA_DRIVER_MESH_CONF_FLAG_AUTO_PLINKS;
+	params->conf.flags |= WPA_DRIVER_MESH_CONF_FLAG_PEER_LINK_TIMEOUT;
+	params->conf.flags |= WPA_DRIVER_MESH_CONF_FLAG_MAX_PEER_LINKS;
+	if (nl80211_put_mesh_config(msg, &params->conf) < 0)
 		goto fail;
-
-	if (!(params->conf.flags & WPA_DRIVER_MESH_CONF_FLAG_AUTO_PLINKS) &&
-	    nla_put_u32(msg, NL80211_MESHCONF_AUTO_OPEN_PLINKS, 0))
-		goto fail;
-	if (nla_put_u16(msg, NL80211_MESHCONF_MAX_PEER_LINKS,
-			params->max_peer_links))
-		goto fail;
-
-	/*
-	 * Set NL80211_MESHCONF_PLINK_TIMEOUT even if user mpm is used because
-	 * the timer could disconnect stations even in that case.
-	 */
-	if (nla_put_u32(msg, NL80211_MESHCONF_PLINK_TIMEOUT,
-			params->conf.peer_link_timeout)) {
-		wpa_printf(MSG_ERROR, "nl80211: Failed to set PLINK_TIMEOUT");
-		goto fail;
-	}
-
-	nla_nest_end(msg, container);
 
 	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
 	msg = NULL;
