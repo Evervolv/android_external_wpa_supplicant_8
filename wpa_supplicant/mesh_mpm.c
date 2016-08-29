@@ -290,7 +290,8 @@ static void mesh_mpm_send_plink_action(struct wpa_supplicant *wpa_s,
 		/* TODO: Add Connected to Mesh Gate/AS subfields */
 		wpabuf_put_u8(buf, info);
 		/* always forwarding & accepting plinks for now */
-		wpabuf_put_u8(buf, 0x1 | 0x8);
+		wpabuf_put_u8(buf, MESH_CAP_ACCEPT_ADDITIONAL_PEER |
+			      MESH_CAP_FORWARDING);
 	} else {	/* Peer closing frame */
 		/* IE: Mesh ID */
 		wpabuf_put_u8(buf, WLAN_EID_MESH_ID);
@@ -649,6 +650,14 @@ static struct sta_info * mesh_mpm_add_peer(struct wpa_supplicant *wpa_s,
 	struct sta_info *sta;
 	int ret;
 
+	if (elems->mesh_config_len >= 7 &&
+	    !(elems->mesh_config[6] & MESH_CAP_ACCEPT_ADDITIONAL_PEER)) {
+		wpa_msg(wpa_s, MSG_DEBUG,
+			"mesh: Ignore a crowded peer " MACSTR,
+			MAC2STR(addr));
+		return NULL;
+	}
+
 	sta = ap_get_sta(data, addr);
 	if (!sta) {
 		sta = ap_sta_add(data, addr);
@@ -793,18 +802,32 @@ static void mesh_mpm_plink_estab(struct wpa_supplicant *wpa_s,
 		MAC2STR(sta->addr));
 
 	if (conf->security & MESH_CONF_SEC_AMPE) {
-		wpa_drv_set_key(wpa_s, WPA_ALG_CCMP, sta->addr, 0, 0,
-				seq, sizeof(seq), sta->mtk, sizeof(sta->mtk));
-		wpa_drv_set_key(wpa_s, WPA_ALG_CCMP, sta->addr, 1, 0,
-				seq, sizeof(seq),
-				sta->mgtk, sizeof(sta->mgtk));
-		wpa_drv_set_key(wpa_s, WPA_ALG_IGTK, sta->addr, 4, 0,
-				seq, sizeof(seq),
-				sta->mgtk, sizeof(sta->mgtk));
+		wpa_hexdump_key(MSG_DEBUG, "mesh: MTK", sta->mtk, sta->mtk_len);
+		wpa_drv_set_key(wpa_s, wpa_cipher_to_alg(conf->pairwise_cipher),
+				sta->addr, 0, 0, seq, sizeof(seq),
+				sta->mtk, sta->mtk_len);
 
-		wpa_hexdump_key(MSG_DEBUG, "mtk:", sta->mtk, sizeof(sta->mtk));
-		wpa_hexdump_key(MSG_DEBUG, "mgtk:",
-				sta->mgtk, sizeof(sta->mgtk));
+		wpa_hexdump_key(MSG_DEBUG, "mesh: RX MGTK Key RSC",
+				sta->mgtk_rsc, sizeof(sta->mgtk_rsc));
+		wpa_hexdump_key(MSG_DEBUG, "mesh: RX MGTK",
+				sta->mgtk, sta->mgtk_len);
+		wpa_drv_set_key(wpa_s, wpa_cipher_to_alg(conf->group_cipher),
+				sta->addr, sta->mgtk_key_id, 0,
+				sta->mgtk_rsc, sizeof(sta->mgtk_rsc),
+				sta->mgtk, sta->mgtk_len);
+
+		if (sta->igtk_len) {
+			wpa_hexdump_key(MSG_DEBUG, "mesh: RX IGTK Key RSC",
+					sta->igtk_rsc, sizeof(sta->igtk_rsc));
+			wpa_hexdump_key(MSG_DEBUG, "mesh: RX IGTK",
+					sta->igtk, sta->igtk_len);
+			wpa_drv_set_key(
+				wpa_s,
+				wpa_cipher_to_alg(conf->mgmt_group_cipher),
+				sta->addr, sta->igtk_key_id, 0,
+				sta->igtk_rsc, sizeof(sta->igtk_rsc),
+				sta->igtk, sta->igtk_len);
+		}
 	}
 
 	wpa_mesh_set_plink_state(wpa_s, sta, PLINK_ESTAB);

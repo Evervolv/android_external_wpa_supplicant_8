@@ -757,9 +757,14 @@ struct ieee80211_ampe_ie {
 	u8 selected_pairwise_suite[4];
 	u8 local_nonce[32];
 	u8 peer_nonce[32];
-	u8 mgtk[16];
-	u8 key_rsc[8];
-	u8 key_expiration[4];
+	/* Followed by
+	 * Key Replay Counter[8] (optional)
+	 *	(only in Mesh Group Key Inform/Acknowledge frames)
+	 * GTKdata[variable] (optional)
+	 *	(MGTK[variable] || Key RSC[8] || GTKExpirationTime[4])
+	 * IGTKdata[variable] (optional)
+	 *	(Key ID[2], IPN[6], IGTK[variable] in IGTK KDE format)
+	 */
 } STRUCT_PACKED;
 
 #ifdef _MSC_VER
@@ -1332,6 +1337,14 @@ enum wifi_display_subelem {
 #define MESH_PATH_PROTOCOL_VENDOR	255
 #define MESH_PATH_METRIC_AIRTIME	1
 #define MESH_PATH_METRIC_VENDOR		255
+/* IEEE 802.11s - Mesh Capability */
+#define MESH_CAP_ACCEPT_ADDITIONAL_PEER	BIT(0)
+#define MESH_CAP_MCCA_SUPPORTED		BIT(1)
+#define MESH_CAP_MCCA_ENABLED		BIT(2)
+#define MESH_CAP_FORWARDING		BIT(3)
+#define MESH_CAP_MBCA_ENABLED		BIT(4)
+#define MESH_CAP_TBTT_ADJUSTING		BIT(5)
+#define MESH_CAP_MESH_PS_LEVEL		BIT(6)
 
 enum plink_action_field {
 	PLINK_OPEN = 1,

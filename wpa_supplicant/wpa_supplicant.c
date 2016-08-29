@@ -2039,6 +2039,16 @@ void ibss_mesh_setup_freq(struct wpa_supplicant *wpa_s,
 			if (chwidth == VHT_CHANWIDTH_80P80MHZ)
 				break;
 		}
+	} else if (ssid->max_oper_chwidth == VHT_CHANWIDTH_160MHZ) {
+		if (freq->freq == 5180) {
+			chwidth = VHT_CHANWIDTH_160MHZ;
+			vht_caps |= VHT_CAP_SUPP_CHAN_WIDTH_160MHZ;
+			seg0 = 50;
+		} else if (freq->freq == 5520) {
+			chwidth = VHT_CHANWIDTH_160MHZ;
+			vht_caps |= VHT_CAP_SUPP_CHAN_WIDTH_160MHZ;
+			seg0 = 114;
+		}
 	}
 
 	if (hostapd_set_freq_params(&vht_freq, mode->mode, freq->freq,
@@ -2291,6 +2301,11 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 	 * element in all cases, it is justifiable to skip it to avoid
 	 * interoperability issues.
 	 */
+	if (ssid->p2p_group)
+		wpa_drv_get_ext_capa(wpa_s, WPA_IF_P2P_CLIENT);
+	else
+		wpa_drv_get_ext_capa(wpa_s, WPA_IF_STATION);
+
 	if (!bss || wpa_bss_get_ie(bss, WLAN_EID_EXT_CAPAB)) {
 		u8 ext_capab[18];
 		int ext_capab_len;
