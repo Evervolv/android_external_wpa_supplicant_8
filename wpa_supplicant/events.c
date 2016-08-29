@@ -1014,8 +1014,10 @@ struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 			continue;
 		}
 
-		if (!bss_is_ess(bss) && !bss_is_pbss(bss)) {
-			wpa_dbg(wpa_s, MSG_DEBUG, "   skip - neither ESS nor PBSS network");
+		if (ssid->mode != IEEE80211_MODE_MESH && !bss_is_ess(bss) &&
+		    !bss_is_pbss(bss)) {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"   skip - not ESS, PBSS, or MBSS");
 			continue;
 		}
 
@@ -1030,6 +1032,14 @@ struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 				"allowed");
 			continue;
 		}
+
+#ifdef CONFIG_MESH
+		if (ssid->mode == IEEE80211_MODE_MESH && ssid->frequency > 0 &&
+		    ssid->frequency != bss->freq) {
+			wpa_dbg(wpa_s, MSG_DEBUG, "   skip - frequency not allowed (mesh)");
+			continue;
+		}
+#endif /* CONFIG_MESH */
 
 		if (!rate_match(wpa_s, bss)) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "   skip - rate sets do "
@@ -1624,6 +1634,14 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 
 	selected = wpa_supplicant_pick_network(wpa_s, &ssid);
 
+#ifdef CONFIG_MESH
+	if (wpa_s->ifmsh) {
+		wpa_msg(wpa_s, MSG_INFO,
+			"Avoiding join because we already joined a mesh group");
+		return 0;
+	}
+#endif /* CONFIG_MESH */
+
 	if (selected) {
 		int skip;
 		skip = !wpa_supplicant_need_to_roam(wpa_s, selected, ssid);
@@ -1652,13 +1670,6 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 		 */
 		return 1;
 	} else {
-#ifdef CONFIG_MESH
-		if (wpa_s->ifmsh) {
-			wpa_msg(wpa_s, MSG_INFO,
-				"Avoiding join because we already joined a mesh group");
-			return 0;
-		}
-#endif /* CONFIG_MESH */
 		wpa_dbg(wpa_s, MSG_DEBUG, "No suitable network found");
 		ssid = wpa_supplicant_pick_new_network(wpa_s);
 		if (ssid) {
@@ -4066,6 +4077,14 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		hostapd_acs_channel_selected(wpa_s->ap_iface->bss[0],
 					     &data->acs_selected_channels);
 #endif /* CONFIG_ACS */
+		break;
+	case EVENT_P2P_LO_STOP:
+#ifdef CONFIG_P2P
+		wpa_s->p2p_lo_started = 0;
+		wpa_msg(wpa_s, MSG_INFO, P2P_EVENT_LISTEN_OFFLOAD_STOP
+			P2P_LISTEN_OFFLOAD_STOP_REASON "reason=%d",
+			data->p2p_lo_stop.reason_code);
+#endif /* CONFIG_P2P */
 		break;
 	default:
 		wpa_msg(wpa_s, MSG_INFO, "Unknown event %d", event);
