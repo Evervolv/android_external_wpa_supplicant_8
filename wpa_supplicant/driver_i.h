@@ -158,6 +158,15 @@ static inline int wpa_drv_set_key(struct wpa_supplicant *wpa_s,
 	return -1;
 }
 
+static inline int wpa_drv_get_seqnum(struct wpa_supplicant *wpa_s,
+				     const u8 *addr, int idx, u8 *seq)
+{
+	if (wpa_s->driver->get_seqnum)
+		return wpa_s->driver->get_seqnum(wpa_s->ifname, wpa_s->drv_priv,
+						 addr, idx, seq);
+	return -1;
+}
+
 static inline int wpa_drv_sta_deauth(struct wpa_supplicant *wpa_s,
 				     const u8 *addr, int reason_code)
 {
@@ -924,6 +933,17 @@ static inline int wpa_drv_configure_frame_filters(struct wpa_supplicant *wpa_s,
 		return -1;
 	return wpa_s->driver->configure_data_frame_filters(wpa_s->drv_priv,
 							   filters);
+}
+
+static inline int wpa_drv_get_ext_capa(struct wpa_supplicant *wpa_s,
+				       enum wpa_driver_if_type type)
+{
+	if (!wpa_s->driver->get_ext_capab)
+		return -1;
+	return wpa_s->driver->get_ext_capab(wpa_s->drv_priv, type,
+					    &wpa_s->extended_capa,
+					    &wpa_s->extended_capa_mask,
+					    &wpa_s->extended_capa_len);
 }
 
 #endif /* DRIVER_I_H */

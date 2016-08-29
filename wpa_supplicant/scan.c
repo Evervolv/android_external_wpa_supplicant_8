@@ -227,10 +227,8 @@ int wpa_supplicant_trigger_scan(struct wpa_supplicant *wpa_s,
 	}
 
 	ctx = wpa_scan_clone_params(params);
-	if (ctx == NULL)
-		return -1;
-
-	if (radio_add_work(wpa_s, 0, "scan", 0, wpas_trigger_scan_cb, ctx) < 0)
+	if (!ctx ||
+	    radio_add_work(wpa_s, 0, "scan", 0, wpas_trigger_scan_cb, ctx) < 0)
 	{
 		wpa_scan_free_params(ctx);
 		wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_SCAN_FAILED "ret=-1");
@@ -437,6 +435,13 @@ static struct wpabuf * wpa_supplicant_extra_ies(struct wpa_supplicant *wpa_s)
 	int wps = 0;
 	enum wps_request_type req_type = WPS_REQ_ENROLLEE_INFO;
 #endif /* CONFIG_WPS */
+
+#ifdef CONFIG_P2P
+	if (wpa_s->p2p_group_interface == P2P_GROUP_INTERFACE_CLIENT)
+		wpa_drv_get_ext_capa(wpa_s, WPA_IF_P2P_CLIENT);
+	else
+#endif /* CONFIG_P2P */
+		wpa_drv_get_ext_capa(wpa_s, WPA_IF_STATION);
 
 	ext_capab_len = wpas_build_ext_capab(wpa_s, ext_capab,
 					     sizeof(ext_capab));
@@ -842,12 +847,10 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 		 * slot for the zero-terminator.
 		 */
 		params.freqs = os_malloc(sizeof(int) * 2);
-		if (params.freqs == NULL) {
-			wpa_dbg(wpa_s, MSG_ERROR, "Memory allocation failed");
-			return;
+		if (params.freqs) {
+			params.freqs[0] = wpa_s->assoc_freq;
+			params.freqs[1] = 0;
 		}
-		params.freqs[0] = wpa_s->assoc_freq;
-		params.freqs[1] = 0;
 
 		/*
 		 * Reset the reattach flag so that we fall back to full scan if
@@ -2613,13 +2616,6 @@ int wpas_sched_scan_plans_set(struct wpa_supplicant *wpa_s, const char *cmd)
 		if (ret <= 0 || ret > 2 || !scan_plan->interval) {
 			wpa_printf(MSG_ERROR,
 				   "Invalid sched scan plan input: %s", token);
-			goto fail;
-		}
-
-		if (!scan_plan->interval) {
-			wpa_printf(MSG_ERROR,
-				   "scan plan %u: Interval cannot be zero",
-				   num);
 			goto fail;
 		}
 
