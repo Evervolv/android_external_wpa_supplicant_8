@@ -161,9 +161,10 @@ static void sme_auth_handle_rrm(struct wpa_supplicant *wpa_s,
 		return;
 	}
 
-	if (!(wpa_s->drv_rrm_flags &
-	      WPA_DRIVER_FLAGS_DS_PARAM_SET_IE_IN_PROBES) ||
-	    !(wpa_s->drv_rrm_flags & WPA_DRIVER_FLAGS_QUIET)) {
+	if (!((wpa_s->drv_rrm_flags &
+	       WPA_DRIVER_FLAGS_DS_PARAM_SET_IE_IN_PROBES) &&
+	      (wpa_s->drv_rrm_flags & WPA_DRIVER_FLAGS_QUIET)) &&
+	    !(wpa_s->drv_rrm_flags & WPA_DRIVER_FLAGS_SUPPORT_RRM)) {
 		wpa_printf(MSG_DEBUG,
 			   "RRM: Insufficient RRM support in driver - do not use RRM");
 		return;
@@ -185,6 +186,9 @@ static void sme_auth_handle_rrm(struct wpa_supplicant *wpa_s,
 	/* Set supported capabilites flags */
 	if (wpa_s->drv_rrm_flags & WPA_DRIVER_FLAGS_TX_POWER_INSERTION)
 		*pos |= WLAN_RRM_CAPS_LINK_MEASUREMENT;
+
+	if (wpa_s->lci)
+		pos[1] |= WLAN_RRM_CAPS_LCI_MEASUREMENT;
 
 	wpa_s->sme.assoc_req_ie_len += rrm_ie_len + 2;
 	wpa_s->rrm.rrm_used = 1;
@@ -555,6 +559,10 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	wpa_supplicant_initiate_eapol(wpa_s);
 	if (old_ssid != wpa_s->current_ssid)
 		wpas_notify_network_changed(wpa_s);
+
+#ifdef CONFIG_HS20
+	hs20_configure_frame_filters(wpa_s);
+#endif /* CONFIG_HS20 */
 
 #ifdef CONFIG_P2P
 	/*

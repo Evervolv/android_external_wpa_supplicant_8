@@ -36,8 +36,7 @@ static void wpa_supplicant_gen_assoc_event(struct wpa_supplicant *wpa_s)
 
 	if (wpa_s->current_ssid == NULL) {
 		wpa_s->current_ssid = ssid;
-		if (wpa_s->current_ssid != NULL)
-			wpas_notify_network_changed(wpa_s);
+		wpas_notify_network_changed(wpa_s);
 	}
 	wpa_supplicant_initiate_eapol(wpa_s);
 	wpa_dbg(wpa_s, MSG_DEBUG, "Already associated with a configured "
@@ -60,10 +59,7 @@ static int wpas_wps_in_use(struct wpa_supplicant *wpa_s,
 
 		wps = 1;
 		*req_type = wpas_wps_get_req_type(ssid);
-		if (!ssid->eap.phase1)
-			continue;
-
-		if (os_strstr(ssid->eap.phase1, "pbc=1"))
+		if (ssid->eap.phase1 && os_strstr(ssid->eap.phase1, "pbc=1"))
 			return 2;
 	}
 
@@ -166,6 +162,8 @@ static void wpas_trigger_scan_cb(struct wpa_radio_work *work, int deinit)
 	if (wpas_update_random_addr_disassoc(wpa_s) < 0) {
 		wpa_msg(wpa_s, MSG_INFO,
 			"Failed to assign random MAC address for a scan");
+		wpa_scan_free_params(params);
+		wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_SCAN_FAILED "ret=-1");
 		radio_work_done(work);
 		return;
 	}
@@ -235,6 +233,7 @@ int wpa_supplicant_trigger_scan(struct wpa_supplicant *wpa_s,
 	if (radio_add_work(wpa_s, 0, "scan", 0, wpas_trigger_scan_cb, ctx) < 0)
 	{
 		wpa_scan_free_params(ctx);
+		wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_SCAN_FAILED "ret=-1");
 		return -1;
 	}
 
@@ -266,8 +265,9 @@ wpa_supplicant_sched_scan_timeout(void *eloop_ctx, void *timeout_ctx)
 }
 
 
-int wpa_supplicant_start_sched_scan(struct wpa_supplicant *wpa_s,
-				    struct wpa_driver_scan_params *params)
+static int
+wpa_supplicant_start_sched_scan(struct wpa_supplicant *wpa_s,
+				struct wpa_driver_scan_params *params)
 {
 	int ret;
 
@@ -282,7 +282,7 @@ int wpa_supplicant_start_sched_scan(struct wpa_supplicant *wpa_s,
 }
 
 
-int wpa_supplicant_stop_sched_scan(struct wpa_supplicant *wpa_s)
+static int wpa_supplicant_stop_sched_scan(struct wpa_supplicant *wpa_s)
 {
 	int ret;
 
@@ -495,6 +495,13 @@ static struct wpabuf * wpa_supplicant_extra_ies(struct wpa_supplicant *wpa_s)
 	if (wpabuf_resize(&extra_ie, 9) == 0)
 		wpas_mbo_scan_ie(wpa_s, extra_ie);
 #endif /* CONFIG_MBO */
+
+	if (wpa_s->vendor_elem[VENDOR_ELEM_PROBE_REQ]) {
+		struct wpabuf *buf = wpa_s->vendor_elem[VENDOR_ELEM_PROBE_REQ];
+
+		if (wpabuf_resize(&extra_ie, wpabuf_len(buf)) == 0)
+			wpabuf_put_buf(extra_ie, buf);
+	}
 
 	return extra_ie;
 }
@@ -1867,8 +1874,8 @@ int wpa_supplicant_filter_bssid_match(struct wpa_supplicant *wpa_s,
 }
 
 
-static void filter_scan_res(struct wpa_supplicant *wpa_s,
-			    struct wpa_scan_results *res)
+void filter_scan_res(struct wpa_supplicant *wpa_s,
+		     struct wpa_scan_results *res)
 {
 	size_t i, j;
 
@@ -1901,7 +1908,7 @@ static void filter_scan_res(struct wpa_supplicant *wpa_s,
 #define DEFAULT_NOISE_FLOOR_2GHZ (-89)
 #define DEFAULT_NOISE_FLOOR_5GHZ (-92)
 
-static void scan_snr(struct wpa_scan_res *res)
+void scan_snr(struct wpa_scan_res *res)
 {
 	if (res->flags & WPA_SCAN_NOISE_INVALID) {
 		res->noise = IS_5GHZ(res->freq) ?
@@ -1985,8 +1992,8 @@ static unsigned int max_vht80_rate(int snr)
 }
 
 
-static void scan_est_throughput(struct wpa_supplicant *wpa_s,
-				struct wpa_scan_res *res)
+void scan_est_throughput(struct wpa_supplicant *wpa_s,
+			 struct wpa_scan_res *res)
 {
 	enum local_hw_capab capab = wpa_s->hw_capab;
 	int rate; /* max legacy rate in 500 kb/s units */

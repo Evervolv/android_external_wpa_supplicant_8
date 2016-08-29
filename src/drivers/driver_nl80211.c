@@ -1989,6 +1989,10 @@ static int nl80211_mgmt_subscribe_non_ap(struct i802_bss *bss)
 	if (nl80211_register_action_frame(bss, (u8 *) "\x05\x05", 2) < 0)
 		ret = -1;
 
+	/* Radio Measurement - Radio Measurement Request */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x05\x00", 2) < 0)
+		ret = -1;
+
 	/* Radio Measurement - Link Measurement Request */
 	if ((drv->capa.rrm_flags & WPA_DRIVER_FLAGS_TX_POWER_INSERTION) &&
 	    (nl80211_register_action_frame(bss, (u8 *) "\x05\x02", 2) < 0))
@@ -2050,6 +2054,49 @@ static int nl80211_register_spurious_class3(struct i802_bss *bss)
 }
 
 
+static int nl80211_action_subscribe_ap(struct i802_bss *bss)
+{
+	int ret = 0;
+
+	/* Public Action frames */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x04", 1) < 0)
+		ret = -1;
+	/* RRM Measurement Report */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x05\x01", 2) < 0)
+		ret = -1;
+	/* RRM Neighbor Report Request */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x05\x04", 2) < 0)
+		ret = -1;
+	/* FT Action frames */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x06", 1) < 0)
+		ret = -1;
+#ifdef CONFIG_IEEE80211W
+	/* SA Query */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x08", 1) < 0)
+		ret = -1;
+#endif /* CONFIG_IEEE80211W */
+	/* Protected Dual of Public Action */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x09", 1) < 0)
+		ret = -1;
+	/* WNM */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x0a", 1) < 0)
+		ret = -1;
+	/* WMM */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x11", 1) < 0)
+		ret = -1;
+#ifdef CONFIG_FST
+	/* FST Action frames */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x12", 1) < 0)
+		ret = -1;
+#endif /* CONFIG_FST */
+	/* Vendor-specific */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x7f", 1) < 0)
+		ret = -1;
+
+	return ret;
+}
+
+
 static int nl80211_mgmt_subscribe_ap(struct i802_bss *bss)
 {
 	static const int stypes[] = {
@@ -2058,7 +2105,6 @@ static int nl80211_mgmt_subscribe_ap(struct i802_bss *bss)
 		WLAN_FC_STYPE_REASSOC_REQ,
 		WLAN_FC_STYPE_DISASSOC,
 		WLAN_FC_STYPE_DEAUTH,
-		WLAN_FC_STYPE_ACTION,
 		WLAN_FC_STYPE_PROBE_REQ,
 /* Beacon doesn't work as mac80211 doesn't currently allow
  * it, but it wouldn't really be the right thing anyway as
@@ -2083,6 +2129,9 @@ static int nl80211_mgmt_subscribe_ap(struct i802_bss *bss)
 		}
 	}
 
+	if (nl80211_action_subscribe_ap(bss))
+		goto out_err;
+
 	if (nl80211_register_spurious_class3(bss))
 		goto out_err;
 
@@ -2105,10 +2154,7 @@ static int nl80211_mgmt_subscribe_ap_dev_sme(struct i802_bss *bss)
 	wpa_printf(MSG_DEBUG, "nl80211: Subscribe to mgmt frames with AP "
 		   "handle %p (device SME)", bss->nl_mgmt);
 
-	if (nl80211_register_frame(bss, bss->nl_mgmt,
-				   (WLAN_FC_TYPE_MGMT << 2) |
-				   (WLAN_FC_STYPE_ACTION << 4),
-				   NULL, 0) < 0)
+	if (nl80211_action_subscribe_ap(bss))
 		goto out_err;
 
 	nl80211_mgmt_handle_register_eloop(bss);
@@ -3877,6 +3923,13 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 				    params->ext_capab_len, params->ext_capab))
 				goto fail;
 		}
+
+		if (is_ap_interface(drv->nlmode) &&
+		    nla_put_u8(msg, NL80211_ATTR_STA_SUPPORT_P2P_PS,
+			       params->support_p2p_ps ?
+			       NL80211_P2P_PS_SUPPORTED :
+			       NL80211_P2P_PS_UNSUPPORTED))
+			goto fail;
 	}
 	if (!params->set) {
 		if (params->aid) {
@@ -4291,7 +4344,8 @@ static int nl80211_setup_ap(struct i802_bss *bss)
 
 	if (drv->device_ap_sme && !drv->use_monitor)
 		if (nl80211_mgmt_subscribe_ap_dev_sme(bss))
-			return -1;
+			wpa_printf(MSG_DEBUG,
+				   "nl80211: Failed to subscribe for mgmt frames from SME driver - trying to run without it");
 
 	if (!drv->device_ap_sme && drv->use_monitor &&
 	    nl80211_create_monitor_interface(drv) &&
@@ -4822,9 +4876,10 @@ static int nl80211_connect_common(struct wpa_driver_nl80211_data *drv,
 
 	if (params->rrm_used) {
 		u32 drv_rrm_flags = drv->capa.rrm_flags;
-		if (!(drv_rrm_flags &
-		      WPA_DRIVER_FLAGS_DS_PARAM_SET_IE_IN_PROBES) ||
-		    !(drv_rrm_flags & WPA_DRIVER_FLAGS_QUIET) ||
+		if ((!((drv_rrm_flags &
+			WPA_DRIVER_FLAGS_DS_PARAM_SET_IE_IN_PROBES) &&
+		       (drv_rrm_flags & WPA_DRIVER_FLAGS_QUIET)) &&
+		     !(drv_rrm_flags & WPA_DRIVER_FLAGS_SUPPORT_RRM)) ||
 		    nla_put_flag(msg, NL80211_ATTR_USE_RRM))
 			return -1;
 	}
@@ -8249,6 +8304,9 @@ static int nl80211_set_mac_addr(void *priv, const u8 *addr)
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	int new_addr = addr != NULL;
 
+	if (TEST_FAIL())
+		return -1;
+
 	if (!addr)
 		addr = drv->perm_addr;
 
@@ -9053,6 +9111,97 @@ static int nl80211_set_prob_oper_freq(void *priv, unsigned int freq)
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 
 
+static int nl80211_write_to_file(const char *name, unsigned int val)
+{
+	int fd, len;
+	char tmp[128];
+
+	fd = open(name, O_RDWR);
+	if (fd < 0) {
+		wpa_printf(MSG_ERROR, "nl80211: Failed to open %s: %s",
+			   name, strerror(errno));
+		return fd;
+	}
+
+	len = os_snprintf(tmp, sizeof(tmp), "%u\n", val);
+	len = write(fd, tmp, len);
+	if (len < 0)
+		wpa_printf(MSG_ERROR, "nl80211: Failed to write to %s: %s",
+			   name, strerror(errno));
+	close(fd);
+
+	return 0;
+}
+
+
+static int nl80211_configure_data_frame_filters(void *priv, u32 filter_flags)
+{
+	struct i802_bss *bss = priv;
+	char path[128];
+	int ret;
+
+	wpa_printf(MSG_DEBUG, "nl80211: Data frame filter flags=0x%x",
+		   filter_flags);
+
+	/* Configure filtering of unicast frame encrypted using GTK */
+	ret = os_snprintf(path, sizeof(path),
+			  "/proc/sys/net/ipv4/conf/%s/drop_unicast_in_l2_multicast",
+			  bss->ifname);
+	if (os_snprintf_error(sizeof(path), ret))
+		return -1;
+
+	ret = nl80211_write_to_file(path,
+				    !!(filter_flags &
+				       WPA_DATA_FRAME_FILTER_FLAG_GTK));
+	if (ret) {
+		wpa_printf(MSG_ERROR,
+			   "nl80211: Failed to set IPv4 unicast in multicast filter");
+		return ret;
+	}
+
+	os_snprintf(path, sizeof(path),
+		    "/proc/sys/net/ipv6/conf/%s/drop_unicast_in_l2_multicast",
+		    bss->ifname);
+	ret = nl80211_write_to_file(path,
+				    !!(filter_flags &
+				       WPA_DATA_FRAME_FILTER_FLAG_GTK));
+
+	if (ret) {
+		wpa_printf(MSG_ERROR,
+			   "nl80211: Failed to set IPv6 unicast in multicast filter");
+		return ret;
+	}
+
+	/* Configure filtering of unicast frame encrypted using GTK */
+	os_snprintf(path, sizeof(path),
+		    "/proc/sys/net/ipv4/conf/%s/drop_gratuitous_arp",
+		    bss->ifname);
+	ret = nl80211_write_to_file(path,
+				    !!(filter_flags &
+				       WPA_DATA_FRAME_FILTER_FLAG_ARP));
+	if (ret) {
+		wpa_printf(MSG_ERROR,
+			   "nl80211: Failed set gratuitous ARP filter");
+		return ret;
+	}
+
+	/* Configure filtering of IPv6 NA frames */
+	os_snprintf(path, sizeof(path),
+		    "/proc/sys/net/ipv6/conf/%s/drop_unsolicited_na",
+		    bss->ifname);
+	ret = nl80211_write_to_file(path,
+				    !!(filter_flags &
+				       WPA_DATA_FRAME_FILTER_FLAG_NA));
+	if (ret) {
+		wpa_printf(MSG_ERROR,
+			   "nl80211: Failed to set unsolicited NA filter");
+		return ret;
+	}
+
+	return 0;
+}
+
+
 const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.name = "nl80211",
 	.desc = "Linux nl80211/cfg80211",
@@ -9169,4 +9318,5 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.get_pref_freq_list = nl80211_get_pref_freq_list,
 	.set_prob_oper_freq = nl80211_set_prob_oper_freq,
 #endif /* CONFIG_DRIVER_NL80211_QCA */
+	.configure_data_frame_filters = nl80211_configure_data_frame_filters,
 };

@@ -478,6 +478,12 @@ static int wpa_config_parse_psk(const struct parse_data *data,
 		}
 		wpa_hexdump_ascii_key(MSG_MSGDUMP, "PSK (ASCII passphrase)",
 				      (u8 *) value, len);
+		if (has_ctrl_char((u8 *) value, len)) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: Invalid passphrase character",
+				   line);
+			return -1;
+		}
 		if (ssid->passphrase && os_strlen(ssid->passphrase) == len &&
 		    os_memcmp(ssid->passphrase, value, len) == 0) {
 			/* No change to the previously configured value */
@@ -2048,7 +2054,8 @@ static const struct parse_data ssid_fields[] = {
 	{ INT(update_identifier) },
 #endif /* CONFIG_HS20 */
 	{ INT_RANGE(mac_addr, 0, 2) },
-	{ INT_RANGE(pbss, 0, 1) },
+	{ INT_RANGE(pbss, 0, 2) },
+	{ INT_RANGE(wps_disabled, 0, 1) },
 };
 
 #undef OFFSET
@@ -2695,14 +2702,15 @@ char * wpa_config_get(struct wpa_ssid *ssid, const char *var)
 		const struct parse_data *field = &ssid_fields[i];
 		if (os_strcmp(var, field->name) == 0) {
 			char *ret = field->writer(field, ssid);
-			if (ret != NULL && (os_strchr(ret, '\r') != NULL ||
-				os_strchr(ret, '\n') != NULL)) {
+
+			if (ret && has_newline(ret)) {
 				wpa_printf(MSG_ERROR,
-					"Found newline in value for %s; "
-					"not returning it", var);
+					   "Found newline in value for %s; not returning it",
+					   var);
 				os_free(ret);
 				ret = NULL;
 			}
+
 			return ret;
 		}
 	}
@@ -2889,6 +2897,8 @@ int wpa_config_set_cred(struct wpa_cred *cred, const char *var,
 
 	if (os_strcmp(var, "password") == 0 &&
 	    os_strncmp(value, "ext:", 4) == 0) {
+		if (has_newline(value))
+			return -1;
 		str_clear_free(cred->password);
 		cred->password = os_strdup(value);
 		cred->ext_password = 1;
@@ -2939,9 +2949,14 @@ int wpa_config_set_cred(struct wpa_cred *cred, const char *var,
 	}
 
 	val = wpa_config_parse_string(value, &len);
-	if (val == NULL) {
+	if (val == NULL ||
+	    (os_strcmp(var, "excluded_ssid") != 0 &&
+	     os_strcmp(var, "roaming_consortium") != 0 &&
+	     os_strcmp(var, "required_roaming_consortium") != 0 &&
+	     has_newline(val))) {
 		wpa_printf(MSG_ERROR, "Line %d: invalid field '%s' string "
 			   "value '%s'.", line, var, value);
+		os_free(val);
 		return -1;
 	}
 
@@ -3750,6 +3765,12 @@ static int wpa_global_config_parse_str(const struct global_parse_data *data,
 		return -1;
 	}
 
+	if (has_newline(pos)) {
+		wpa_printf(MSG_ERROR, "Line %d: invalid %s value with newline",
+			   line, data->name);
+		return -1;
+	}
+
 	tmp = os_strdup(pos);
 	if (tmp == NULL)
 		return -1;
@@ -3788,21 +3809,11 @@ static int wpa_global_config_parse_bin(const struct global_parse_data *data,
 				       struct wpa_config *config, int line,
 				       const char *pos)
 {
-	size_t len;
 	struct wpabuf **dst, *tmp;
 
-	len = os_strlen(pos);
-	if (len & 0x01)
+	tmp = wpabuf_parse_bin(pos);
+	if (!tmp)
 		return -1;
-
-	tmp = wpabuf_alloc(len / 2);
-	if (tmp == NULL)
-		return -1;
-
-	if (hexstr2bin(pos, wpabuf_put(tmp, len / 2), len / 2)) {
-		wpabuf_free(tmp);
-		return -1;
-	}
 
 	dst = (struct wpabuf **) (((u8 *) config) + (long) data->param1);
 	wpabuf_free(*dst);

@@ -36,9 +36,9 @@ static int hostapd_get_sta_tx_rx(struct hostapd_data *hapd,
 		return 0;
 
 	ret = os_snprintf(buf, buflen, "rx_packets=%lu\ntx_packets=%lu\n"
-			  "rx_bytes=%llu\ntx_bytes=%llu\n",
+			  "rx_bytes=%llu\ntx_bytes=%llu\ninactive_msec=%lu\n",
 			  data.rx_packets, data.tx_packets,
-			  data.rx_bytes, data.tx_bytes);
+			  data.rx_bytes, data.tx_bytes, data.inactive_msec);
 	if (os_snprintf_error(buflen, ret))
 		return 0;
 	return ret;
@@ -352,7 +352,10 @@ int hostapd_ctrl_iface_deauthenticate(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_P2P_MANAGER */
 
-	hostapd_drv_sta_deauth(hapd, addr, reason);
+	if (os_strstr(txtaddr, " tx=0"))
+		hostapd_drv_sta_remove(hapd, addr);
+	else
+		hostapd_drv_sta_deauth(hapd, addr, reason);
 	sta = ap_get_sta(hapd, addr);
 	if (sta)
 		ap_sta_deauthenticate(hapd, sta, reason);
@@ -412,13 +415,37 @@ int hostapd_ctrl_iface_disassociate(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_P2P_MANAGER */
 
-	hostapd_drv_sta_disassoc(hapd, addr, reason);
+	if (os_strstr(txtaddr, " tx=0"))
+		hostapd_drv_sta_remove(hapd, addr);
+	else
+		hostapd_drv_sta_disassoc(hapd, addr, reason);
 	sta = ap_get_sta(hapd, addr);
 	if (sta)
 		ap_sta_disassociate(hapd, sta, reason);
 	else if (addr[0] == 0xff)
 		hostapd_free_stas(hapd);
 
+	return 0;
+}
+
+
+int hostapd_ctrl_iface_poll_sta(struct hostapd_data *hapd,
+				const char *txtaddr)
+{
+	u8 addr[ETH_ALEN];
+	struct sta_info *sta;
+
+	wpa_dbg(hapd->msg_ctx, MSG_DEBUG, "CTRL_IFACE POLL_STA %s", txtaddr);
+
+	if (hwaddr_aton(txtaddr, addr))
+		return -1;
+
+	sta = ap_get_sta(hapd, addr);
+	if (!sta)
+		return -1;
+
+	hostapd_drv_poll_client(hapd, hapd->own_addr, addr,
+				sta->flags & WLAN_STA_WMM);
 	return 0;
 }
 
