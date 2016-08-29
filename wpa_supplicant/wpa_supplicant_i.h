@@ -393,11 +393,6 @@ struct wps_ap_info {
 	u8 uuid[WPS_UUID_LEN];
 };
 
-struct wpa_ssid_value {
-	u8 ssid[SSID_MAX_LEN];
-	size_t ssid_len;
-};
-
 #define WPA_FREQ_USED_BY_INFRA_STATION BIT(0)
 #define WPA_FREQ_USED_BY_P2P_CLIENT BIT(1)
 
@@ -1063,6 +1058,13 @@ struct wpa_supplicant {
 	 * the bss_temp_disallowed list for other purposes as well.
 	 */
 	struct dl_list bss_tmp_disallowed;
+
+	/*
+	 * Content of a measurement report element with type 8 (LCI),
+	 * own location.
+	 */
+	struct wpabuf *lci;
+	struct os_reltime lci_time;
 };
 
 
@@ -1168,10 +1170,14 @@ void wpas_rrm_reset(struct wpa_supplicant *wpa_s);
 void wpas_rrm_process_neighbor_rep(struct wpa_supplicant *wpa_s,
 				   const u8 *report, size_t report_len);
 int wpas_rrm_send_neighbor_rep_request(struct wpa_supplicant *wpa_s,
-				       const struct wpa_ssid *ssid,
+				       const struct wpa_ssid_value *ssid,
+				       int lci, int civic,
 				       void (*cb)(void *ctx,
 						  struct wpabuf *neighbor_rep),
 				       void *cb_ctx);
+void wpas_rrm_handle_radio_measurement_request(struct wpa_supplicant *wpa_s,
+					       const u8 *src,
+					       const u8 *frame, size_t len);
 void wpas_rrm_handle_link_measurement_request(struct wpa_supplicant *wpa_s,
 					      const u8 *src,
 					      const u8 *frame, size_t len,
