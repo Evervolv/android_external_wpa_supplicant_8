@@ -1118,13 +1118,19 @@ struct wpa_driver_ap_params {
 };
 
 struct wpa_driver_mesh_bss_params {
-#define WPA_DRIVER_MESH_CONF_FLAG_AUTO_PLINKS	0x00000001
+#define WPA_DRIVER_MESH_CONF_FLAG_AUTO_PLINKS		0x00000001
+#define WPA_DRIVER_MESH_CONF_FLAG_PEER_LINK_TIMEOUT	0x00000002
+#define WPA_DRIVER_MESH_CONF_FLAG_MAX_PEER_LINKS	0x00000004
+#define WPA_DRIVER_MESH_CONF_FLAG_HT_OP_MODE		0x00000008
 	/*
 	 * TODO: Other mesh configuration parameters would go here.
 	 * See NL80211_MESHCONF_* for all the mesh config parameters.
 	 */
 	unsigned int flags;
+	int auto_plinks;
 	int peer_link_timeout;
+	int max_peer_links;
+	u16 ht_opmode;
 };
 
 struct wpa_driver_mesh_join_params {
@@ -1136,7 +1142,6 @@ struct wpa_driver_mesh_join_params {
 	struct hostapd_freq_params freq;
 	int beacon_int;
 	int dtim_period;
-	int max_peer_links;
 	struct wpa_driver_mesh_bss_params conf;
 #define WPA_DRIVER_MESH_FLAG_USER_MPM	0x00000001
 #define WPA_DRIVER_MESH_FLAG_DRIVER_MPM	0x00000002
