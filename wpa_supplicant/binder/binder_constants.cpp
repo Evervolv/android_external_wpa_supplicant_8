@@ -7,22 +7,12 @@
  * See README for more details.
  */
 
-#ifndef BINDER_I_H
-#define BINDER_I_H
+#include "binder_constants.h"
 
-#ifdef _cplusplus
-extern "C" {
-#endif // _cplusplus
+namespace wpa_supplicant_binder {
+namespace binder_constants {
 
-struct wpas_binder_priv
-{
-	int binder_fd;
-	struct wpa_global *global;
-	void *binder_manager;
-};
+const char kServiceName[] = "wpa_supplicant";
 
-#ifdef _cplusplus
-}
-#endif /* _cplusplus */
-
-#endif /* BINDER_I_H */
+} /* namespace binder_constants */
+} /* namespace wpa_supplicant_binder */

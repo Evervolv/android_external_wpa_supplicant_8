@@ -2332,7 +2332,8 @@ wpa_driver_nl80211_finish_drv_init(struct wpa_driver_nl80211_data *drv,
 
 	if (drv->hostapd || bss->static_ap)
 		nlmode = NL80211_IFTYPE_AP;
-	else if (bss->if_dynamic)
+	else if (bss->if_dynamic ||
+		 nl80211_get_ifmode(bss) == NL80211_IFTYPE_MESH_POINT)
 		nlmode = nl80211_get_ifmode(bss);
 	else
 		nlmode = NL80211_IFTYPE_STATION;
@@ -9469,6 +9470,7 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.set_prob_oper_freq = nl80211_set_prob_oper_freq,
 	.p2p_lo_start = nl80211_p2p_lo_start,
 	.p2p_lo_stop = nl80211_p2p_lo_stop,
+	.set_default_scan_ies = nl80211_set_default_scan_ies,
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 	.configure_data_frame_filters = nl80211_configure_data_frame_filters,
 	.get_ext_capab = nl80211_get_ext_capab,

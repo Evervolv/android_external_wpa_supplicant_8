@@ -7,10 +7,15 @@
  * See README for more details.
  */
 
-#include "iface.h"
+#ifndef WPA_SUPPLICANT_BINDER_BINDER_CONSTANTS_H
+#define WPA_SUPPLICANT_BINDER_BINDER_CONSTANTS_H
 
 namespace wpa_supplicant_binder {
+namespace binder_constants {
 
-Iface::Iface(struct wpa_supplicant *wpa_s) : wpa_s_(wpa_s) {}
+extern const char kServiceName[];
 
+} /* namespace binder_constants */
 } /* namespace wpa_supplicant_binder */
+
+#endif /* WPA_SUPPLICANT_BINDER_BINDER_CONSTANTS_H */

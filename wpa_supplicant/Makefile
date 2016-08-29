@@ -110,6 +110,7 @@ OBJS_p += ../src/utils/wpabuf.o
 OBJS_c = wpa_cli.o ../src/common/wpa_ctrl.o
 OBJS_c += ../src/utils/wpa_debug.o
 OBJS_c += ../src/utils/common.o
+OBJS_c += ../src/common/cli.o
 OBJS += wmm_ac.o
 
 ifndef CONFIG_OS
@@ -930,7 +931,11 @@ ifdef CONFIG_NATIVE_WINDOWS
 #dynamic symbol loading that is now used in pcsc_funcs.c
 #LIBS += -lwinscard
 else
+ifdef CONFIG_OSX
+LIBS += -framework PCSC
+else
 LIBS += -lpcsclite -lpthread
+endif
 endif
 endif
 
