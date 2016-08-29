@@ -9,6 +9,7 @@
 #include "utils/includes.h"
 
 #include "utils/common.h"
+#include "utils/module_tests.h"
 #include "crypto/aes_siv.h"
 #include "crypto/aes_wrap.h"
 #include "crypto/aes.h"
@@ -1266,7 +1267,7 @@ static int test_sha1(void)
 }
 
 
-const struct {
+static const struct {
 	char *data;
 	u8 hash[32];
 } tests[] = {
@@ -1290,7 +1291,7 @@ const struct {
 	}
 };
 
-const struct hmac_test {
+static const struct hmac_test {
 	u8 key[80];
 	size_t key_len;
 	u8 data[128];
