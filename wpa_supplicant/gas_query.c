@@ -117,8 +117,6 @@ static const char * gas_result_txt(enum gas_query_result result)
 		return "PEER_ERROR";
 	case GAS_QUERY_INTERNAL_ERROR:
 		return "INTERNAL_ERROR";
-	case GAS_QUERY_CANCELLED:
-		return "CANCELLED";
 	case GAS_QUERY_DELETED_AT_DEINIT:
 		return "DELETED_AT_DEINIT";
 	}
@@ -512,6 +510,14 @@ int gas_query_rx(struct gas_query *gas, const u8 *da, const u8 *sa,
 	if (gas == NULL || len < 4)
 		return -1;
 
+	pos = data;
+	action = *pos++;
+	dialog_token = *pos++;
+
+	if (action != WLAN_PA_GAS_INITIAL_RESP &&
+	    action != WLAN_PA_GAS_COMEBACK_RESP)
+		return -1; /* Not a GAS response */
+
 	prot = categ == WLAN_ACTION_PROTECTED_DUAL;
 	pmf = pmf_in_use(gas->wpa_s, sa);
 	if (prot && !pmf) {
@@ -522,14 +528,6 @@ int gas_query_rx(struct gas_query *gas, const u8 *da, const u8 *sa,
 		wpa_printf(MSG_DEBUG, "GAS: Drop unexpected unprotected GAS frame when PMF is enabled");
 		return 0;
 	}
-
-	pos = data;
-	action = *pos++;
-	dialog_token = *pos++;
-
-	if (action != WLAN_PA_GAS_INITIAL_RESP &&
-	    action != WLAN_PA_GAS_COMEBACK_RESP)
-		return -1; /* Not a GAS response */
 
 	query = gas_query_get_pending(gas, sa, dialog_token);
 	if (query == NULL) {
@@ -696,7 +694,7 @@ static void gas_query_tx_initial_req(struct gas_query *gas,
 			 GAS_QUERY_WAIT_TIME_INITIAL) < 0) {
 		wpa_printf(MSG_DEBUG, "GAS: Failed to send Action frame to "
 			   MACSTR, MAC2STR(query->addr));
-		gas_query_free(query, 1);
+		gas_query_done(gas, query, GAS_QUERY_INTERNAL_ERROR);
 		return;
 	}
 	gas->current = query;
@@ -776,26 +774,10 @@ int gas_query_req(struct gas_query *gas, const u8 *dst, int freq,
 
 	if (radio_add_work(gas->wpa_s, freq, "gas-query", 0, gas_query_start_cb,
 			   query) < 0) {
+		query->req = NULL; /* caller will free this in error case */
 		gas_query_free(query, 1);
 		return -1;
 	}
 
 	return dialog_token;
-}
-
-
-/**
- * gas_query_cancel - Cancel a pending GAS query
- * @gas: GAS query data from gas_query_init()
- * @dst: Destination MAC address for the query
- * @dialog_token: Dialog token from gas_query_req()
- */
-void gas_query_cancel(struct gas_query *gas, const u8 *dst, u8 dialog_token)
-{
-	struct gas_query_pending *query;
-
-	query = gas_query_get_pending(gas, dst, dialog_token);
-	if (query)
-		gas_query_done(gas, query, GAS_QUERY_CANCELLED);
-
 }
