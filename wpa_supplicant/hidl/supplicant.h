@@ -12,65 +12,68 @@
 
 #include <android-base/macros.h>
 
-#include "fi/w1/wpa_supplicant/BnSupplicant.h"
-#include "fi/w1/wpa_supplicant/IIface.h"
-#include "fi/w1/wpa_supplicant/ISupplicantCallback.h"
+#include <android/hardware/wifi/supplicant/1.0/ISupplicant.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantIface.h>
 
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
-#include "../wpa_supplicant_i.h"
+#include "utils/wpa_debug.h"
+#include "wpa_supplicant_i.h"
 }
 
-namespace wpa_supplicant_hidl {
-
+namespace android {
+namespace hardware {
+namespace wifi {
+namespace supplicant {
+namespace V1_0 {
+namespace implementation {
 /**
  * Implementation of the supplicant hidl object. This hidl
  * object is used core for global control operations on
  * wpa_supplicant.
  */
-class Supplicant : public fi::w1::wpa_supplicant::BnSupplicant
+class Supplicant : public android::hardware::wifi::supplicant::V1_0::ISupplicant
 {
 public:
-	Supplicant(struct wpa_global *global);
+	Supplicant(struct wpa_global* global);
 	~Supplicant() override = default;
 
-	// Hidl methods exposed in aidl.
-	android::hidl::Status CreateInterface(
-	    const fi::w1::wpa_supplicant::ParcelableIfaceParams &params,
-	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
-	    override;
-	android::hidl::Status RemoveInterface(
-	    const std::string &ifname) override;
-	android::hidl::Status GetInterface(
-	    const std::string &ifname,
-	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
-	    override;
-	android::hidl::Status SetDebugParams(
-	    int level, bool show_timestamp, bool show_keys) override;
-	android::hidl::Status GetDebugLevel(int *level_out) override;
-	android::hidl::Status GetDebugShowTimestamp(
-	    bool *show_timestamp_out) override;
-	android::hidl::Status GetDebugShowKeys(bool *show_keys_out) override;
-	android::hidl::Status RegisterCallback(
-	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
-		&callback) override;
+	// Hidl methods exposed.
+	Return<void> createInterface(
+	    const hidl_string& ifname, createInterface_cb _hidl_cb) override;
+	Return<void> removeInterface(
+	    const hidl_string& ifname, removeInterface_cb _hidl_cb) override;
+	Return<void> getInterface(
+	    const hidl_string& ifname, getInterface_cb _hidl_cb) override;
+	Return<void> listInterfaces(listInterfaces_cb _hidl_cb) override;
+	Return<void> registerCallback(
+	    const sp<ISupplicantCallback>& callback,
+	    registerCallback_cb _hidl_cb) override;
+	Return<void> setDebugParams(
+	    ISupplicant::DebugLevel level, bool show_timestamp, bool show_keys,
+	    setDebugParams_cb _hidl_cb) override;
+	Return<ISupplicant::DebugLevel> getDebugLevel() override;
+	Return<bool> isDebugShowTimestampEnabled() override;
+	Return<bool> isDebugShowKeysEnabled() override;
 
 private:
-	int convertDebugLevelToInternalLevel(
-	    int external_level, int *internal_level);
-	int convertDebugLevelToExternalLevel(
-	    int internal_level, int *external_level);
-
-	/* Raw pointer to the global structure maintained by the core. */
-	struct wpa_global *wpa_global_;
-	/* All the callback objects registered by the clients. */
-	std::vector<android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>>
-	    callbacks_;
+	// Raw pointer to the global structure maintained by the core.
+	struct wpa_global* wpa_global_;
+	// Driver name to be used for creating interfaces.
+	static const char kDriverName[];
+	// wpa_supplicant.conf file location on the device.
+	static const char kConfigFilePath[];
 
 	DISALLOW_COPY_AND_ASSIGN(Supplicant);
 };
 
-} /* namespace wpa_supplicant_hidl */
+}  // namespace implementation
+}  // namespace V1_0
+}  // namespace wifi
+}  // namespace supplicant
+}  // namespace hardware
+}  // namespace android
 
-#endif /* WPA_SUPPLICANT_HIDL_SUPPLICANT_H */
+#endif  // WPA_SUPPLICANT_HIDL_SUPPLICANT_H
