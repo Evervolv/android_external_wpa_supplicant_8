@@ -1,5 +1,5 @@
 /*
- * binder interface for wpa_supplicant daemon
+ * hidl interface for wpa_supplicant daemon
  * Copyright (c) 2004-2016, Jouni Malinen <j@w1.fi>
  * Copyright (c) 2004-2016, Roshan Pius <rpius@google.com>
  *
@@ -7,8 +7,8 @@
  * See README for more details.
  */
 
-#ifndef WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H
-#define WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H
+#ifndef WPA_SUPPLICANT_HIDL_HIDL_MANAGER_H
+#define WPA_SUPPLICANT_HIDL_HIDL_MANAGER_H
 
 #include <map>
 #include <string>
@@ -24,22 +24,22 @@
 struct wpa_global;
 struct wpa_supplicant;
 
-namespace wpa_supplicant_binder {
+namespace wpa_supplicant_hidl {
 
 /**
- * BinderManager is responsible for managing the lifetime of all
- * binder objects created by wpa_supplicant. This is a singleton
+ * HidlManager is responsible for managing the lifetime of all
+ * hidl objects created by wpa_supplicant. This is a singleton
  * class which is created by the supplicant core and can be used
- * to get references to the binder objects.
+ * to get references to the hidl objects.
  */
-class BinderManager
+class HidlManager
 {
 public:
-	static BinderManager *getInstance();
+	static HidlManager *getInstance();
 	static void destroyInstance();
 
 	// Methods called from wpa_supplicant core.
-	int registerBinderService(struct wpa_global *global);
+	int registerHidlService(struct wpa_global *global);
 	int registerInterface(struct wpa_supplicant *wpa_s);
 	int unregisterInterface(struct wpa_supplicant *wpa_s);
 	int registerNetwork(
@@ -51,91 +51,91 @@ public:
 	    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid, int type,
 	    const char *param);
 
-	// Methods called from binder objects.
-	int getIfaceBinderObjectByIfname(
+	// Methods called from hidl objects.
+	int getIfaceHidlObjectByIfname(
 	    const std::string &ifname,
 	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object);
-	int getNetworkBinderObjectByIfnameAndNetworkId(
+	int getNetworkHidlObjectByIfnameAndNetworkId(
 	    const std::string &ifname, int network_id,
 	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object);
-	int addSupplicantCallbackBinderObject(
+	int addSupplicantCallbackHidlObject(
 	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
 		&callback);
-	int addIfaceCallbackBinderObject(
+	int addIfaceCallbackHidlObject(
 	    const std::string &ifname,
 	    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback>
 		&callback);
-	int addNetworkCallbackBinderObject(
+	int addNetworkCallbackHidlObject(
 	    const std::string &ifname, int network_id,
 	    const android::sp<fi::w1::wpa_supplicant::INetworkCallback>
 		&callback);
 
 private:
-	BinderManager() = default;
-	~BinderManager() = default;
-	BinderManager(const BinderManager &) = default;
-	BinderManager &operator=(const BinderManager &) = default;
+	HidlManager() = default;
+	~HidlManager() = default;
+	HidlManager(const HidlManager &) = default;
+	HidlManager &operator=(const HidlManager &) = default;
 
 	const std::string getNetworkObjectMapKey(
 	    const std::string &ifname, int network_id);
 
-	void removeSupplicantCallbackBinderObject(
+	void removeSupplicantCallbackHidlObject(
 	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
 		&callback);
-	void removeIfaceCallbackBinderObject(
+	void removeIfaceCallbackHidlObject(
 	    const std::string &ifname,
 	    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback>
 		&callback);
-	void removeNetworkCallbackBinderObject(
+	void removeNetworkCallbackHidlObject(
 	    const std::string &ifname, int network_id,
 	    const android::sp<fi::w1::wpa_supplicant::INetworkCallback>
 		&callback);
 	template <class CallbackType>
-	int registerForDeathAndAddCallbackBinderObjectToList(
+	int registerForDeathAndAddCallbackHidlObjectToList(
 	    const android::sp<CallbackType> &callback,
 	    const std::function<void(const android::sp<CallbackType> &)>
-		&on_binder_died_fctor,
+		&on_hidl_died_fctor,
 	    std::vector<android::sp<CallbackType>> &callback_list);
 
 	void callWithEachSupplicantCallback(
-	    const std::function<android::binder::Status(
+	    const std::function<android::hidl::Status(
 		android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>)>
 		&method);
 	void callWithEachIfaceCallback(
 	    const std::string &ifname,
-	    const std::function<android::binder::Status(
+	    const std::function<android::hidl::Status(
 		android::sp<fi::w1::wpa_supplicant::IIfaceCallback>)> &method);
 	void callWithEachNetworkCallback(
 	    const std::string &ifname, int network_id,
-	    const std::function<android::binder::Status(
+	    const std::function<android::hidl::Status(
 		android::sp<fi::w1::wpa_supplicant::INetworkCallback>)>
 		&method);
 
 	// Singleton instance of this class.
-	static BinderManager *instance_;
-	// The main binder service object.
+	static HidlManager *instance_;
+	// The main hidl service object.
 	android::sp<Supplicant> supplicant_object_;
-	// Map of all the interface specific binder objects controlled by
+	// Map of all the interface specific hidl objects controlled by
 	// wpa_supplicant. This map is keyed in by the corresponding
 	// |ifname|.
 	std::map<const std::string, android::sp<Iface>> iface_object_map_;
-	// Map of all the network specific binder objects controlled by
+	// Map of all the network specific hidl objects controlled by
 	// wpa_supplicant. This map is keyed in by the corresponding
 	// |ifname| & |network_id|.
 	std::map<const std::string, android::sp<Network>> network_object_map_;
 
-	// Callback registered for the main binder service object.
+	// Callback registered for the main hidl service object.
 	std::vector<android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>>
 	    supplicant_callbacks_;
 	// Map of all the callbacks registered for interface specific
-	// binder objects controlled by wpa_supplicant.  This map is keyed in by
+	// hidl objects controlled by wpa_supplicant.  This map is keyed in by
 	// the corresponding |ifname|.
 	std::map<
 	    const std::string,
 	    std::vector<android::sp<fi::w1::wpa_supplicant::IIfaceCallback>>>
 	    iface_callbacks_map_;
 	// Map of all the callbacks registered for network specific
-	// binder objects controlled by wpa_supplicant.  This map is keyed in by
+	// hidl objects controlled by wpa_supplicant.  This map is keyed in by
 	// the corresponding |ifname| & |network_id|.
 	std::map<
 	    const std::string,
@@ -145,40 +145,40 @@ private:
 	/**
 	 * Helper class used to deregister the callback object reference from
 	 * our
-	 * callback list on the death of the binder object.
-	 * This class stores a reference of the callback binder object and a
-	 * function to be called to indicate the death of the binder object.
+	 * callback list on the death of the hidl object.
+	 * This class stores a reference of the callback hidl object and a
+	 * function to be called to indicate the death of the hidl object.
 	 */
 	template <class CallbackType>
 	class CallbackObjectDeathNotifier
-	    : public android::IBinder::DeathRecipient
+	    : public android::IHidl::DeathRecipient
 	{
 	public:
 		CallbackObjectDeathNotifier(
 		    const android::sp<CallbackType> &callback,
 		    const std::function<void(const android::sp<CallbackType> &)>
-			&on_binder_died)
-		    : callback_(callback), on_binder_died_(on_binder_died)
+			&on_hidl_died)
+		    : callback_(callback), on_hidl_died_(on_hidl_died)
 		{
 		}
-		void binderDied(
-		    const android::wp<android::IBinder> & /* who */) override
+		void hidlDied(
+		    const android::wp<android::IHidl> & /* who */) override
 		{
-			on_binder_died_(callback_);
+			on_hidl_died_(callback_);
 		}
 
 	private:
-		// The callback binder object reference.
+		// The callback hidl object reference.
 		const android::sp<CallbackType> callback_;
-		// Callback function to be called when the binder dies.
+		// Callback function to be called when the hidl dies.
 		const std::function<void(const android::sp<CallbackType> &)>
-		    on_binder_died_;
+		    on_hidl_died_;
 	};
 };
 
-// The binder interface uses some values which are the same as internal ones to
-// avoid nasty runtime conversion functions.  So, adding compile time asserts
-// to guard against any internal changes breaking the binder interface.
+// The hidl interface uses some values which are the same as internal ones to
+// avoid nasty runtime conversion functions. So, adding compile time asserts
+// to guard against any internal changes breaking the hidl interface.
 static_assert(
     fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_NONE == WPA_KEY_MGMT_NONE,
     "KeyMgmt value mismatch");
@@ -263,5 +263,5 @@ static_assert(
     WPA_CTRL_REQ_EXT_CERT_CHECK ==
 	fi::w1::wpa_supplicant::INetworkCallback::NETWORK_REQ_EXT_CERT_CHECK,
     "Network Req value mismatch");
-}  // namespace wpa_supplicant_binder
-#endif  // WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H
+}  // namespace wpa_supplicant_hidl
+#endif  // WPA_SUPPLICANT_HIDL_HIDL_MANAGER_H

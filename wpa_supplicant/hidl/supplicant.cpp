@@ -1,5 +1,5 @@
 /*
- * binder interface for wpa_supplicant daemon
+ * hidl interface for wpa_supplicant daemon
  * Copyright (c) 2004-2016, Jouni Malinen <j@w1.fi>
  * Copyright (c) 2004-2016, Roshan Pius <rpius@google.com>
  *
@@ -7,20 +7,21 @@
  * See README for more details.
  */
 
-#include "binder_manager.h"
 #include "supplicant.h"
+#include "hidl_manager.h"
+#include "../src/utils/wpa_debug.h"
 
-namespace wpa_supplicant_binder {
+namespace wpa_supplicant_hidl {
 
 Supplicant::Supplicant(struct wpa_global *global) : wpa_global_(global) {}
-android::binder::Status Supplicant::CreateInterface(
+android::hidl::Status Supplicant::CreateInterface(
     const fi::w1::wpa_supplicant::ParcelableIfaceParams &params,
     android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 {
 	/* Check if required Ifname argument is missing */
 	if (params.ifname_.isEmpty()) {
-		return android::binder::Status::fromExceptionCode(
-		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		return android::hidl::Status::fromExceptionCode(
+		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
 		    "Ifname missing in params.");
 	}
 	/*
@@ -29,12 +30,12 @@ android::binder::Status Supplicant::CreateInterface(
 	 */
 	if (wpa_supplicant_get_iface(wpa_global_, params.ifname_.string()) !=
 	    NULL) {
-		return android::binder::Status::fromServiceSpecificError(
+		return android::hidl::Status::fromServiceSpecificError(
 		    ERROR_IFACE_EXISTS,
 		    "wpa_supplicant already controls this interface.");
 	}
 
-	android::binder::Status status;
+	android::hidl::Status status;
 	struct wpa_supplicant *wpa_s = NULL;
 	struct wpa_interface iface;
 
@@ -45,24 +46,24 @@ android::binder::Status Supplicant::CreateInterface(
 	iface.bridge_ifname = os_strdup(params.bridge_ifname_.string());
 	/* Otherwise, have wpa_supplicant attach to it. */
 	wpa_s = wpa_supplicant_add_iface(wpa_global_, &iface, NULL);
-	/* The supplicant core creates a corresponding binder object via
-	 * BinderManager when |wpa_supplicant_add_iface| is called. */
+	/* The supplicant core creates a corresponding hidl object via
+	 * HidlManager when |wpa_supplicant_add_iface| is called. */
 	if (!wpa_s) {
-		status = android::binder::Status::fromServiceSpecificError(
+		status = android::hidl::Status::fromServiceSpecificError(
 		    ERROR_GENERIC,
 		    "wpa_supplicant couldn't grab this interface.");
 	} else {
-		BinderManager *binder_manager = BinderManager::getInstance();
+		HidlManager *hidl_manager = HidlManager::getInstance();
 
-		if (!binder_manager ||
-		    binder_manager->getIfaceBinderObjectByIfname(
+		if (!hidl_manager ||
+		    hidl_manager->getIfaceHidlObjectByIfname(
 			wpa_s->ifname, iface_object_out)) {
 			status =
-			    android::binder::Status::fromServiceSpecificError(
+			    android::hidl::Status::fromServiceSpecificError(
 				ERROR_GENERIC,
-				"wpa_supplicant encountered a binder error.");
+				"wpa_supplicant encountered a hidl error.");
 		} else {
-			status = android::binder::Status::ok();
+			status = android::hidl::Status::ok();
 		}
 	}
 	os_free((void *)iface.driver);
@@ -72,25 +73,25 @@ android::binder::Status Supplicant::CreateInterface(
 	return status;
 }
 
-android::binder::Status Supplicant::RemoveInterface(const std::string &ifname)
+android::hidl::Status Supplicant::RemoveInterface(const std::string &ifname)
 {
 	struct wpa_supplicant *wpa_s;
 
 	wpa_s = wpa_supplicant_get_iface(wpa_global_, ifname.c_str());
 	if (!wpa_s) {
-		return android::binder::Status::fromServiceSpecificError(
+		return android::hidl::Status::fromServiceSpecificError(
 		    ERROR_IFACE_UNKNOWN,
 		    "wpa_supplicant does not control this interface.");
 	}
 	if (wpa_supplicant_remove_iface(wpa_global_, wpa_s, 0)) {
-		return android::binder::Status::fromServiceSpecificError(
+		return android::hidl::Status::fromServiceSpecificError(
 		    ERROR_GENERIC,
 		    "wpa_supplicant couldn't remove this interface.");
 	}
-	return android::binder::Status::ok();
+	return android::hidl::Status::ok();
 }
 
-android::binder::Status Supplicant::GetInterface(
+android::hidl::Status Supplicant::GetInterface(
     const std::string &ifname,
     android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 {
@@ -98,45 +99,51 @@ android::binder::Status Supplicant::GetInterface(
 
 	wpa_s = wpa_supplicant_get_iface(wpa_global_, ifname.c_str());
 	if (!wpa_s) {
-		return android::binder::Status::fromServiceSpecificError(
+		return android::hidl::Status::fromServiceSpecificError(
 		    ERROR_IFACE_UNKNOWN,
 		    "wpa_supplicant does not control this interface.");
 	}
 
-	BinderManager *binder_manager = BinderManager::getInstance();
-	if (!binder_manager ||
-	    binder_manager->getIfaceBinderObjectByIfname(
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager ||
+	    hidl_manager->getIfaceHidlObjectByIfname(
 		wpa_s->ifname, iface_object_out)) {
-		return android::binder::Status::fromServiceSpecificError(
+		return android::hidl::Status::fromServiceSpecificError(
 		    ERROR_GENERIC,
-		    "wpa_supplicant encountered a binder error.");
+		    "wpa_supplicant encountered a hidl error.");
 	}
 
-	return android::binder::Status::ok();
+	return android::hidl::Status::ok();
 }
 
-android::binder::Status Supplicant::SetDebugParams(
+android::hidl::Status Supplicant::SetDebugParams(
     int level, bool show_timestamp, bool show_keys)
 {
 	int internal_level;
 	if (convertDebugLevelToInternalLevel(level, &internal_level)) {
 		const std::string error_msg =
 		    "invalid debug level: " + std::to_string(level);
-		return android::binder::Status::fromExceptionCode(
-		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		return android::hidl::Status::fromExceptionCode(
+		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
 		    error_msg.c_str());
 	}
 	if (wpa_supplicant_set_debug_params(
+<<<<<<< 390ba2881ef621db480848b7e50b93d61542206a:wpa_supplicant/binder/supplicant.cpp
 		wpa_global_, internal_level, show_timestamp, show_keys)) {
 		return android::binder::Status::fromServiceSpecificError(
+=======
+		wpa_global_, level, show_timestamp, show_keys)) {
+		return android::hidl::Status::fromServiceSpecificError(
+>>>>>>> wpa_supplicant: HIDL implementation (1/2):wpa_supplicant/hidl/supplicant.cpp
 		    ERROR_GENERIC,
 		    "wpa_supplicant could not set debug params.");
 	}
-	return android::binder::Status::ok();
+	return android::hidl::Status::ok();
 }
 
-android::binder::Status Supplicant::GetDebugLevel(int *level_out)
+android::hidl::Status Supplicant::GetDebugLevel(int *level_out)
 {
+<<<<<<< 390ba2881ef621db480848b7e50b93d61542206a:wpa_supplicant/binder/supplicant.cpp
 	if (convertDebugLevelToExternalLevel(wpa_debug_level, level_out)) {
 		const std::string error_msg =
 		    "invalid debug level: " + std::to_string(wpa_debug_level);
@@ -145,33 +152,38 @@ android::binder::Status Supplicant::GetDebugLevel(int *level_out)
 		    error_msg.c_str());
 	}
 	return android::binder::Status::ok();
+=======
+	*level_out = wpa_debug_level;
+	return android::hidl::Status::ok();
+>>>>>>> wpa_supplicant: HIDL implementation (1/2):wpa_supplicant/hidl/supplicant.cpp
 }
 
-android::binder::Status Supplicant::GetDebugShowTimestamp(
+android::hidl::Status Supplicant::GetDebugShowTimestamp(
     bool *show_timestamp_out)
 {
 	*show_timestamp_out = wpa_debug_timestamp ? true : false;
-	return android::binder::Status::ok();
+	return android::hidl::Status::ok();
 }
 
-android::binder::Status Supplicant::GetDebugShowKeys(bool *show_keys_out)
+android::hidl::Status Supplicant::GetDebugShowKeys(bool *show_keys_out)
 {
 	*show_keys_out = wpa_debug_show_keys ? true : false;
-	return android::binder::Status::ok();
+	return android::hidl::Status::ok();
 }
 
-android::binder::Status Supplicant::RegisterCallback(
+android::hidl::Status Supplicant::RegisterCallback(
     const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback> &callback)
 {
-	BinderManager *binder_manager = BinderManager::getInstance();
-	if (!binder_manager ||
-	    binder_manager->addSupplicantCallbackBinderObject(callback)) {
-		return android::binder::Status::fromServiceSpecificError(
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager ||
+	    hidl_manager->addSupplicantCallbackHidlObject(callback)) {
+		return android::hidl::Status::fromServiceSpecificError(
 		    ERROR_GENERIC,
-		    "wpa_supplicant encountered a binder error.");
+		    "wpa_supplicant encountered a hidl error.");
 	}
-	return android::binder::Status::ok();
+	return android::hidl::Status::ok();
 }
+<<<<<<< 390ba2881ef621db480848b7e50b93d61542206a:wpa_supplicant/binder/supplicant.cpp
 
 /**
  * Helper function to convert the debug level parameter from the binder
@@ -241,3 +253,6 @@ int Supplicant::convertDebugLevelToExternalLevel(
 	}
 }
 } /* namespace wpa_supplicant_binder */
+=======
+} /* namespace wpa_supplicant_hidl */
+>>>>>>> wpa_supplicant: HIDL implementation (1/2):wpa_supplicant/hidl/supplicant.cpp

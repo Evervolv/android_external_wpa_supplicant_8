@@ -1,5 +1,5 @@
 /*
- * binder interface for wpa_supplicant daemon
+ * hidl interface for wpa_supplicant daemon
  * Copyright (c) 2004-2016, Jouni Malinen <j@w1.fi>
  * Copyright (c) 2004-2016, Roshan Pius <rpius@google.com>
  *
@@ -7,8 +7,8 @@
  * See README for more details.
  */
 
-#ifndef WPA_SUPPLICANT_BINDER_SUPPLICANT_H
-#define WPA_SUPPLICANT_BINDER_SUPPLICANT_H
+#ifndef WPA_SUPPLICANT_HIDL_SUPPLICANT_H
+#define WPA_SUPPLICANT_HIDL_SUPPLICANT_H
 
 #include <android-base/macros.h>
 
@@ -22,10 +22,10 @@ extern "C" {
 #include "../wpa_supplicant_i.h"
 }
 
-namespace wpa_supplicant_binder {
+namespace wpa_supplicant_hidl {
 
 /**
- * Implementation of the supplicant binder object. This binder
+ * Implementation of the supplicant hidl object. This hidl
  * object is used core for global control operations on
  * wpa_supplicant.
  */
@@ -35,24 +35,24 @@ public:
 	Supplicant(struct wpa_global *global);
 	~Supplicant() override = default;
 
-	// Binder methods exposed in aidl.
-	android::binder::Status CreateInterface(
+	// Hidl methods exposed in aidl.
+	android::hidl::Status CreateInterface(
 	    const fi::w1::wpa_supplicant::ParcelableIfaceParams &params,
 	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 	    override;
-	android::binder::Status RemoveInterface(
+	android::hidl::Status RemoveInterface(
 	    const std::string &ifname) override;
-	android::binder::Status GetInterface(
+	android::hidl::Status GetInterface(
 	    const std::string &ifname,
 	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 	    override;
-	android::binder::Status SetDebugParams(
+	android::hidl::Status SetDebugParams(
 	    int level, bool show_timestamp, bool show_keys) override;
-	android::binder::Status GetDebugLevel(int *level_out) override;
-	android::binder::Status GetDebugShowTimestamp(
+	android::hidl::Status GetDebugLevel(int *level_out) override;
+	android::hidl::Status GetDebugShowTimestamp(
 	    bool *show_timestamp_out) override;
-	android::binder::Status GetDebugShowKeys(bool *show_keys_out) override;
-	android::binder::Status RegisterCallback(
+	android::hidl::Status GetDebugShowKeys(bool *show_keys_out) override;
+	android::hidl::Status RegisterCallback(
 	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
 		&callback) override;
 
@@ -71,6 +71,6 @@ private:
 	DISALLOW_COPY_AND_ASSIGN(Supplicant);
 };
 
-} /* namespace wpa_supplicant_binder */
+} /* namespace wpa_supplicant_hidl */
 
-#endif /* WPA_SUPPLICANT_BINDER_SUPPLICANT_H */
+#endif /* WPA_SUPPLICANT_HIDL_SUPPLICANT_H */
