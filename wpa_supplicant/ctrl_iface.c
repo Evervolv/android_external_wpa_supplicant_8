@@ -511,6 +511,12 @@ static int wpa_supplicant_ctrl_iface_set(struct wpa_supplicant *wpa_s,
 		wpa_s->test_failure = atoi(value);
 	} else if (os_strcasecmp(cmd, "p2p_go_csa_on_inv") == 0) {
 		wpa_s->p2p_go_csa_on_inv = !!atoi(value);
+	} else if (os_strcasecmp(cmd, "ignore_auth_resp") == 0) {
+		wpa_s->ignore_auth_resp = !!atoi(value);
+	} else if (os_strcasecmp(cmd, "ignore_assoc_disallow") == 0) {
+		wpa_s->ignore_assoc_disallow = !!atoi(value);
+	} else if (os_strcasecmp(cmd, "reject_btm_req_reason") == 0) {
+		wpa_s->reject_btm_req_reason = atoi(value);
 #endif /* CONFIG_TESTING_OPTIONS */
 #ifndef CONFIG_NO_CONFIG_BLOBS
 	} else if (os_strcmp(cmd, "blob") == 0) {
@@ -1885,6 +1891,10 @@ static int wpa_supplicant_ctrl_iface_status(struct wpa_supplicant *wpa_s,
 				ret = os_snprintf(pos, end - pos,
 						  "mode=P2P GO - group "
 						  "formation\n");
+				break;
+			case WPAS_MODE_MESH:
+				ret = os_snprintf(pos, end - pos,
+						  "mode=mesh\n");
 				break;
 			default:
 				ret = 0;
@@ -7195,6 +7205,9 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 	wpa_s->extra_roc_dur = 0;
 	wpa_s->test_failure = WPAS_TEST_FAILURE_NONE;
 	wpa_s->p2p_go_csa_on_inv = 0;
+	wpa_s->ignore_auth_resp = 0;
+	wpa_s->ignore_assoc_disallow = 0;
+	wpa_s->reject_btm_req_reason = 0;
 	wpa_sm_set_test_assoc_ie(wpa_s->wpa, NULL);
 #endif /* CONFIG_TESTING_OPTIONS */
 
@@ -8551,10 +8564,7 @@ static int wpas_ctrl_iface_mac_rand_scan(struct wpa_supplicant *wpa_s,
 			}
 		} else if (wpa_s->sched_scanning &&
 			   (type & MAC_ADDR_RAND_SCHED_SCAN)) {
-			/* simulate timeout to restart the sched scan */
-			wpa_s->sched_scan_timed_out = 1;
-			wpa_s->prev_sched_ssid = NULL;
-			wpa_supplicant_cancel_sched_scan(wpa_s);
+			wpas_scan_restart_sched_scan(wpa_s);
 		}
 		return 0;
 	}
@@ -8580,12 +8590,8 @@ static int wpas_ctrl_iface_mac_rand_scan(struct wpa_supplicant *wpa_s,
 		wpas_mac_addr_rand_scan_set(wpa_s, MAC_ADDR_RAND_SCHED_SCAN,
 					    addr, mask);
 
-		if (wpa_s->sched_scanning && !wpa_s->pno) {
-			/* simulate timeout to restart the sched scan */
-			wpa_s->sched_scan_timed_out = 1;
-			wpa_s->prev_sched_ssid = NULL;
-			wpa_supplicant_cancel_sched_scan(wpa_s);
-		}
+		if (wpa_s->sched_scanning && !wpa_s->pno)
+			wpas_scan_restart_sched_scan(wpa_s);
 	}
 
 	if (type & MAC_ADDR_RAND_PNO) {

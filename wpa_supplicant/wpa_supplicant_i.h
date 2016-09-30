@@ -1023,7 +1023,10 @@ struct wpa_supplicant {
 	struct l2_packet_data *l2_test;
 	unsigned int extra_roc_dur;
 	enum wpa_supplicant_test_failure test_failure;
+	unsigned int reject_btm_req_reason;
 	unsigned int p2p_go_csa_on_inv:1;
+	unsigned int ignore_auth_resp:1;
+	unsigned int ignore_assoc_disallow:1;
 #endif /* CONFIG_TESTING_OPTIONS */
 
 	struct wmm_ac_assoc_data *wmm_ac_assoc_info;
@@ -1047,7 +1050,6 @@ struct wpa_supplicant {
 		enum mbo_non_pref_chan_reason reason;
 		u8 oper_class;
 		u8 chan;
-		u8 reason_detail;
 		u8 preference;
 	} *non_pref_chan;
 	size_t non_pref_chan_num;
