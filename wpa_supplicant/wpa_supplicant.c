@@ -192,7 +192,9 @@ static void wpa_supplicant_timeout(void *eloop_ctx, void *timeout_ctx)
 {
 	struct wpa_supplicant *wpa_s = eloop_ctx;
 	const u8 *bssid = wpa_s->bssid;
-	if (is_zero_ether_addr(bssid))
+	if (!is_zero_ether_addr(wpa_s->pending_bssid) &&
+	    (wpa_s->wpa_state == WPA_AUTHENTICATING ||
+	     wpa_s->wpa_state == WPA_ASSOCIATING))
 		bssid = wpa_s->pending_bssid;
 	wpa_msg(wpa_s, MSG_INFO, "Authentication with " MACSTR " timed out.",
 		MAC2STR(bssid));
@@ -2173,7 +2175,10 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 	} else {
 		wpa_msg(wpa_s, MSG_INFO, "Trying to associate with SSID '%s'",
 			wpa_ssid_txt(ssid->ssid, ssid->ssid_len));
-		os_memset(wpa_s->pending_bssid, 0, ETH_ALEN);
+		if (bss)
+			os_memcpy(wpa_s->pending_bssid, bss->bssid, ETH_ALEN);
+		else
+			os_memset(wpa_s->pending_bssid, 0, ETH_ALEN);
 	}
 	if (!wpa_s->pno)
 		wpa_supplicant_cancel_sched_scan(wpa_s);
@@ -2702,12 +2707,12 @@ void wpa_supplicant_deauthenticate(struct wpa_supplicant *wpa_s,
 		MAC2STR(wpa_s->bssid), MAC2STR(wpa_s->pending_bssid),
 		reason_code, wpa_supplicant_state_txt(wpa_s->wpa_state));
 
-	if (!is_zero_ether_addr(wpa_s->bssid))
-		addr = wpa_s->bssid;
-	else if (!is_zero_ether_addr(wpa_s->pending_bssid) &&
-		 (wpa_s->wpa_state == WPA_AUTHENTICATING ||
-		  wpa_s->wpa_state == WPA_ASSOCIATING))
+	if (!is_zero_ether_addr(wpa_s->pending_bssid) &&
+	    (wpa_s->wpa_state == WPA_AUTHENTICATING ||
+	     wpa_s->wpa_state == WPA_ASSOCIATING))
 		addr = wpa_s->pending_bssid;
+	else if (!is_zero_ether_addr(wpa_s->bssid))
+		addr = wpa_s->bssid;
 	else if (wpa_s->wpa_state == WPA_ASSOCIATING) {
 		/*
 		 * When using driver-based BSS selection, we may not know the
@@ -3012,6 +3017,7 @@ void wpa_supplicant_select_network(struct wpa_supplicant *wpa_s,
 	if (wpa_s->connect_without_scan ||
 	    wpa_supplicant_fast_associate(wpa_s) != 1) {
 		wpa_s->scan_req = NORMAL_SCAN_REQ;
+		wpas_scan_reset_sched_scan(wpa_s);
 		wpa_supplicant_req_scan(wpa_s, 0, disconnected ? 100000 : 0);
 	}
 
@@ -3371,6 +3377,13 @@ void wpa_supplicant_rx_eapol(void *ctx, const u8 *src_addr,
 
 	wpa_dbg(wpa_s, MSG_DEBUG, "RX EAPOL from " MACSTR, MAC2STR(src_addr));
 	wpa_hexdump(MSG_MSGDUMP, "RX EAPOL", buf, len);
+
+#ifdef CONFIG_TESTING_OPTIONS
+	if (wpa_s->ignore_auth_resp) {
+		wpa_printf(MSG_INFO, "RX EAPOL - ignore_auth_resp active!");
+		return;
+	}
+#endif /* CONFIG_TESTING_OPTIONS */
 
 #ifdef CONFIG_PEERKEY
 	if (wpa_s->wpa_state > WPA_ASSOCIATED && wpa_s->current_ssid &&
