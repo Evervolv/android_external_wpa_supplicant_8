@@ -1101,6 +1101,10 @@ struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 			continue;
 		}
 #ifdef CONFIG_MBO
+#ifdef CONFIG_TESTING_OPTIONS
+		if (wpa_s->ignore_assoc_disallow)
+			goto skip_assoc_disallow;
+#endif /* CONFIG_TESTING_OPTIONS */
 		assoc_disallow = wpas_mbo_get_bss_attr(
 			bss, MBO_ATTR_ID_ASSOC_DISALLOW);
 		if (assoc_disallow && assoc_disallow[1] >= 1) {
@@ -1115,6 +1119,9 @@ struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 				"   skip - MBO retry delay has not passed yet");
 			continue;
 		}
+#ifdef CONFIG_TESTING_OPTIONS
+	skip_assoc_disallow:
+#endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_MBO */
 
 		/* Matching configuration found */
@@ -3445,6 +3452,13 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		sme_event_auth(wpa_s, data);
 		break;
 	case EVENT_ASSOC:
+#ifdef CONFIG_TESTING_OPTIONS
+		if (wpa_s->ignore_auth_resp) {
+			wpa_printf(MSG_INFO,
+				   "EVENT_ASSOC - ignore_auth_resp active!");
+			break;
+		}
+#endif /* CONFIG_TESTING_OPTIONS */
 		wpa_supplicant_event_assoc(wpa_s, data);
 		if (data && data->assoc_info.authorized)
 			wpa_supplicant_event_assoc_auth(wpa_s, data);
@@ -3459,6 +3473,13 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 				    data ? &data->disassoc_info : NULL);
 		break;
 	case EVENT_DEAUTH:
+#ifdef CONFIG_TESTING_OPTIONS
+		if (wpa_s->ignore_auth_resp) {
+			wpa_printf(MSG_INFO,
+				   "EVENT_DEAUTH - ignore_auth_resp active!");
+			break;
+		}
+#endif /* CONFIG_TESTING_OPTIONS */
 		wpas_event_deauth(wpa_s,
 				  data ? &data->deauth_info : NULL);
 		break;
@@ -3959,6 +3980,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 				wpa_s, WLAN_REASON_DEAUTH_LEAVING, 1);
 		}
 		wpa_supplicant_mark_disassoc(wpa_s);
+		wpa_bss_flush(wpa_s);
 		radio_remove_works(wpa_s, NULL, 0);
 
 		wpa_supplicant_set_state(wpa_s, WPA_INTERFACE_DISABLED);
