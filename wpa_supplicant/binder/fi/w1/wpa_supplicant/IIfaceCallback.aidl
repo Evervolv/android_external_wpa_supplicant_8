@@ -19,4 +19,17 @@ package fi.w1.wpa_supplicant;
  */
 @utf8InCpp
 interface IIfaceCallback {
+	/**
+	 * Used to indicate that a new network has been added.
+	 *
+	 * @param id Network ID allocated to the corresponding network.
+	 */
+	oneway void OnNetworkAdded(int id);
+
+	/**
+	 * Used to indicate that a network has been removed.
+	 *
+	 * @param id Network ID allocated to the corresponding network.
+	 */
+	oneway void OnNetworkRemoved(int network_id);
 }
