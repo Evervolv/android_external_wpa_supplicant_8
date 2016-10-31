@@ -1655,6 +1655,7 @@ LOCAL_C_INCLUDES = \
     $(LOCAL_PATH)/binder/include
 LOCAL_SRC_FILES := \
     binder/binder_constants.cpp \
+    binder/parcelable_iface_params.cpp \
     binder/fi/w1/wpa_supplicant/IIface.aidl \
     binder/fi/w1/wpa_supplicant/INetwork.aidl \
     binder/fi/w1/wpa_supplicant/ISupplicant.aidl \
