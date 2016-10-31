@@ -35,24 +35,26 @@ public:
 	int registerBinderService(struct wpa_global *global);
 	int registerInterface(struct wpa_supplicant *wpa_s);
 	int unregisterInterface(struct wpa_supplicant *wpa_s);
-	int getIfaceBinderObjectByKey(
-	    const void *iface_object_key,
+	int getIfaceBinderObjectByIfname(
+	    const std::string &ifname,
 	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object);
 
 private:
 	BinderManager() = default;
 	~BinderManager() = default;
+	BinderManager(const BinderManager &) = default;
+	BinderManager &operator=(const BinderManager &) = default;
 
-	/* Singleton instance of this class. */
+	// Singleton instance of this class.
 	static BinderManager *instance_;
-	/* The main binder service object. */
+	// The main binder service object.
 	android::sp<Supplicant> supplicant_object_;
-	/* Map of all the interface specific binder objects controlled by
-	 * wpa_supplicant. This map is keyed in by the corresponding
-	 * wpa_supplicant structure pointer. */
-	std::map<const void *, android::sp<Iface>> iface_object_map_;
+	// Map of all the interface specific binder objects controlled by
+	// wpa_supplicant. This map is keyed in by the corresponding
+	// |ifname|.
+	std::map<const std::string, android::sp<Iface>> iface_object_map_;
 };
 
-} /* namespace wpa_supplicant_binder */
+} // namespace wpa_supplicant_binder
 
-#endif /* WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H */
+#endif // WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H
