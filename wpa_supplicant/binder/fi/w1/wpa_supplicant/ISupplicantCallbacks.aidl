@@ -16,5 +16,6 @@ import android.os.PersistableBundle;
  * to host an instance of this binder object and pass a reference of the object
  * to wpa_supplicant via the registerCallbacksObject method.
  */
+@utf8InCpp
 interface ISupplicantCallbacks {
 }
