@@ -7,8 +7,8 @@
  * See README for more details.
  */
 
-#include "supplicant.h"
 #include "binder_manager.h"
+#include "supplicant.h"
 
 namespace wpa_supplicant_binder {
 
@@ -158,6 +158,19 @@ Supplicant::GetDebugShowTimestamp(bool *show_timestamp_out)
 android::binder::Status Supplicant::GetDebugShowKeys(bool *show_keys_out)
 {
 	*show_keys_out = wpa_debug_show_keys ? true : false;
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Supplicant::RegisterCallback(
+    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback> &callback)
+{
+	BinderManager *binder_manager = BinderManager::getInstance();
+	if (!binder_manager ||
+	    binder_manager->addSupplicantCallbackBinderObject(callback)) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC,
+		    "wpa_supplicant encountered a binder error.");
+	}
 	return android::binder::Status::ok();
 }
 
