@@ -21,11 +21,7 @@ namespace wpa_supplicant_binder {
 
 BinderManager *BinderManager::instance_ = NULL;
 
-<<<<<<< 7cfb967dde32a14e227bee3b36eee1b36d1f8d0a
 BinderManager *BinderManager::getInstance()
-=======
-BinderManager * BinderManager::getInstance()
->>>>>>> binder: Expose an aidl interface module
 {
 	if (!instance_)
 		instance_ = new BinderManager();
