@@ -167,3 +167,23 @@ int wpas_binder_notify_state_changed(struct wpa_supplicant *wpa_s)
 
 	return binder_manager->notifyStateChange(wpa_s);
 }
+
+int wpas_binder_notify_network_request(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid,
+    enum wpa_ctrl_req_type rtype, const char *default_txt)
+{
+	if (!wpa_s || !wpa_s->global->binder || !ssid)
+		return 1;
+
+	wpa_printf(
+	    MSG_DEBUG, "Notifying network request to binder control: %d",
+	    ssid->id);
+
+	wpa_supplicant_binder::BinderManager *binder_manager =
+	    wpa_supplicant_binder::BinderManager::getInstance();
+	if (!binder_manager)
+		return 1;
+
+	return binder_manager->notifyNetworkRequest(
+	    wpa_s, ssid, rtype, default_txt);
+}
