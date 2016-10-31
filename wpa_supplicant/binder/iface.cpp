@@ -121,6 +121,49 @@ android::binder::Status Iface::RegisterCallback(
 	return android::binder::Status::ok();
 }
 
+android::binder::Status Iface::Reassociate()
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	RETURN_IF_IFACE_INVALID(wpa_s);
+
+	if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_IFACE_DISABLED);
+	}
+	wpas_request_connection(wpa_s);
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Iface::Reconnect()
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	RETURN_IF_IFACE_INVALID(wpa_s);
+
+	if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_IFACE_DISABLED);
+	}
+	if (!wpa_s->disconnected) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_IFACE_NOT_DISCONNECTED);
+	}
+	wpas_request_connection(wpa_s);
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Iface::Disconnect()
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	RETURN_IF_IFACE_INVALID(wpa_s);
+
+	if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_IFACE_DISABLED);
+	}
+	wpas_request_disconnection(wpa_s);
+	return android::binder::Status::ok();
+}
+
 /**
  * Retrieve the underlying |wpa_supplicant| struct pointer for
  * this iface.
