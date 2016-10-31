@@ -328,8 +328,10 @@ void wpas_notify_network_added(struct wpa_supplicant *wpa_s,
 	 * applications since these network objects won't behave like
 	 * regular ones.
 	 */
-	if (!ssid->p2p_group && wpa_s->global->p2p_group_formation != wpa_s)
+	if (!ssid->p2p_group && wpa_s->global->p2p_group_formation != wpa_s) {
 		wpas_dbus_register_network(wpa_s, ssid);
+		wpas_binder_register_network(wpa_s, ssid);
+	}
 }
 
 
@@ -359,8 +361,10 @@ void wpas_notify_network_removed(struct wpa_supplicant *wpa_s,
 	if (wpa_s->wpa)
 		wpa_sm_pmksa_cache_flush(wpa_s->wpa, ssid);
 	if (!ssid->p2p_group && wpa_s->global->p2p_group_formation != wpa_s &&
-	    !wpa_s->p2p_mgmt)
+	    !wpa_s->p2p_mgmt) {
 		wpas_dbus_unregister_network(wpa_s, ssid->id);
+		wpas_binder_unregister_network(wpa_s, ssid);
+	}
 	if (network_is_persistent_group(ssid))
 		wpas_notify_persistent_group_removed(wpa_s, ssid);
 

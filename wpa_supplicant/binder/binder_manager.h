@@ -14,6 +14,7 @@
 #include <string>
 
 #include "iface.h"
+#include "network.h"
 #include "supplicant.h"
 
 struct wpa_global;
@@ -32,18 +33,29 @@ class BinderManager
 public:
 	static BinderManager *getInstance();
 	static void destroyInstance();
+
 	int registerBinderService(struct wpa_global *global);
 	int registerInterface(struct wpa_supplicant *wpa_s);
 	int unregisterInterface(struct wpa_supplicant *wpa_s);
+	int
+	registerNetwork(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
+	int
+	unregisterNetwork(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
 	int getIfaceBinderObjectByIfname(
 	    const std::string &ifname,
 	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object);
+	int getNetworkBinderObjectByIfnameAndNetworkId(
+	    const std::string &ifname, int network_id,
+	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object);
 
 private:
 	BinderManager() = default;
 	~BinderManager() = default;
 	BinderManager(const BinderManager &) = default;
 	BinderManager &operator=(const BinderManager &) = default;
+
+	const std::string
+	getNetworkObjectMapKey(const std::string &ifname, int network_id);
 
 	// Singleton instance of this class.
 	static BinderManager *instance_;
@@ -53,6 +65,10 @@ private:
 	// wpa_supplicant. This map is keyed in by the corresponding
 	// |ifname|.
 	std::map<const std::string, android::sp<Iface>> iface_object_map_;
+	// Map of all the network specific binder objects controlled by
+	// wpa_supplicant. This map is keyed in by the corresponding
+	// |ifname| & |network_id|.
+	std::map<const std::string, android::sp<Network>> network_object_map_;
 };
 
 } // namespace wpa_supplicant_binder
