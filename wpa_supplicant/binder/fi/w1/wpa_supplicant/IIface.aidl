@@ -28,6 +28,9 @@ interface IIface {
 	/* Network being removed/retrieved does not exist */
 	const int ERROR_NETWORK_UNKNOWN = 5;
 
+	/** Length of mac_address param in |InitiateTDLS|* functions. */
+	const int MAC_ADDRESS_LEN = 6;
+
 	/**
 	 * Retrieves the name of the network interface.
 	 *
@@ -91,4 +94,31 @@ interface IIface {
 	 */
 	void Disconnect();
 
+	/**
+	 * Turn on/off power save mode for the interface.
+	 *
+	 * @param enable Indicate if power save is to be turned on/off.
+	 */
+	void SetPowerSave(boolean enable);
+
+	/**
+	 * Initiate TDLS discover with the provided peer mac address.
+	 *
+	 * @param mac_address MAC address of the peer.
+	 */
+	void InitiateTDLSDiscover(in byte[] mac_address);
+
+	/**
+	 * Initiate TDLS setup with the provided peer mac address.
+	 *
+	 * @param mac_address MAC address of the peer.
+	 */
+	void InitiateTDLSSetup(in byte[] mac_address);
+
+	/**
+	 * Initiate TDLS teardown with the provided peer mac address.
+	 *
+	 * @param mac_address MAC address of the peer.
+	 */
+	void InitiateTDLSTeardown(in byte[] mac_address);
 }

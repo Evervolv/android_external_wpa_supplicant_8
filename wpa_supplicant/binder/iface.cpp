@@ -164,6 +164,107 @@ android::binder::Status Iface::Disconnect()
 	return android::binder::Status::ok();
 }
 
+android::binder::Status Iface::SetPowerSave(bool enable)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	RETURN_IF_IFACE_INVALID(wpa_s);
+	if (wpa_drv_set_p2p_powersave(wpa_s, enable, -1, -1)) {
+		const std::string error_msg = "Failed setting power save mode" +
+					      std::to_string(enable) + ".";
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, error_msg.c_str());
+	}
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Iface::InitiateTDLSDiscover(
+    const std::vector<uint8_t> &mac_address)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	RETURN_IF_IFACE_INVALID(wpa_s);
+
+	if (mac_address.size() != MAC_ADDRESS_LEN) {
+		const std::string error_msg =
+		    "Invalid MAC address value length: " +
+		    std::to_string(mac_address.size()) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	int ret;
+	const u8 *peer = mac_address.data();
+	if (wpa_tdls_is_external_setup(wpa_s->wpa)) {
+		ret = wpa_tdls_send_discovery_request(wpa_s->wpa, peer);
+	} else {
+		ret = wpa_drv_tdls_oper(wpa_s, TDLS_DISCOVERY_REQ, peer);
+	}
+	if (ret) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, "Failed to initiate TDLS Discover.");
+	}
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Iface::InitiateTDLSSetup(
+    const std::vector<uint8_t> &mac_address)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	RETURN_IF_IFACE_INVALID(wpa_s);
+
+	if (mac_address.size() != MAC_ADDRESS_LEN) {
+		const std::string error_msg =
+		    "Invalid MAC address value length: " +
+		    std::to_string(mac_address.size()) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	int ret;
+	const u8 *peer = mac_address.data();
+	if (wpa_tdls_is_external_setup(wpa_s->wpa) &&
+	    !(wpa_s->conf->tdls_external_control)) {
+		wpa_tdls_remove(wpa_s->wpa, peer);
+		ret = wpa_tdls_start(wpa_s->wpa, peer);
+	} else {
+		ret = wpa_drv_tdls_oper(wpa_s, TDLS_SETUP, peer);
+	}
+	if (ret) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, "Failed to initiate TDLS Setup.");
+	}
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Iface::InitiateTDLSTeardown(
+    const std::vector<uint8_t> &mac_address)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	RETURN_IF_IFACE_INVALID(wpa_s);
+
+	if (mac_address.size() != MAC_ADDRESS_LEN) {
+		const std::string error_msg =
+		    "Invalid MAC address value length: " +
+		    std::to_string(mac_address.size()) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	int ret;
+	const u8 *peer = mac_address.data();
+	if (wpa_tdls_is_external_setup(wpa_s->wpa) &&
+	    !(wpa_s->conf->tdls_external_control)) {
+		ret = wpa_tdls_teardown_link(
+		    wpa_s->wpa, peer, WLAN_REASON_TDLS_TEARDOWN_UNSPECIFIED);
+	} else {
+		ret = wpa_drv_tdls_oper(wpa_s, TDLS_TEARDOWN, peer);
+	}
+	if (ret) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, "Failed to initiate TDLS Teardown.");
+	}
+	return android::binder::Status::ok();
+}
+
 /**
  * Retrieve the underlying |wpa_supplicant| struct pointer for
  * this iface.
