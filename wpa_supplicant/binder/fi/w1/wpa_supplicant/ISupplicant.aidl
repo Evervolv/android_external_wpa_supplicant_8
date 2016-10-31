@@ -26,6 +26,17 @@ interface ISupplicant {
 	const int ERROR_IFACE_UNKNOWN = 3;
 
 	/**
+	 * Debug levels for wpa_supplicant.
+	 * These correspond to levels defined in |wpa_debug.h|.
+	 */
+	const int DEBUG_LEVEL_EXCESSIVE = 1;
+	const int DEBUG_LEVEL_MSGDUMP = 2;
+	const int DEBUG_LEVEL_DEBUG = 3;
+	const int DEBUG_LEVEL_INFO = 4;
+	const int DEBUG_LEVEL_WARNING = 5;
+	const int DEBUG_LEVEL_ERROR = 6;
+
+	/**
 	 * Registers a wireless interface in wpa_supplicant.
 	 *
 	 * @param args A dictionary with arguments used to add the interface to
@@ -58,4 +69,39 @@ interface ISupplicant {
 	 * @return Binder object representing the interface.
 	 */
 	IIface GetInterface(in String ifname);
+
+	/**
+	 * Set debug parameters for wpa_supplicant.
+	 *
+	 * @param level Debug logging level for wpa_supplicant.
+	 *        (one of DEBUG_LEVEL_* values).
+	 * @param timestamp Determines whether to show timestamps in logs or
+	 *        not.
+	 * @param show_keys Determines whether to show keys in debug logs or
+	 *        not.
+	 *        CAUTION: Do not set this param in production code!
+	 */
+	void SetDebugParams(
+	    int level, boolean show_timestamp, boolean show_keys);
+
+	/**
+	 * Get the debug level set.
+	 *
+	 * @return one of DEBUG_LEVEL_* values.
+	 */
+	int GetDebugLevel();
+
+	/**
+	 * Get whether the |show_timestamp| parameter has been set ot not.
+	 *
+	 * @return true if set, false otherwise.
+	 */
+	boolean GetDebugShowTimestamp();
+
+	/**
+	 * Get whether the |show_keys| parameter has been set ot not.
+	 *
+	 * @return true if set, false otherwise.
+	 */
+	boolean GetDebugShowKeys();
 }
