@@ -93,6 +93,20 @@ private:
 		&on_binder_died_fctor,
 	    std::vector<android::sp<CallbackType>> &callback_list);
 
+	void callWithEachSupplicantCallback(
+	    const std::function<android::binder::Status(
+		android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>)>
+		&method);
+	void callWithEachIfaceCallback(
+	    const std::string &ifname,
+	    const std::function<android::binder::Status(
+		android::sp<fi::w1::wpa_supplicant::IIfaceCallback>)> &method);
+	void callWithEachNetworkCallback(
+	    const std::string &ifname, int network_id,
+	    const std::function<android::binder::Status(
+		android::sp<fi::w1::wpa_supplicant::INetworkCallback>)>
+		&method);
+
 	// Singleton instance of this class.
 	static BinderManager *instance_;
 	// The main binder service object.
