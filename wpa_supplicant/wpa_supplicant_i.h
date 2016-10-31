@@ -44,7 +44,7 @@ struct wpa_driver_associate_params;
 struct ctrl_iface_priv;
 struct ctrl_iface_global_priv;
 struct wpas_dbus_priv;
-struct wpas_binder_priv;
+struct wpas_hidl_priv;
 
 /**
  * struct wpa_interface - Parameters for wpa_supplicant_add_iface()
@@ -265,7 +265,7 @@ struct wpa_global {
 	struct wpa_params params;
 	struct ctrl_iface_global_priv *ctrl_iface;
 	struct wpas_dbus_priv *dbus;
-	struct wpas_binder_priv *binder;
+	struct wpas_hidl_priv *hidl;
 	void **drv_priv;
 	size_t drv_count;
 	struct os_time suspend_time;
@@ -479,9 +479,9 @@ struct wpa_supplicant {
 	char *preq_notify_peer;
 #endif /* CONFIG_AP */
 #endif /* CONFIG_CTRL_IFACE_DBUS_NEW */
-#ifdef CONFIG_CTRL_IFACE_BINDER
-	const void *binder_object_key;
-#endif /* CONFIG_CTRL_IFACE_BINDER */
+#ifdef CONFIG_CTRL_IFACE_HIDL
+	const void *hidl_object_key;
+#endif /* CONFIG_CTRL_IFACE_HIDL */
 	char bridge_ifname[16];
 
 	char *confname;
@@ -1219,6 +1219,20 @@ int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 					      struct wpa_ssid *ssid,
 					      const char *field,
 					      const char *value);
+/**
+ * wpa_supplicant_ctrl_rsp_handle - Handle a control response
+ * @wpa_s: Pointer to wpa_supplicant data
+ * @ssid: Pointer to the network block the reply is for
+ * @field: field the response is a reply for
+ * @value: value (ie, password, etc) for @field
+ * Returns: 0 on success, non-zero on error
+ *
+ * Helper function to handle replies to control interface requests.
+ */
+int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
+				   struct wpa_ssid *ssid,
+				   enum wpa_ctrl_req_type rtype,
+				   const char *value);
 
 void ibss_mesh_setup_freq(struct wpa_supplicant *wpa_s,
 			  const struct wpa_ssid *ssid,

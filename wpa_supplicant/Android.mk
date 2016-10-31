@@ -49,7 +49,7 @@ ifeq ($(TARGET_ARCH),arm)
 L_CFLAGS += -mabi=aapcs-linux
 endif
 
-# C++ flags for binder interface
+# C++ flags for hidl interface
 L_CPPFLAGS := -std=c++11 -Wall -Werror
 # TODO: Remove these allowed warnings later.
 L_CPPFLAGS += -Wno-unused-variable -Wno-unused-parameter
@@ -1355,9 +1355,9 @@ endif
 OBJS += $(DBUS_OBJS)
 L_CFLAGS += $(DBUS_CFLAGS)
 
-ifdef CONFIG_CTRL_IFACE_BINDER
-WPA_SUPPLICANT_USE_BINDER=y
-L_CFLAGS += -DCONFIG_BINDER -DCONFIG_CTRL_IFACE_BINDER
+ifdef CONFIG_CTRL_IFACE_HIDL
+WPA_SUPPLICANT_USE_HIDL=y
+L_CFLAGS += -DCONFIG_HIDL -DCONFIG_CTRL_IFACE_HIDL
 endif
 
 ifdef CONFIG_READLINE
@@ -1597,9 +1597,10 @@ LOCAL_C_INCLUDES := $(INCLUDES)
 ifeq ($(DBUS), y)
 LOCAL_SHARED_LIBRARIES += libdbus
 endif
-ifeq ($(WPA_SUPPLICANT_USE_BINDER), y)
-LOCAL_SHARED_LIBRARIES += libbinder libutils
-LOCAL_STATIC_LIBRARIES += libwpa_binder libwpa_binder_interface
+ifeq ($(WPA_SUPPLICANT_USE_HIDL), y)
+LOCAL_SHARED_LIBRARIES += android.hardware.wifi.supplicant@1.0
+LOCAL_SHARED_LIBRARIES += libhidl libhwbinder libutils
+LOCAL_STATIC_LIBRARIES += libwpa_hidl
 endif
 include $(BUILD_EXECUTABLE)
 
@@ -1641,41 +1642,24 @@ LOCAL_COPY_HEADERS += src/common/qca-vendor.h
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/wpa_client_include
 include $(BUILD_SHARED_LIBRARY)
 
-ifeq ($(WPA_SUPPLICANT_USE_BINDER), y)
-### Binder interface library ###
+ifeq ($(WPA_SUPPLICANT_USE_HIDL), y)
+### Hidl service library ###
 ########################
-
 include $(CLEAR_VARS)
-LOCAL_MODULE := libwpa_binder_interface
-LOCAL_AIDL_INCLUDES := \
-    $(LOCAL_PATH)/binder \
-    frameworks/native/aidl/binder
-LOCAL_EXPORT_C_INCLUDE_DIRS := \
-    $(LOCAL_PATH)/binder
-LOCAL_CPPFLAGS := $(L_CPPFLAGS)
-LOCAL_SRC_FILES := \
-    binder/binder_constants.cpp \
-    binder/fi/w1/wpa_supplicant/ISupplicant.aidl \
-    binder/fi/w1/wpa_supplicant/ISupplicantCallbacks.aidl \
-    binder/fi/w1/wpa_supplicant/IIface.aidl
-LOCAL_SHARED_LIBRARIES := libbinder
-include $(BUILD_STATIC_LIBRARY)
-
-### Binder service library ###
-########################
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := libwpa_binder
+LOCAL_MODULE := libwpa_hidl
 LOCAL_CPPFLAGS := $(L_CPPFLAGS)
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_C_INCLUDES := $(INCLUDES)
 LOCAL_SRC_FILES := \
-    binder/binder.cpp binder/binder_manager.cpp \
-    binder/supplicant.cpp binder/iface.cpp
+    hidl/hidl.cpp \
+    hidl/hidl_manager.cpp \
+    hidl/iface.cpp \
+    hidl/network.cpp \
+    hidl/supplicant.cpp
 LOCAL_SHARED_LIBRARIES := \
-    libbinder \
+    android.hardware.wifi.supplicant@1.0 \
+    libhidl \
+    libhwbinder \
     libutils
-LOCAL_STATIC_LIBRARIES := libwpa_binder_interface
 include $(BUILD_STATIC_LIBRARY)
-
-endif # BINDER == y
+endif # WPA_SUPPLICANT_USE_HIDL == y

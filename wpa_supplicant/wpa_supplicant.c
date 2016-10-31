@@ -2767,9 +2767,8 @@ static void wpa_supplicant_enable_one_network(struct wpa_supplicant *wpa_s,
 		wpa_s->reassociate = 1;
 }
 
-
 /**
- * wpa_supplicant_add_network - Add a new network
+ * wpa_supplicant_add_network - Add a new network.
  * @wpa_s: wpa_supplicant structure for a network interface
  * Returns: The new network configuration or %NULL if operation failed
  *
@@ -2784,15 +2783,15 @@ struct wpa_ssid * wpa_supplicant_add_network(struct wpa_supplicant *wpa_s)
 	struct wpa_ssid *ssid;
 
 	ssid = wpa_config_add_network(wpa_s->conf);
-	if (!ssid)
+	if (!ssid) {
 		return NULL;
+	}
 	wpas_notify_network_added(wpa_s, ssid);
 	ssid->disabled = 1;
 	wpa_config_set_network_defaults(ssid);
 
 	return ssid;
 }
-
 
 /**
  * wpa_supplicant_remove_network - Remove a configured network based on id
@@ -2813,14 +2812,16 @@ int wpa_supplicant_remove_network(struct wpa_supplicant *wpa_s, int id)
 	int was_disabled;
 
 	ssid = wpa_config_get_network(wpa_s->conf, id);
-	if (!ssid)
+	if (ssid)
+		wpas_notify_network_removed(wpa_s, ssid);
+	if (ssid == NULL) {
 		return -1;
-	wpas_notify_network_removed(wpa_s, ssid);
+	}
 
 	if (wpa_s->last_ssid == ssid)
 		wpa_s->last_ssid = NULL;
 
-	if (ssid == wpa_s->current_ssid || !wpa_s->current_ssid) {
+	if (ssid == wpa_s->current_ssid || wpa_s->current_ssid == NULL) {
 #ifdef CONFIG_SME
 		wpa_s->sme.prev_bssid_set = 0;
 #endif /* CONFIG_SME */
@@ -2843,19 +2844,18 @@ int wpa_supplicant_remove_network(struct wpa_supplicant *wpa_s, int id)
 
 	was_disabled = ssid->disabled;
 
-	if (wpa_config_remove_network(wpa_s->conf, id) < 0)
+	if (wpa_config_remove_network(wpa_s->conf, id) < 0) {
 		return -2;
+	}
 
 	if (!was_disabled && wpa_s->sched_scanning) {
-		wpa_printf(MSG_DEBUG,
-			   "Stop ongoing sched_scan to remove network from filters");
+		wpa_printf(MSG_DEBUG, "Stop ongoing sched_scan to remove "
+			   "network from filters");
 		wpa_supplicant_cancel_sched_scan(wpa_s);
 		wpa_supplicant_req_scan(wpa_s, 0, 0);
 	}
-
 	return 0;
 }
-
 
 /**
  * wpa_supplicant_enable_network - Mark a configured network as enabled
@@ -5813,20 +5813,36 @@ int wpas_driver_bss_selection(struct wpa_supplicant *wpa_s)
 }
 
 
-#if defined(CONFIG_CTRL_IFACE) || defined(CONFIG_CTRL_IFACE_DBUS_NEW)
+#if defined(CONFIG_CTRL_IFACE) || defined(CONFIG_CTRL_IFACE_DBUS_NEW) || defined (CONFIG_CTRL_IFACE_HIDL)
 int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 					      struct wpa_ssid *ssid,
 					      const char *field,
 					      const char *value)
 {
 #ifdef IEEE8021X_EAPOL
-	struct eap_peer_config *eap = &ssid->eap;
+	enum wpa_ctrl_req_type rtype;
 
 	wpa_printf(MSG_DEBUG, "CTRL_IFACE: response handle field=%s", field);
 	wpa_hexdump_ascii_key(MSG_DEBUG, "CTRL_IFACE: response value",
 			      (const u8 *) value, os_strlen(value));
 
-	switch (wpa_supplicant_ctrl_req_from_string(field)) {
+	rtype = wpa_supplicant_ctrl_req_from_string(field);
+	return wpa_supplicant_ctrl_rsp_handle(wpa_s, ssid, rtype, value);
+#else /* IEEE8021X_EAPOL */
+	wpa_printf(MSG_DEBUG, "CTRL_IFACE: IEEE 802.1X not included");
+	return -1;
+#endif /* IEEE8021X_EAPOL */
+}
+
+int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
+				   struct wpa_ssid *ssid,
+				   enum wpa_ctrl_req_type rtype,
+				   const char *value)
+{
+#ifdef IEEE8021X_EAPOL
+	struct eap_peer_config *eap = &ssid->eap;
+
+	switch (rtype) {
 	case WPA_CTRL_REQ_EAP_IDENTITY:
 		os_free(eap->identity);
 		eap->identity = (u8 *) os_strdup(value);
@@ -5897,7 +5913,7 @@ int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 			return -1;
 		break;
 	default:
-		wpa_printf(MSG_DEBUG, "CTRL_IFACE: Unknown field '%s'", field);
+		wpa_printf(MSG_DEBUG, "CTRL_IFACE: Unknown type %d", rtype);
 		return -1;
 	}
 
@@ -5907,7 +5923,7 @@ int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 	return -1;
 #endif /* IEEE8021X_EAPOL */
 }
-#endif /* CONFIG_CTRL_IFACE || CONFIG_CTRL_IFACE_DBUS_NEW */
+#endif /* CONFIG_CTRL_IFACE || CONFIG_CTRL_IFACE_DBUS_NEW || CONFIG_CTRL_IFACE_HIDL */
 
 
 int wpas_network_disabled(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
@@ -6134,7 +6150,6 @@ void wpas_request_connection(struct wpa_supplicant *wpa_s)
 	else
 		wpa_s->reattach = 0;
 }
-
 
 /**
  * wpas_request_disconnection - Request disconnection
