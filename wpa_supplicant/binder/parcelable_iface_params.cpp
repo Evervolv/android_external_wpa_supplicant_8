@@ -14,8 +14,8 @@ namespace fi {
 namespace w1 {
 namespace wpa_supplicant {
 
-android::status_t
-ParcelableIfaceParams::writeToParcel(android::Parcel *parcel) const
+android::status_t ParcelableIfaceParams::writeToParcel(
+    android::Parcel *parcel) const
 {
 	android::status_t status;
 	status = parcel->writeString8(ifname_);
@@ -33,8 +33,8 @@ ParcelableIfaceParams::writeToParcel(android::Parcel *parcel) const
 	return parcel->writeString8(config_file_);
 }
 
-android::status_t
-ParcelableIfaceParams::readFromParcel(const android::Parcel *parcel)
+android::status_t ParcelableIfaceParams::readFromParcel(
+    const android::Parcel *parcel)
 {
 	android::status_t status;
 	status = parcel->readString8(&ifname_);
@@ -52,6 +52,6 @@ ParcelableIfaceParams::readFromParcel(const android::Parcel *parcel)
 	return parcel->readString8(&config_file_);
 }
 
-} // namespace fi
-} // namespace w1
-} // namespace wpa_supplicant
+}  // namespace fi
+}  // namespace w1
+}  // namespace wpa_supplicant

@@ -21,7 +21,8 @@ extern "C" {
 #include "utils/includes.h"
 }
 
-void wpas_binder_sock_handler(int /* sock */, void * /* eloop_ctx */, void *sock_ctx)
+void wpas_binder_sock_handler(
+    int /* sock */, void * /* eloop_ctx */, void *sock_ctx)
 {
 	struct wpas_binder_priv *priv = (wpas_binder_priv *)sock_ctx;
 	wpa_printf(

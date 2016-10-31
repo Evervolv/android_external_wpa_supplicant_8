@@ -40,17 +40,17 @@ public:
 	    const fi::w1::wpa_supplicant::ParcelableIfaceParams &params,
 	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 	    override;
-	android::binder::Status
-	RemoveInterface(const std::string &ifname) override;
+	android::binder::Status RemoveInterface(
+	    const std::string &ifname) override;
 	android::binder::Status GetInterface(
 	    const std::string &ifname,
 	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 	    override;
-	android::binder::Status
-	SetDebugParams(int level, bool show_timestamp, bool show_keys) override;
+	android::binder::Status SetDebugParams(
+	    int level, bool show_timestamp, bool show_keys) override;
 	android::binder::Status GetDebugLevel(int *level_out) override;
-	android::binder::Status
-	GetDebugShowTimestamp(bool *show_timestamp_out) override;
+	android::binder::Status GetDebugShowTimestamp(
+	    bool *show_timestamp_out) override;
 	android::binder::Status GetDebugShowKeys(bool *show_keys_out) override;
 	android::binder::Status RegisterCallback(
 	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
