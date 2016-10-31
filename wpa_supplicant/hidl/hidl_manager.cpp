@@ -9,19 +9,21 @@
 
 #include <algorithm>
 
-#include <hidl/IServiceManager.h>
-
-#include "hidl_constants.h"
 #include "hidl_manager.h"
-#include "wpa_supplicant_hidl/hidl_constants.h"
 
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
 }
 
-namespace wpa_supplicant_hidl {
+namespace android {
+namespace hardware {
+namespace wifi {
+namespace supplicant {
+namespace V1_0 {
+namespace implementation {
 
+const char HidlManager::kServiceName[] = "wpa_supplicant";
 HidlManager *HidlManager::instance_ = NULL;
 
 HidlManager *HidlManager::getInstance()
@@ -40,13 +42,12 @@ void HidlManager::destroyInstance()
 
 int HidlManager::registerHidlService(struct wpa_global *global)
 {
-	// Create the main hidl service object and register with system
-	// ServiceManager.
+	// Create the main hidl service object and register it.
 	supplicant_object_ = new Supplicant(global);
-
-	android::String16 service_name(hidl_constants::kServiceName);
-	android::defaultServiceManager()->addService(
-	    service_name, android::IInterface::asHidl(supplicant_object_));
+	if (supplicant_object_->registerAsService(kServiceName) !=
+	    android::NO_ERROR) {
+		return 1;
+	}
 	return 0;
 }
 
@@ -75,12 +76,12 @@ int HidlManager::registerInterface(struct wpa_supplicant *wpa_s)
 
 	// Initialize the vector of callbacks for this object.
 	iface_callbacks_map_[ifname] =
-	    std::vector<android::sp<fi::w1::wpa_supplicant::IIfaceCallback>>();
+	    std::vector<android::sp<ISupplicantIfaceCallback>>();
 
-	// Invoke the |OnInterfaceCreated| method on all registered callbacks.
+	// Invoke the |onInterfaceCreated| method on all registered callbacks.
 	callWithEachSupplicantCallback(std::bind(
-	    &fi::w1::wpa_supplicant::ISupplicantCallback::OnInterfaceCreated,
-	    std::placeholders::_1, ifname));
+	    &ISupplicantCallback::onInterfaceCreated, std::placeholders::_1,
+	    ifname));
 	return 0;
 }
 
@@ -109,21 +110,24 @@ int HidlManager::unregisterInterface(struct wpa_supplicant *wpa_s)
 	if (iface_callback_map_iter == iface_callbacks_map_.end())
 		return 1;
 	const auto &iface_callback_list = iface_callback_map_iter->second;
+#if 0   // TODO(b/31632518): HIDL object death notifications.
 	for (const auto &callback : iface_callback_list) {
-		if (android::IInterface::asHidl(callback)->unlinkToDeath(
-			nullptr, callback.get()) != android::OK) {
+		if (android::hardware::IInterface::asBinder(callback)
+			->unlinkToDeath(nullptr, callback.get()) !=
+		    android::OK) {
 			wpa_printf(
 			    MSG_ERROR,
 			    "Error deregistering for death notification for "
 			    "iface callback object");
 		}
 	}
+#endif  // TODO(b/31632518): HIDL object death notifications.
 	iface_callbacks_map_.erase(iface_callback_map_iter);
 
-	// Invoke the |OnInterfaceRemoved| method on all registered callbacks.
+	// Invoke the |onInterfaceRemoved| method on all registered callbacks.
 	callWithEachSupplicantCallback(std::bind(
-	    &fi::w1::wpa_supplicant::ISupplicantCallback::OnInterfaceRemoved,
-	    std::placeholders::_1, ifname));
+	    &ISupplicantCallback::onInterfaceRemoved, std::placeholders::_1,
+	    ifname));
 	return 0;
 }
 
@@ -155,15 +159,14 @@ int HidlManager::registerNetwork(
 		return 1;
 
 	// Initialize the vector of callbacks for this object.
-	network_callbacks_map_[network_key] = std::vector<
-	    android::sp<fi::w1::wpa_supplicant::INetworkCallback>>();
+	network_callbacks_map_[network_key] =
+	    std::vector<android::sp<ISupplicantNetworkCallback>>();
 
-	// Invoke the |OnNetworkAdded| method on all registered callbacks.
+	// Invoke the |onNetworkAdded| method on all registered callbacks.
 	callWithEachIfaceCallback(
-	    wpa_s->ifname,
-	    std::bind(
-		&fi::w1::wpa_supplicant::IIfaceCallback::OnNetworkAdded,
-		std::placeholders::_1, ssid->id));
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantIfaceCallback::onNetworkAdded,
+			       std::placeholders::_1, ssid->id));
 	return 0;
 }
 
@@ -198,9 +201,11 @@ int HidlManager::unregisterNetwork(
 	if (network_callback_map_iter == network_callbacks_map_.end())
 		return 1;
 	const auto &network_callback_list = network_callback_map_iter->second;
+#if 0   // TODO(b/31632518): HIDL object death notifications.
 	for (const auto &callback : network_callback_list) {
-		if (android::IInterface::asHidl(callback)->unlinkToDeath(
-			nullptr, callback.get()) != android::OK) {
+		if (android::hardware::IInterface::asBinder(callback)
+			->unlinkToDeath(nullptr, callback.get()) !=
+		    android::OK) {
 			wpa_printf(
 			    MSG_ERROR,
 			    "Error deregistering for death "
@@ -208,14 +213,14 @@ int HidlManager::unregisterNetwork(
 			    "network callback object");
 		}
 	}
+#endif  // TODO(b/31632518): HIDL object death notifications.
 	network_callbacks_map_.erase(network_callback_map_iter);
 
-	// Invoke the |OnNetworkRemoved| method on all registered callbacks.
+	// Invoke the |onNetworkRemoved| method on all registered callbacks.
 	callWithEachIfaceCallback(
-	    wpa_s->ifname,
-	    std::bind(
-		&fi::w1::wpa_supplicant::IIfaceCallback::OnNetworkRemoved,
-		std::placeholders::_1, ssid->id));
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantIfaceCallback::onNetworkRemoved,
+			       std::placeholders::_1, ssid->id));
 	return 0;
 }
 
@@ -234,23 +239,24 @@ int HidlManager::notifyStateChange(struct wpa_supplicant *wpa_s)
 	if (iface_object_map_.find(ifname) == iface_object_map_.end())
 		return 1;
 
-	// Invoke the |OnStateChanged| method on all registered callbacks.
-	int state = wpa_s->wpa_state;
-	std::vector<uint8_t> bssid(wpa_s->bssid, wpa_s->bssid + ETH_ALEN);
-	int network_id =
-	    fi::w1::wpa_supplicant::IIfaceCallback::NETWORK_ID_INVALID;
-	std::vector<uint8_t> ssid;
+	// Invoke the |onStateChanged| method on all registered callbacks.
+	ISupplicantIfaceCallback::State hidl_state =
+	    static_cast<ISupplicantIfaceCallback::State>(wpa_s->wpa_state);
+	hidl_array<uint8_t, 6> hidl_bssid;
+	os_memcpy(hidl_bssid.data(), wpa_s->bssid, ETH_ALEN);
+	uint32_t hidl_network_id = UINT32_MAX;
+	std::vector<uint8_t> hidl_ssid;
 	if (wpa_s->current_ssid) {
-		network_id = wpa_s->current_ssid->id;
-		ssid.assign(
+		hidl_network_id = wpa_s->current_ssid->id;
+		hidl_ssid.assign(
 		    wpa_s->current_ssid->ssid,
 		    wpa_s->current_ssid->ssid + wpa_s->current_ssid->ssid_len);
 	}
 	callWithEachIfaceCallback(
-	    wpa_s->ifname,
-	    std::bind(
-		&fi::w1::wpa_supplicant::IIfaceCallback::OnStateChanged,
-		std::placeholders::_1, state, bssid, network_id, ssid));
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantIfaceCallback::onStateChanged,
+			       std::placeholders::_1, hidl_state, hidl_bssid,
+			       hidl_network_id, hidl_ssid));
 	return 0;
 }
 
@@ -275,16 +281,13 @@ int HidlManager::notifyNetworkRequest(
 	if (network_object_map_.find(network_key) == network_object_map_.end())
 		return 1;
 
-	callWithEachNetworkCallback(
-	    wpa_s->ifname, ssid->id,
-	    std::bind(
-		&fi::w1::wpa_supplicant::INetworkCallback::OnNetworkRequest,
-		std::placeholders::_1, type, param));
+	// TODO(b/31646740): Parse the param string to find the appropriate
+	// callback.
 	return 0;
 }
 
 /**
- * Retrieve the |IIface| hidl object reference using the provided
+ * Retrieve the |ISupplicantIface| hidl object reference using the provided
  * ifname.
  *
  * @param ifname Name of the corresponding interface.
@@ -293,8 +296,7 @@ int HidlManager::notifyNetworkRequest(
  * @return 0 on success, 1 on failure.
  */
 int HidlManager::getIfaceHidlObjectByIfname(
-    const std::string &ifname,
-    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object)
+    const std::string &ifname, android::sp<ISupplicantIface> *iface_object)
 {
 	if (ifname.empty() || !iface_object)
 		return 1;
@@ -308,7 +310,7 @@ int HidlManager::getIfaceHidlObjectByIfname(
 }
 
 /**
- * Retrieve the |INetwork| hidl object reference using the provided
+ * Retrieve the |ISupplicantNetwork| hidl object reference using the provided
  * ifname and network_id.
  *
  * @param ifname Name of the corresponding interface.
@@ -319,7 +321,7 @@ int HidlManager::getIfaceHidlObjectByIfname(
  */
 int HidlManager::getNetworkHidlObjectByIfnameAndNetworkId(
     const std::string &ifname, int network_id,
-    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object)
+    android::sp<ISupplicantNetwork> *network_object)
 {
 	if (ifname.empty() || network_id < 0 || !network_object)
 		return 1;
@@ -345,28 +347,28 @@ int HidlManager::getNetworkHidlObjectByIfnameAndNetworkId(
  * @return 0 on success, 1 on failure.
  */
 int HidlManager::addSupplicantCallbackHidlObject(
-    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback> &callback)
+    const android::sp<ISupplicantCallback> &callback)
 {
 	// Register for death notification before we add it to our list.
 	auto on_hidl_died_fctor = std::bind(
 	    &HidlManager::removeSupplicantCallbackHidlObject, this,
 	    std::placeholders::_1);
 	return registerForDeathAndAddCallbackHidlObjectToList<
-	    fi::w1::wpa_supplicant::ISupplicantCallback>(
+	    ISupplicantCallback>(
 	    callback, on_hidl_died_fctor, supplicant_callbacks_);
 }
 /**
- * Add a new |IIfaceCallback| hidl object reference to our
+ * Add a new |ISupplicantIfaceCallback| hidl object reference to our
  * interface callback list.
  *
  * @param ifname Name of the corresponding interface.
- * @param callback Hidl reference of the |IIfaceCallback| object.
+ * @param callback Hidl reference of the |ISupplicantIfaceCallback| object.
  *
  * @return 0 on success, 1 on failure.
  */
 int HidlManager::addIfaceCallbackHidlObject(
     const std::string &ifname,
-    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
+    const android::sp<ISupplicantIfaceCallback> &callback)
 {
 	if (ifname.empty())
 		return 1;
@@ -381,23 +383,23 @@ int HidlManager::addIfaceCallbackHidlObject(
 	    &HidlManager::removeIfaceCallbackHidlObject, this, ifname,
 	    std::placeholders::_1);
 	return registerForDeathAndAddCallbackHidlObjectToList<
-	    fi::w1::wpa_supplicant::IIfaceCallback>(
+	    ISupplicantIfaceCallback>(
 	    callback, on_hidl_died_fctor, iface_callback_list);
 }
 
 /**
- * Add a new |INetworkCallback| hidl object reference to our
+ * Add a new |ISupplicantNetworkCallback| hidl object reference to our
  * network callback list.
  *
  * @param ifname Name of the corresponding interface.
  * @param network_id ID of the corresponding network.
- * @param callback Hidl reference of the |INetworkCallback| object.
+ * @param callback Hidl reference of the |ISupplicantNetworkCallback| object.
  *
  * @return 0 on success, 1 on failure.
  */
 int HidlManager::addNetworkCallbackHidlObject(
     const std::string &ifname, int network_id,
-    const android::sp<fi::w1::wpa_supplicant::INetworkCallback> &callback)
+    const android::sp<ISupplicantNetworkCallback> &callback)
 {
 	if (ifname.empty() || network_id < 0)
 		return 1;
@@ -416,13 +418,13 @@ int HidlManager::addNetworkCallbackHidlObject(
 	    &HidlManager::removeNetworkCallbackHidlObject, this, ifname,
 	    network_id, std::placeholders::_1);
 	return registerForDeathAndAddCallbackHidlObjectToList<
-	    fi::w1::wpa_supplicant::INetworkCallback>(
+	    ISupplicantNetworkCallback>(
 	    callback, on_hidl_died_fctor, network_callback_list);
 }
 
 /**
  * Creates a unique key for the network using the provided |ifname| and
- * |network_id| to be used in the internal map of |INetwork| objects.
+ * |network_id| to be used in the internal map of |ISupplicantNetwork| objects.
  * This is of the form |ifname|_|network_id|. For ex: "wlan0_1".
  *
  * @param ifname Name of the corresponding interface.
@@ -441,7 +443,7 @@ const std::string HidlManager::getNetworkObjectMapKey(
  * @param callback Hidl reference of the |ISupplicantCallback| object.
  */
 void HidlManager::removeSupplicantCallbackHidlObject(
-    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback> &callback)
+    const android::sp<ISupplicantCallback> &callback)
 {
 	supplicant_callbacks_.erase(
 	    std::remove(
@@ -451,15 +453,15 @@ void HidlManager::removeSupplicantCallbackHidlObject(
 }
 
 /**
- * Removes the provided |IIfaceCallback| hidl object reference from
+ * Removes the provided |ISupplicantIfaceCallback| hidl object reference from
  * our interface callback list.
  *
  * @param ifname Name of the corresponding interface.
- * @param callback Hidl reference of the |IIfaceCallback| object.
+ * @param callback Hidl reference of the |ISupplicantIfaceCallback| object.
  */
 void HidlManager::removeIfaceCallbackHidlObject(
     const std::string &ifname,
-    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
+    const android::sp<ISupplicantIfaceCallback> &callback)
 {
 	if (ifname.empty())
 		return;
@@ -477,16 +479,16 @@ void HidlManager::removeIfaceCallbackHidlObject(
 }
 
 /**
- * Removes the provided |INetworkCallback| hidl object reference from
+ * Removes the provided |ISupplicantNetworkCallback| hidl object reference from
  * our network callback list.
  *
  * @param ifname Name of the corresponding interface.
  * @param network_id ID of the corresponding network.
- * @param callback Hidl reference of the |INetworkCallback| object.
+ * @param callback Hidl reference of the |ISupplicantNetworkCallback| object.
  */
 void HidlManager::removeNetworkCallbackHidlObject(
     const std::string &ifname, int network_id,
-    const android::sp<fi::w1::wpa_supplicant::INetworkCallback> &callback)
+    const android::sp<ISupplicantNetworkCallback> &callback)
 {
 	if (ifname.empty() || network_id < 0)
 		return;
@@ -512,7 +514,7 @@ void HidlManager::removeNetworkCallbackHidlObject(
  * Add callback to the corresponding list after linking to death on the
  * corresponding hidl object reference.
  *
- * @param callback Hidl reference of the |INetworkCallback| object.
+ * @param callback Hidl reference of the |ISupplicantNetworkCallback| object.
  *
  * @return 0 on success, 1 on failure.
  */
@@ -529,10 +531,10 @@ int HidlManager::registerForDeathAndAddCallbackHidlObjectToList(
 	// store a reference to this |CallbackObjectDeathNotifier| instance
 	// to use in |unlinkToDeath| later.
 	// NOTE: This may cause an immediate callback if the object is already
-	// dead,
-	// so add it to the list before we register for callback!
+	// dead, so add it to the list before we register for callback!
 	callback_list.push_back(callback);
-	if (android::IInterface::asHidl(callback)->linkToDeath(
+#if 0   // TODO(b/31632518): HIDL object death notifications.
+	if (android::hardware::IInterface::asBinder(callback)->linkToDeath(
 		death_notifier, callback.get()) != android::OK) {
 		wpa_printf(
 		    MSG_ERROR,
@@ -544,6 +546,7 @@ int HidlManager::registerForDeathAndAddCallbackHidlObjectToList(
 		    callback_list.end());
 		return 1;
 	}
+#endif  // TODO(b/31632518): HIDL object death notifications.
 	return 0;
 }
 
@@ -555,8 +558,7 @@ int HidlManager::registerForDeathAndAddCallbackHidlObjectToList(
  * |ISupplicantCallback|.
  */
 void HidlManager::callWithEachSupplicantCallback(
-    const std::function<android::hidl::Status(
-	android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>)> &method)
+    const std::function<Return<void>(android::sp<ISupplicantCallback>)> &method)
 {
 	for (const auto &callback : supplicant_callbacks_) {
 		method(callback);
@@ -565,16 +567,17 @@ void HidlManager::callWithEachSupplicantCallback(
 
 /**
  * Helper fucntion to invoke the provided callback method on all the
- * registered |IIfaceCallback| callback hidl objects for the specified
+ * registered |ISupplicantIfaceCallback| callback hidl objects for the specified
  * |ifname|.
  *
  * @param ifname Name of the corresponding interface.
- * @param method Pointer to the required hidl method from |IIfaceCallback|.
+ * @param method Pointer to the required hidl method from
+ * |ISupplicantIfaceCallback|.
  */
 void HidlManager::callWithEachIfaceCallback(
     const std::string &ifname,
-    const std::function<android::hidl::Status(
-	android::sp<fi::w1::wpa_supplicant::IIfaceCallback>)> &method)
+    const std::function<Return<void>(android::sp<ISupplicantIfaceCallback>)>
+	&method)
 {
 	if (ifname.empty())
 		return;
@@ -590,17 +593,19 @@ void HidlManager::callWithEachIfaceCallback(
 
 /**
  * Helper function to invoke the provided callback method on all the
- * registered |INetworkCallback| callback hidl objects for the specified
+ * registered |ISupplicantNetworkCallback| callback hidl objects for the
+ * specified
  * |ifname| & |network_id|.
  *
  * @param ifname Name of the corresponding interface.
  * @param network_id ID of the corresponding network.
- * @param method Pointer to the required hidl method from |INetworkCallback|.
+ * @param method Pointer to the required hidl method from
+ * |ISupplicantNetworkCallback|.
  */
 void HidlManager::callWithEachNetworkCallback(
     const std::string &ifname, int network_id,
-    const std::function<android::hidl::Status(
-	android::sp<fi::w1::wpa_supplicant::INetworkCallback>)> &method)
+    const std::function<Return<void>(android::sp<ISupplicantNetworkCallback>)>
+	&method)
 {
 	if (ifname.empty() || network_id < 0)
 		return;
@@ -617,4 +622,10 @@ void HidlManager::callWithEachNetworkCallback(
 		method(callback);
 	}
 }
-}  // namespace wpa_supplicant_hidl
+
+}  // namespace implementation
+}  // namespace V1_0
+}  // namespace wifi
+}  // namespace supplicant
+}  // namespace hardware
+}  // namespace android

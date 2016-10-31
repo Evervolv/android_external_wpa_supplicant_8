@@ -13,9 +13,9 @@
 #include <map>
 #include <string>
 
-#include "fi/w1/wpa_supplicant/IIfaceCallback.h"
-#include "fi/w1/wpa_supplicant/INetworkCallback.h"
-#include "fi/w1/wpa_supplicant/ISupplicantCallback.h"
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantIfaceCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantNetworkCallback.h>
 
 #include "iface.h"
 #include "network.h"
@@ -24,7 +24,12 @@
 struct wpa_global;
 struct wpa_supplicant;
 
-namespace wpa_supplicant_hidl {
+namespace android {
+namespace hardware {
+namespace wifi {
+namespace supplicant {
+namespace V1_0 {
+namespace implementation {
 
 /**
  * HidlManager is responsible for managing the lifetime of all
@@ -54,21 +59,26 @@ public:
 	// Methods called from hidl objects.
 	int getIfaceHidlObjectByIfname(
 	    const std::string &ifname,
-	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object);
+	    android::sp<
+		android::hardware::wifi::supplicant::V1_0::ISupplicantIface>
+		*iface_object);
 	int getNetworkHidlObjectByIfnameAndNetworkId(
 	    const std::string &ifname, int network_id,
-	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object);
+	    android::sp<
+		android::hardware::wifi::supplicant::V1_0::ISupplicantNetwork>
+		*network_object);
 	int addSupplicantCallbackHidlObject(
-	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
+	    const android::sp<
+		android::hardware::wifi::supplicant::V1_0::ISupplicantCallback>
 		&callback);
 	int addIfaceCallbackHidlObject(
 	    const std::string &ifname,
-	    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback>
-		&callback);
+	    const android::sp<android::hardware::wifi::supplicant::V1_0::
+				  ISupplicantIfaceCallback> &callback);
 	int addNetworkCallbackHidlObject(
 	    const std::string &ifname, int network_id,
-	    const android::sp<fi::w1::wpa_supplicant::INetworkCallback>
-		&callback);
+	    const android::sp<android::hardware::wifi::supplicant::V1_0::
+				  ISupplicantNetworkCallback> &callback);
 
 private:
 	HidlManager() = default;
@@ -80,16 +90,17 @@ private:
 	    const std::string &ifname, int network_id);
 
 	void removeSupplicantCallbackHidlObject(
-	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
+	    const android::sp<
+		android::hardware::wifi::supplicant::V1_0::ISupplicantCallback>
 		&callback);
 	void removeIfaceCallbackHidlObject(
 	    const std::string &ifname,
-	    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback>
-		&callback);
+	    const android::sp<android::hardware::wifi::supplicant::V1_0::
+				  ISupplicantIfaceCallback> &callback);
 	void removeNetworkCallbackHidlObject(
 	    const std::string &ifname, int network_id,
-	    const android::sp<fi::w1::wpa_supplicant::INetworkCallback>
-		&callback);
+	    const android::sp<android::hardware::wifi::supplicant::V1_0::
+				  ISupplicantNetworkCallback> &callback);
 	template <class CallbackType>
 	int registerForDeathAndAddCallbackHidlObjectToList(
 	    const android::sp<CallbackType> &callback,
@@ -98,19 +109,22 @@ private:
 	    std::vector<android::sp<CallbackType>> &callback_list);
 
 	void callWithEachSupplicantCallback(
-	    const std::function<android::hidl::Status(
-		android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>)>
-		&method);
+	    const std::function<android::hardware::Return<void>(
+		android::sp<android::hardware::wifi::supplicant::V1_0::
+				ISupplicantCallback>)> &method);
 	void callWithEachIfaceCallback(
 	    const std::string &ifname,
-	    const std::function<android::hidl::Status(
-		android::sp<fi::w1::wpa_supplicant::IIfaceCallback>)> &method);
+	    const std::function<android::hardware::Return<void>(
+		android::sp<android::hardware::wifi::supplicant::V1_0::
+				ISupplicantIfaceCallback>)> &method);
 	void callWithEachNetworkCallback(
 	    const std::string &ifname, int network_id,
-	    const std::function<android::hidl::Status(
-		android::sp<fi::w1::wpa_supplicant::INetworkCallback>)>
-		&method);
+	    const std::function<android::hardware::Return<void>(
+		android::sp<android::hardware::wifi::supplicant::V1_0::
+				ISupplicantNetworkCallback>)> &method);
 
+	// HIDL Service name.
+	static const char kServiceName[];
 	// Singleton instance of this class.
 	static HidlManager *instance_;
 	// The main hidl service object.
@@ -125,33 +139,35 @@ private:
 	std::map<const std::string, android::sp<Network>> network_object_map_;
 
 	// Callback registered for the main hidl service object.
-	std::vector<android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>>
+	std::vector<android::sp<
+	    android::hardware::wifi::supplicant::V1_0::ISupplicantCallback>>
 	    supplicant_callbacks_;
 	// Map of all the callbacks registered for interface specific
 	// hidl objects controlled by wpa_supplicant.  This map is keyed in by
 	// the corresponding |ifname|.
 	std::map<
 	    const std::string,
-	    std::vector<android::sp<fi::w1::wpa_supplicant::IIfaceCallback>>>
+	    std::vector<android::sp<android::hardware::wifi::supplicant::V1_0::
+					ISupplicantIfaceCallback>>>
 	    iface_callbacks_map_;
 	// Map of all the callbacks registered for network specific
 	// hidl objects controlled by wpa_supplicant.  This map is keyed in by
 	// the corresponding |ifname| & |network_id|.
 	std::map<
 	    const std::string,
-	    std::vector<android::sp<fi::w1::wpa_supplicant::INetworkCallback>>>
+	    std::vector<android::sp<android::hardware::wifi::supplicant::V1_0::
+					ISupplicantNetworkCallback>>>
 	    network_callbacks_map_;
 
 	/**
 	 * Helper class used to deregister the callback object reference from
-	 * our
-	 * callback list on the death of the hidl object.
+	 * our callback list on the death of the hidl object.
 	 * This class stores a reference of the callback hidl object and a
 	 * function to be called to indicate the death of the hidl object.
 	 */
 	template <class CallbackType>
 	class CallbackObjectDeathNotifier
-	    : public android::IHidl::DeathRecipient
+	    : public android::hardware::IBinder::DeathRecipient
 	{
 	public:
 		CallbackObjectDeathNotifier(
@@ -161,8 +177,8 @@ private:
 		    : callback_(callback), on_hidl_died_(on_hidl_died)
 		{
 		}
-		void hidlDied(
-		    const android::wp<android::IHidl> & /* who */) override
+		void binderDied(const android::wp<android::hardware::IBinder>
+				    & /* who */) override
 		{
 			on_hidl_died_(callback_);
 		}
@@ -180,88 +196,116 @@ private:
 // avoid nasty runtime conversion functions. So, adding compile time asserts
 // to guard against any internal changes breaking the hidl interface.
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_NONE == WPA_KEY_MGMT_NONE,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicant::DebugLevel::EXCESSIVE) ==
+	MSG_EXCESSIVE,
+    "Debug level value mismatch");
+static_assert(
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicant::DebugLevel::ERROR) == MSG_ERROR,
+    "Debug level value mismatch");
+
+static_assert(
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::KeyMgmtMask::NONE) ==
+	WPA_KEY_MGMT_NONE,
     "KeyMgmt value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_WPA_PSK == WPA_KEY_MGMT_PSK,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::KeyMgmtMask::WPA_PSK) ==
+	WPA_KEY_MGMT_PSK,
     "KeyMgmt value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_WPA_EAP ==
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::KeyMgmtMask::WPA_EAP) ==
 	WPA_KEY_MGMT_IEEE8021X,
     "KeyMgmt value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_IEEE8021X ==
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::KeyMgmtMask::IEEE8021X) ==
 	WPA_KEY_MGMT_IEEE8021X_NO_WPA,
     "KeyMgmt value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::PROTO_MASK_WPA == WPA_PROTO_WPA,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::ProtoMask::WPA) ==
+	WPA_PROTO_WPA,
     "Proto value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::PROTO_MASK_RSN == WPA_PROTO_RSN,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::ProtoMask::RSN) ==
+	WPA_PROTO_RSN,
     "Proto value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::PROTO_MASK_OSEN == WPA_PROTO_OSEN,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::ProtoMask::OSEN) ==
+	WPA_PROTO_OSEN,
     "Proto value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_OPEN == WPA_AUTH_ALG_OPEN,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::AuthAlgMask::OPEN) ==
+	WPA_AUTH_ALG_OPEN,
     "AuthAlg value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_SHARED ==
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::AuthAlgMask::SHARED) ==
 	WPA_AUTH_ALG_SHARED,
     "AuthAlg value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_LEAP == WPA_AUTH_ALG_LEAP,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::AuthAlgMask::LEAP) ==
+	WPA_AUTH_ALG_LEAP,
     "AuthAlg value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_WEP40 ==
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::GroupCipherMask::WEP40) ==
 	WPA_CIPHER_WEP40,
     "GroupCipher value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_WEP104 ==
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::GroupCipherMask::WEP104) ==
 	WPA_CIPHER_WEP104,
     "GroupCipher value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_TKIP == WPA_CIPHER_TKIP,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::GroupCipherMask::TKIP) ==
+	WPA_CIPHER_TKIP,
     "GroupCipher value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_CCMP == WPA_CIPHER_CCMP,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::GroupCipherMask::CCMP) ==
+	WPA_CIPHER_CCMP,
     "GroupCipher value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_NONE ==
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::PairwiseCipherMask::NONE) ==
 	WPA_CIPHER_NONE,
     "PairwiseCipher value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_TKIP ==
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::PairwiseCipherMask::TKIP) ==
 	WPA_CIPHER_TKIP,
     "PairwiseCipher value mismatch");
 static_assert(
-    fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_CCMP ==
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantNetwork::PairwiseCipherMask::CCMP) ==
 	WPA_CIPHER_CCMP,
     "PairwiseCipher value mismatch");
 
 static_assert(
-    WPA_DISCONNECTED ==
-	fi::w1::wpa_supplicant::IIfaceCallback::STATE_DISCONNECTED,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantIfaceCallback::State::DISCONNECTED) ==
+	WPA_DISCONNECTED,
     "State value mismatch");
 static_assert(
-    WPA_COMPLETED == fi::w1::wpa_supplicant::IIfaceCallback::STATE_COMPLETED,
+    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
+			      ISupplicantIfaceCallback::State::COMPLETED) ==
+	WPA_COMPLETED,
     "State value mismatch");
 
-static_assert(
-    WPA_CTRL_REQ_UNKNOWN ==
-	fi::w1::wpa_supplicant::INetwork::NETWORK_RSP_UNKNOWN,
-    "Network Rsp value mismatch");
-static_assert(
-    WPA_CTRL_REQ_EXT_CERT_CHECK ==
-	fi::w1::wpa_supplicant::INetwork::NETWORK_RSP_EXT_CERT_CHECK,
-    "Network Rsp value mismatch");
-static_assert(
-    WPA_CTRL_REQ_UNKNOWN ==
-	fi::w1::wpa_supplicant::INetworkCallback::NETWORK_REQ_UNKNOWN,
-    "Network Req value mismatch");
-static_assert(
-    WPA_CTRL_REQ_EXT_CERT_CHECK ==
-	fi::w1::wpa_supplicant::INetworkCallback::NETWORK_REQ_EXT_CERT_CHECK,
-    "Network Req value mismatch");
-}  // namespace wpa_supplicant_hidl
+}  // namespace implementation
+}  // namespace V1_0
+}  // namespace wifi
+}  // namespace supplicant
+}  // namespace hardware
+}  // namespace android
 #endif  // WPA_SUPPLICANT_HIDL_HIDL_MANAGER_H

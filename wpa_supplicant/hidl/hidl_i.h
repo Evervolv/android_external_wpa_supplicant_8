@@ -23,6 +23,6 @@ struct wpas_hidl_priv
 
 #ifdef _cplusplus
 }
-#endif /* _cplusplus */
+#endif  // _cplusplus
 
-#endif /* HIDL_I_H */
+#endif  // HIDL_I_H
