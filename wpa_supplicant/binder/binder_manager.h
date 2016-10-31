@@ -30,7 +30,11 @@ namespace wpa_supplicant_binder {
 class BinderManager
 {
 public:
+<<<<<<< 7cfb967dde32a14e227bee3b36eee1b36d1f8d0a
 	static BinderManager *getInstance();
+=======
+	static BinderManager * getInstance();
+>>>>>>> binder: Expose an aidl interface module
 	static void destroyInstance();
 	int registerBinderService(struct wpa_global *global);
 	int registerInterface(struct wpa_supplicant *wpa_s);
