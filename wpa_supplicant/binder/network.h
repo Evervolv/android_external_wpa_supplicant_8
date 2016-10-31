@@ -63,6 +63,28 @@ public:
 	SetWepKey(int key_idx, const std::vector<uint8_t> &wep_key) override;
 	android::binder::Status SetWepTxKeyIdx(int32_t wep_tx_key_idx) override;
 	android::binder::Status SetRequirePMF(bool enable) override;
+	android::binder::Status SetEapMethod(int32_t method) override;
+	android::binder::Status SetEapPhase2Method(int32_t method) override;
+	android::binder::Status
+	SetEapIdentity(const std::vector<uint8_t> &identity) override;
+	android::binder::Status
+	SetEapAnonymousIdentity(const std::vector<uint8_t> &identity) override;
+	android::binder::Status
+	SetEapPassword(const std::vector<uint8_t> &password) override;
+	android::binder::Status SetEapCACert(const std::string &path) override;
+	android::binder::Status SetEapCAPath(const std::string &path) override;
+	android::binder::Status
+	SetEapClientCert(const std::string &path) override;
+	android::binder::Status
+	SetEapPrivateKey(const std::string &path) override;
+	android::binder::Status
+	SetEapSubjectMatch(const std::string &match) override;
+	android::binder::Status
+	SetEapAltSubjectMatch(const std::string &match) override;
+	android::binder::Status SetEapEngine(bool enable) override;
+	android::binder::Status SetEapEngineID(const std::string &id) override;
+	android::binder::Status
+	SetEapDomainSuffixMatch(const std::string &match) override;
 	android::binder::Status GetSSID(std::vector<uint8_t> *ssid) override;
 	android::binder::Status GetBSSID(std::vector<uint8_t> *bssid) override;
 	android::binder::Status GetScanSSID(bool *enable) override;

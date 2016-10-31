@@ -350,6 +350,125 @@ android::binder::Status Network::SetRequirePMF(bool enable)
 	return android::binder::Status::ok();
 }
 
+android::binder::Status Network::SetEapMethod(int32_t method)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SetEapPhase2Method(int32_t method)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status
+Network::SetEapIdentity(const std::vector<uint8_t> &identity)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status
+Network::SetEapAnonymousIdentity(const std::vector<uint8_t> &identity)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status
+Network::SetEapPassword(const std::vector<uint8_t> &password)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SetEapCACert(const std::string &path)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SetEapCAPath(const std::string &path)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SetEapClientCert(const std::string &path)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SetEapPrivateKey(const std::string &path)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SetEapSubjectMatch(const std::string &match)
+
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SetEapAltSubjectMatch(const std::string &match)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SetEapEngine(bool enable)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::SetEapEngineID(const std::string &id)
+
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
+android::binder::Status
+Network::SetEapDomainSuffixMatch(const std::string &match)
+
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	return android::binder::Status::ok();
+}
+
 android::binder::Status Network::GetSSID(std::vector<uint8_t> *ssid)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
