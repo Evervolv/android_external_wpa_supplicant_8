@@ -21,11 +21,9 @@ extern "C" {
 #include "utils/includes.h"
 }
 
-void wpas_binder_sock_handler(int sock, void *eloop_ctx, void *sock_ctx)
+void wpas_binder_sock_handler(int /* sock */, void * /* eloop_ctx */, void *sock_ctx)
 {
-	struct wpa_global *global = (wpa_global *)eloop_ctx;
 	struct wpas_binder_priv *priv = (wpas_binder_priv *)sock_ctx;
-
 	wpa_printf(
 	    MSG_DEBUG, "Processing binder events on FD %d", priv->binder_fd);
 	android::IPCThreadState::self()->handlePolledCommands();
@@ -65,7 +63,6 @@ struct wpas_binder_priv *wpas_binder_init(struct wpa_global *global)
 	priv->binder_manager = (void *)binder_manager;
 
 	return priv;
-
 err:
 	wpas_binder_deinit(priv);
 	return NULL;
@@ -81,6 +78,7 @@ void wpas_binder_deinit(struct wpas_binder_priv *priv)
 	wpa_supplicant_binder::BinderManager::destroyInstance();
 	eloop_unregister_read_sock(priv->binder_fd);
 	android::IPCThreadState::shutdown();
+	os_free(priv);
 }
 
 int wpas_binder_register_interface(struct wpa_supplicant *wpa_s)
@@ -154,7 +152,7 @@ int wpas_binder_unregister_network(
 
 int wpas_binder_notify_state_changed(struct wpa_supplicant *wpa_s)
 {
-	if (!wpa_s || !wpa_s->global->binder || !ssid)
+	if (!wpa_s || !wpa_s->global->binder)
 		return 1;
 
 	wpa_printf(
