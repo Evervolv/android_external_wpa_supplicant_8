@@ -7,7 +7,7 @@
  * See README for more details.
  */
 
-#include "binder_constants.h"
+#include "wpa_supplicant_binder/binder_constants.h"
 
 namespace wpa_supplicant_binder {
 namespace binder_constants {
