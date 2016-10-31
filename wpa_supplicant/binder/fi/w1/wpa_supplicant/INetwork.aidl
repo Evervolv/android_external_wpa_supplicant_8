@@ -74,6 +74,23 @@ interface INetwork {
 	const int PAIRWISE_CIPHER_MASK_TKIP = 0x08;
 	const int PAIRWISE_CIPHER_MASK_CCMP = 0x10;
 
+	/** Possble mask of values for EapMethod param. */
+	const int EAP_METHOD_PEAP = 0;
+	const int EAP_METHOD_TLS = 1;
+	const int EAP_METHOD_TTLS = 2;
+	const int EAP_METHOD_PWD = 3;
+	const int EAP_METHOD_SIM = 4;
+	const int EAP_METHOD_AKA = 5;
+	const int EAP_METHOD_AKA_PRIME = 6;
+	const int EAP_METHOD_WFA_UNAUTH_TLS = 7;
+
+	/** Possble mask of values for Phase2Method param. */
+	const int EAP_PHASE2_METHOD_NONE = 0;
+	const int EAP_PHASE2_METHOD_PAP = 1;
+	const int EAP_PHASE2_METHOD_MSPAP = 2;
+	const int EAP_PHASE2_METHOD_MSPAPV2 = 3;
+	const int EAP_PHASE2_METHOD_GTC = 4;
+
 	/**
 	 * Retrieves the ID allocated to this network by wpa_supplicant.
 	 *
@@ -105,6 +122,7 @@ interface INetwork {
 	 * Setters for the various network params.
 	 * These correspond to elements of |wpa_sssid| struct used internally by
 	 * wpa_supplicant to represent each network.
+	 * Sets |{struct wpa_ssid}.ssid|.
 	 */
 	/** Set SSID for this network. Max length of |SSID_MAX_LEN|. */
 	void SetSSID(in byte[] ssid);
@@ -113,31 +131,51 @@ interface INetwork {
 	 * Set the network to only connect to an AP with provided BSSSID.
 	 * Pass array of size 0 to clear this param.
 	 * Length of the value should be |BSSID_LEN|.
+	 * Sets |{struct wpa_ssid}.bssid|.
 	 */
 	void SetBSSID(in byte[] bssid);
 
-	/** Set whether to send Probe Requests for this network (hidden). */
+	/**
+	 * Set whether to send Probe Requests for this network (hidden).
+	 * Sets |{struct wpa_ssid}.scan_ssid|.
+	 */
 	void SetScanSSID(boolean enable);
 
-	/** Combination of |KEY_MGMT_MASK_*| values above. */
+	/**
+	 * Combination of |KEY_MGMT_MASK_*| values above.
+	 * Sets |{struct wpa_ssid}.key_mgmt|.
+	 */
 	void SetKeyMgmt(int key_mgmt_mask);
 
-	/** Combination of |PROTO_MASK_*| values above. */
+	/**
+	 * Combination of |PROTO_MASK_*| values above.
+	 * Sets |{struct wpa_ssid}.proto|.
+	 */
 	void SetProto(int proto_mask);
 
-	/** Combination of |AUTH_ALG_MASK_*| values above. */
+	/**
+	 * Combination of |AUTH_ALG_MASK_*| values above.
+	 * Sets |{struct wpa_ssid}.auth_alg|.
+	 * */
 	void SetAuthAlg(int auth_alg_mask);
 
-	/** Combination of |GROUP_CIPHER_MASK_*| values above. */
+	/**
+	 * Combination of |GROUP_CIPHER_MASK_*| values above.
+	 * Sets |{struct wpa_ssid}.group_cipher|.
+	 */
 	void SetGroupCipher(int group_cipher_mask);
 
-	/** Combination of |PAIRWISE_CIPHER_MASK_*| values above. */
+	/**
+	 * Combination of |PAIRWISE_CIPHER_MASK_*| values above.
+	 * Sets |{struct wpa_ssid}.pairwise_cipher|.
+	 * */
 	void SetPairwiseCipher(int pairwise_cipher_mask);
 
 	/**
 	 * Set passphrase for WPA_PSK network.
 	 * Min length of value is |PSK_PASSPHRASE_MIN_LEN|.
 	 * Max length of value is |PSK_PASSPHRASE_MAX_LEN|.
+	 * Sets |{struct wpa_ssid}.passphrase|.
 	 */
 	void SetPskPassphrase(String psk);
 
@@ -145,17 +183,110 @@ interface INetwork {
 	 * Set WEP key for WEP network.
 	 * Length of each key should be either |WEP40_KEY_LEN| or
 	 * |WEP104_KEY_LEN|.
+	 * Sets |{struct wpa_ssid}.wep_key|.
 	 *
 	 * @param key_idx Index of wep key to be set.
 	 *                Max of |WEP_KEYS_MAX_NUM| keys.
 	 */
 	void SetWepKey(int key_idx, in byte[] wep_key);
 
-	/** Set default Tx key index for WEP network. */
+	/**
+	 * Set default Tx key index for WEP network.
+	 * Sets |{struct wpa_ssid}.wep_tx_key_idx|.
+	 * */
 	void SetWepTxKeyIdx(int wep_tx_key_idx);
 
-	/** Set whether RequirePMF is enabled for this network. */
+	/**
+	 * Set whether RequirePMF is enabled for this network.
+	 * Sets |{struct wpa_ssid}.ieee80211w|.
+	 * */
 	void SetRequirePMF(boolean enable);
+
+	/**
+	 * Set EAP Method for this network.
+	 * Must be one of |EAP_METHOD_*| values.
+	 * Sets |{struct eap_peer_config}.eap_methods|.
+	 */
+	void SetEapMethod(int method);
+
+	/**
+	 * Set EAP Phase2 Method for this network.
+	 * Must be one of |EAP_PHASE2_METHOD_*| values.
+	 * Sets |{struct eap_peer_config}.phase2|.
+	 */
+	void SetEapPhase2Method(int method);
+
+	/**
+	 * Set EAP Identity for this network.
+	 * Sets |{struct eap_peer_config}.identity|.
+	 */
+	void SetEapIdentity(in byte[] identity);
+
+	/**
+	 * Set EAP Anonymous Identity for this network.
+	 * Sets |{struct eap_peer_config}.anonymous_identity|.
+	 */
+	void SetEapAnonymousIdentity(in byte[] identity);
+
+	/**
+	 * Set EAP Password for this network.
+	 * Sets |{struct eap_peer_config}.password|.
+	 */
+	void SetEapPassword(in byte[] password);
+
+	/**
+	 * Set EAP CA certificate file path for this network.
+	 * Sets |{struct eap_peer_config}.ca_cert|.
+	 */
+	void SetEapCACert(String path);
+
+	/**
+	 * Set EAP CA certificate directory path for this network.
+	 * Sets |{struct eap_peer_config}.ca_path|.
+	 */
+	void SetEapCAPath(String path);
+
+	/**
+	 * Set EAP Client certificate file path for this network.
+	 * Sets |{struct eap_peer_config}.client_cert|.
+	 */
+	void SetEapClientCert(String path);
+
+	/**
+	 * Set EAP private key file path for this network.
+	 * Sets |{struct eap_peer_config}.private_key|.
+	 */
+	void SetEapPrivateKey(String path);
+
+	/**
+	 * Set EAP subject match for this network.
+	 * Sets |{struct eap_peer_config}.subject_match|.
+	 */
+	void SetEapSubjectMatch(String match);
+
+	/**
+	 * Set EAP Altsubject match for this network.
+	 * Sets |{struct eap_peer_config}.altsubject_match|.
+	 */
+	void SetEapAltSubjectMatch(String match);
+
+	/**
+	 * Enable EAP Open SSL Engine for this network.
+	 * Sets |{struct eap_peer_config}.engine|.
+	 */
+	void SetEapEngine(boolean enable);
+
+	/**
+	 * Set EAP Open SSL Engine ID for this network.
+	 * Sets |{struct eap_peer_config}.engine_id|.
+	 */
+	void SetEapEngineID(String id);
+
+	/**
+	 * Set EAP Domain suffix match for this network.
+	 * Sets |{struct eap_peer_config}.domain_suffix_match|.
+	 */
+	void SetEapDomainSuffixMatch(String match);
 
 	/**
 	 * Getters for the various network params.
