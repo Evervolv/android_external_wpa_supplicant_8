@@ -10,6 +10,31 @@
 #include "binder_manager.h"
 #include "network.h"
 
+namespace {
+constexpr int kAllowedKeyMgmtMask =
+    (fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_NONE |
+     fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_WPA_PSK |
+     fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_WPA_EAP |
+     fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_IEEE8021X);
+constexpr int kAllowedProtoMask =
+    (fi::w1::wpa_supplicant::INetwork::PROTO_MASK_WPA |
+     fi::w1::wpa_supplicant::INetwork::PROTO_MASK_RSN |
+     fi::w1::wpa_supplicant::INetwork::PROTO_MASK_OSEN);
+constexpr int kAllowedAuthAlgMask =
+    (fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_OPEN |
+     fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_SHARED |
+     fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_LEAP);
+constexpr int kAllowedGroupCipherMask =
+    (fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_WEP40 |
+     fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_WEP104 |
+     fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_TKIP |
+     fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_CCMP);
+constexpr int kAllowedPairwiseCipherMask =
+    (fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_NONE |
+     fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_TKIP |
+     fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_CCMP);
+} // namespace
+
 namespace wpa_supplicant_binder {
 
 #define RETURN_IF_NETWORK_INVALID(wpa_ssid)                                    \
@@ -129,6 +154,17 @@ android::binder::Status Network::SetKeyMgmt(int32_t key_mgmt_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (key_mgmt_mask & ~kAllowedKeyMgmtMask) {
+		const std::string error_msg = "Invalid key_mgmt value: " +
+					      std::to_string(key_mgmt_mask) +
+					      ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	wpa_ssid->key_mgmt = key_mgmt_mask;
+	wpa_printf(MSG_MSGDUMP, "key_mgmt: 0x%x", wpa_ssid->key_mgmt);
 	return android::binder::Status::ok();
 }
 
@@ -136,6 +172,16 @@ android::binder::Status Network::SetProto(int32_t proto_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (proto_mask & ~kAllowedProtoMask) {
+		const std::string error_msg =
+		    "Invalid proto value: " + std::to_string(proto_mask) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	wpa_ssid->proto = proto_mask;
+	wpa_printf(MSG_MSGDUMP, "proto: 0x%x", wpa_ssid->proto);
 	return android::binder::Status::ok();
 }
 
@@ -143,6 +189,17 @@ android::binder::Status Network::SetAuthAlg(int32_t auth_alg_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (auth_alg_mask & ~kAllowedAuthAlgMask) {
+		const std::string error_msg = "Invalid auth_alg value: " +
+					      std::to_string(auth_alg_mask) +
+					      ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	wpa_ssid->auth_alg = auth_alg_mask;
+	wpa_printf(MSG_MSGDUMP, "auth_alg: 0x%x", wpa_ssid->auth_alg);
 	return android::binder::Status::ok();
 }
 
@@ -150,6 +207,17 @@ android::binder::Status Network::SetGroupCipher(int32_t group_cipher_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (group_cipher_mask & ~kAllowedGroupCipherMask) {
+		const std::string error_msg =
+		    "Invalid group_cipher value: " +
+		    std::to_string(group_cipher_mask) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	wpa_ssid->group_cipher = group_cipher_mask;
+	wpa_printf(MSG_MSGDUMP, "group_cipher: 0x%x", wpa_ssid->group_cipher);
 	return android::binder::Status::ok();
 }
 
@@ -157,6 +225,18 @@ android::binder::Status Network::SetPairwiseCipher(int32_t pairwise_cipher_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (pairwise_cipher_mask & ~kAllowedPairwiseCipherMask) {
+		const std::string error_msg =
+		    "Invalid pairwise_cipher value: " +
+		    std::to_string(pairwise_cipher_mask) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	wpa_ssid->pairwise_cipher = pairwise_cipher_mask;
+	wpa_printf(
+	    MSG_MSGDUMP, "pairwise_cipher: 0x%x", wpa_ssid->pairwise_cipher);
 	return android::binder::Status::ok();
 }
 
@@ -245,6 +325,9 @@ android::binder::Status Network::SetRequirePMF(bool enable)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	wpa_ssid->ieee80211w =
+	    enable ? MGMT_FRAME_PROTECTION_REQUIRED : NO_MGMT_FRAME_PROTECTION;
 	return android::binder::Status::ok();
 }
 
@@ -283,6 +366,7 @@ android::binder::Status Network::GetKeyMgmt(int32_t *key_mgmt_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	*key_mgmt_mask = wpa_ssid->key_mgmt;
 	return android::binder::Status::ok();
 }
 
@@ -290,6 +374,7 @@ android::binder::Status Network::GetProto(int32_t *proto_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	*proto_mask = wpa_ssid->proto;
 	return android::binder::Status::ok();
 }
 
@@ -297,6 +382,7 @@ android::binder::Status Network::GetAuthAlg(int32_t *auth_alg_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	*auth_alg_mask = wpa_ssid->auth_alg;
 	return android::binder::Status::ok();
 }
 
@@ -304,6 +390,7 @@ android::binder::Status Network::GetGroupCipher(int32_t *group_cipher_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	*group_cipher_mask = wpa_ssid->group_cipher;
 	return android::binder::Status::ok();
 }
 
@@ -312,6 +399,7 @@ Network::GetPairwiseCipher(int32_t *pairwise_cipher_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	*pairwise_cipher_mask = wpa_ssid->pairwise_cipher;
 	return android::binder::Status::ok();
 }
 
@@ -360,6 +448,8 @@ android::binder::Status Network::GetRequirePMF(bool *enable)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	*enable = (wpa_ssid->ieee80211w == MGMT_FRAME_PROTECTION_REQUIRED);
 	return android::binder::Status::ok();
 }
 
