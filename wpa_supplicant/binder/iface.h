@@ -18,6 +18,8 @@
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
+#include "../config.h"
+#include "../notify.h"
 #include "../wpa_supplicant_i.h"
 }
 
@@ -40,6 +42,10 @@ public:
 	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object_out)
 	    override;
 	android::binder::Status RemoveNetwork(int network_id) override;
+	android::binder::Status GetNetwork(
+	    int network_id,
+	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object_out)
+	    override;
 
 private:
 	struct wpa_supplicant *retrieveIfacePtr();

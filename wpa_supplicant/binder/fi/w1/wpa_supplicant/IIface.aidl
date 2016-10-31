@@ -20,6 +20,8 @@ interface IIface {
 	const int ERROR_GENERIC = 1;
 	/* Iface is no longer valid */
 	const int ERROR_IFACE_INVALID = 2;
+	/* Network being removed/retrieved does not exist */
+	const int ERROR_NETWORK_UNKNOWN = 3;
 
 	/**
 	 * Retrieves the name of the network interface.
@@ -44,4 +46,16 @@ interface IIface {
 	 * @param id Network ID allocated to the corresponding network.
 	 */
 	void RemoveNetwork(in int id);
+
+	/**
+	 * Gets a binder object for the network corresponding to the network_id.
+	 *
+	 * Use |INetwork.GetId()| on the corresponding network binder object
+	 * to retrieve the ID.
+	 *
+	 * @param id Network ID allocated to the corresponding network.
+	 *
+	 * @return Binder object representing the network.
+	 */
+	INetwork GetNetwork(in int id);
 }

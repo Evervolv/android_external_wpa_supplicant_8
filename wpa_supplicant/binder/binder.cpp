@@ -116,3 +116,38 @@ int wpas_binder_unregister_interface(struct wpa_supplicant *wpa_s)
 
 	return binder_manager->unregisterInterface(wpa_s);
 }
+
+int wpas_binder_register_network(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
+{
+	if (!wpa_s->global->binder || !wpa_s || !ssid)
+		return 1;
+
+	wpa_printf(
+	    MSG_DEBUG, "Registering network to binder control: %d", ssid->id);
+
+	wpa_supplicant_binder::BinderManager *binder_manager =
+	    wpa_supplicant_binder::BinderManager::getInstance();
+	if (!binder_manager)
+		return 1;
+
+	return binder_manager->registerNetwork(wpa_s, ssid);
+}
+
+int wpas_binder_unregister_network(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
+{
+	if (!wpa_s->global->binder || !wpa_s || !ssid)
+		return 1;
+
+	wpa_printf(
+	    MSG_DEBUG, "Deregistering network from binder control: %d",
+	    ssid->id);
+
+	wpa_supplicant_binder::BinderManager *binder_manager =
+	    wpa_supplicant_binder::BinderManager::getInstance();
+	if (!binder_manager)
+		return 1;
+
+	return binder_manager->unregisterNetwork(wpa_s, ssid);
+}
