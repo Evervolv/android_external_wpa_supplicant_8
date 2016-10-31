@@ -21,8 +21,12 @@ interface IIface {
 	const int ERROR_GENERIC = 1;
 	/* Iface is no longer valid */
 	const int ERROR_IFACE_INVALID = 2;
+	/* Iface is currently disabled */
+	const int ERROR_IFACE_DISABLED = 3;
+	/* Iface is currently connected */
+	const int ERROR_IFACE_NOT_DISCONNECTED = 4;
 	/* Network being removed/retrieved does not exist */
-	const int ERROR_NETWORK_UNKNOWN = 3;
+	const int ERROR_NETWORK_UNKNOWN = 5;
 
 	/**
 	 * Retrieves the name of the network interface.
@@ -69,4 +73,22 @@ interface IIface {
 	 *        instance.
 	 */
 	void RegisterCallback(in IIfaceCallback callback);
+
+	/**
+	 * Reconnect to the currently active network, even if we are already
+	 * connected.
+	 */
+	void Reassociate();
+
+	/**
+	 * Reconnect to the currently active network, if we are currently
+	 * disconnected.
+	 */
+	void Reconnect();
+
+	/**
+	 * Disconnect from the current active network.
+	 */
+	void Disconnect();
+
 }
