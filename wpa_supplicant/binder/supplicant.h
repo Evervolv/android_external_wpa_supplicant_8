@@ -37,7 +37,7 @@ public:
 
 	// Binder methods exposed in aidl.
 	android::binder::Status CreateInterface(
-	    const android::os::PersistableBundle &params,
+	    const fi::w1::wpa_supplicant::ParcelableIfaceParams &params,
 	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 	    override;
 	android::binder::Status

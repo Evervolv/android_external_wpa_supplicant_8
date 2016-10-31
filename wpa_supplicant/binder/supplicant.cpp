@@ -15,28 +15,21 @@ namespace wpa_supplicant_binder {
 Supplicant::Supplicant(struct wpa_global *global) : wpa_global_(global) {}
 
 android::binder::Status Supplicant::CreateInterface(
-    const android::os::PersistableBundle &params,
+    const fi::w1::wpa_supplicant::ParcelableIfaceParams &params,
     android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 {
-	android::String16 driver, ifname, confname, bridge_ifname;
-
 	/* Check if required Ifname argument is missing */
-	if (!params.getString(android::String16("Ifname"), &ifname)) {
+	if (params.ifname_.isEmpty()) {
 		return android::binder::Status::fromExceptionCode(
 		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
 		    "Ifname missing in params.");
 	}
-	/* Retrieve the remaining params from the dictionary */
-	params.getString(android::String16("Driver"), &driver);
-	params.getString(android::String16("ConfigFile"), &confname);
-	params.getString(android::String16("BridgeIfname"), &bridge_ifname);
-
 	/*
 	 * Try to get the wpa_supplicant record for this iface, return
 	 * an error if we already control it.
 	 */
-	if (wpa_supplicant_get_iface(
-		wpa_global_, android::String8(ifname).string()) != NULL) {
+	if (wpa_supplicant_get_iface(wpa_global_, params.ifname_.string()) !=
+	    NULL) {
 		return android::binder::Status::fromServiceSpecificError(
 		    ERROR_IFACE_EXISTS,
 		    "wpa_supplicant already controls this interface.");
@@ -47,11 +40,10 @@ android::binder::Status Supplicant::CreateInterface(
 	struct wpa_interface iface;
 
 	os_memset(&iface, 0, sizeof(iface));
-	iface.driver = os_strdup(android::String8(driver).string());
-	iface.ifname = os_strdup(android::String8(ifname).string());
-	iface.confname = os_strdup(android::String8(confname).string());
-	iface.bridge_ifname =
-	    os_strdup(android::String8(bridge_ifname).string());
+	iface.driver = os_strdup(params.driver_.string());
+	iface.ifname = os_strdup(params.ifname_.string());
+	iface.confname = os_strdup(params.config_file_.string());
+	iface.bridge_ifname = os_strdup(params.bridge_ifname_.string());
 	/* Otherwise, have wpa_supplicant attach to it. */
 	wpa_s = wpa_supplicant_add_iface(wpa_global_, &iface, NULL);
 	/* The supplicant core creates a corresponding binder object via
