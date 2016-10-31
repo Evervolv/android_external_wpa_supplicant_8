@@ -13,6 +13,10 @@
 #include <map>
 #include <string>
 
+#include "fi/w1/wpa_supplicant/IIfaceCallback.h"
+#include "fi/w1/wpa_supplicant/INetworkCallback.h"
+#include "fi/w1/wpa_supplicant/ISupplicantCallback.h"
+
 #include "iface.h"
 #include "network.h"
 #include "supplicant.h"
@@ -34,6 +38,7 @@ public:
 	static BinderManager *getInstance();
 	static void destroyInstance();
 
+	// Methods called from wpa_supplicant core.
 	int registerBinderService(struct wpa_global *global);
 	int registerInterface(struct wpa_supplicant *wpa_s);
 	int unregisterInterface(struct wpa_supplicant *wpa_s);
@@ -41,12 +46,25 @@ public:
 	registerNetwork(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
 	int
 	unregisterNetwork(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
+
+	// Methods called from binder objects.
 	int getIfaceBinderObjectByIfname(
 	    const std::string &ifname,
 	    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object);
 	int getNetworkBinderObjectByIfnameAndNetworkId(
 	    const std::string &ifname, int network_id,
 	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object);
+	int addSupplicantCallbackBinderObject(
+	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
+		&callback);
+	int addIfaceCallbackBinderObject(
+	    const std::string &ifname,
+	    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback>
+		&callback);
+	int addNetworkCallbackBinderObject(
+	    const std::string &ifname, int network_id,
+	    const android::sp<fi::w1::wpa_supplicant::INetworkCallback>
+		&callback);
 
 private:
 	BinderManager() = default;

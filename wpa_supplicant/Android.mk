@@ -1657,9 +1657,11 @@ LOCAL_SRC_FILES := \
     binder/binder_constants.cpp \
     binder/parcelable_iface_params.cpp \
     binder/fi/w1/wpa_supplicant/IIface.aidl \
+    binder/fi/w1/wpa_supplicant/IIfaceCallback.aidl \
     binder/fi/w1/wpa_supplicant/INetwork.aidl \
+    binder/fi/w1/wpa_supplicant/INetworkCallback.aidl \
     binder/fi/w1/wpa_supplicant/ISupplicant.aidl \
-    binder/fi/w1/wpa_supplicant/ISupplicantCallbacks.aidl
+    binder/fi/w1/wpa_supplicant/ISupplicantCallback.aidl
 LOCAL_SHARED_LIBRARIES := libbinder
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/binder/include
