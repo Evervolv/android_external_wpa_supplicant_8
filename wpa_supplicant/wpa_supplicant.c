@@ -5902,20 +5902,36 @@ int wpas_driver_bss_selection(struct wpa_supplicant *wpa_s)
 }
 
 
-#if defined(CONFIG_CTRL_IFACE) || defined(CONFIG_CTRL_IFACE_DBUS_NEW)
+#if defined(CONFIG_CTRL_IFACE) || defined(CONFIG_CTRL_IFACE_DBUS_NEW) || defined (CONFIG_CTRL_IFACE_BINDER)
 int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 					      struct wpa_ssid *ssid,
 					      const char *field,
 					      const char *value)
 {
 #ifdef IEEE8021X_EAPOL
-	struct eap_peer_config *eap = &ssid->eap;
+	enum wpa_ctrl_req_type rtype;
 
 	wpa_printf(MSG_DEBUG, "CTRL_IFACE: response handle field=%s", field);
 	wpa_hexdump_ascii_key(MSG_DEBUG, "CTRL_IFACE: response value",
 			      (const u8 *) value, os_strlen(value));
 
-	switch (wpa_supplicant_ctrl_req_from_string(field)) {
+	rtype = wpa_supplicant_ctrl_req_from_string(field);
+	return wpa_supplicant_ctrl_rsp_handle(wpa_s, ssid, rtype, value);
+#else /* IEEE8021X_EAPOL */
+	wpa_printf(MSG_DEBUG, "CTRL_IFACE: IEEE 802.1X not included");
+	return -1;
+#endif /* IEEE8021X_EAPOL */
+}
+
+int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
+				   struct wpa_ssid *ssid,
+				   enum wpa_ctrl_req_type rtype,
+				   const char *value)
+{
+#ifdef IEEE8021X_EAPOL
+	struct eap_peer_config *eap = &ssid->eap;
+
+	switch (rtype) {
 	case WPA_CTRL_REQ_EAP_IDENTITY:
 		os_free(eap->identity);
 		eap->identity = (u8 *) os_strdup(value);
@@ -5986,7 +6002,7 @@ int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 			return -1;
 		break;
 	default:
-		wpa_printf(MSG_DEBUG, "CTRL_IFACE: Unknown field '%s'", field);
+		wpa_printf(MSG_DEBUG, "CTRL_IFACE: Unknown type %d", rtype);
 		return -1;
 	}
 
@@ -5996,7 +6012,7 @@ int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 	return -1;
 #endif /* IEEE8021X_EAPOL */
 }
-#endif /* CONFIG_CTRL_IFACE || CONFIG_CTRL_IFACE_DBUS_NEW */
+#endif /* CONFIG_CTRL_IFACE || CONFIG_CTRL_IFACE_DBUS_NEW || CONFIG_CTRL_IFACE_BINDER */
 
 
 int wpas_network_disabled(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
