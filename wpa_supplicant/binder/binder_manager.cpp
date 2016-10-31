@@ -75,6 +75,12 @@ int BinderManager::registerInterface(struct wpa_supplicant *wpa_s)
 	// Initialize the vector of callbacks for this object.
 	iface_callbacks_map_[ifname] =
 	    std::vector<android::sp<fi::w1::wpa_supplicant::IIfaceCallback>>();
+
+	// Invoke the |OnInterfaceCreated| method on all registered callbacks.
+	callWithEachSupplicantCallback(std::bind(
+	    &fi::w1::wpa_supplicant::ISupplicantCallback::OnInterfaceCreated,
+	    std::placeholders::_1,
+	    ifname));
 	return 0;
 }
 
@@ -113,6 +119,12 @@ int BinderManager::unregisterInterface(struct wpa_supplicant *wpa_s)
 		}
 	}
 	iface_callbacks_map_.erase(iface_callback_map_iter);
+
+	// Invoke the |OnInterfaceRemoved| method on all registered callbacks.
+	callWithEachSupplicantCallback(std::bind(
+	    &fi::w1::wpa_supplicant::ISupplicantCallback::OnInterfaceRemoved,
+		std::placeholders::_1,
+	    ifname));
 	return 0;
 }
 
@@ -146,6 +158,14 @@ int BinderManager::registerNetwork(
 	// Initialize the vector of callbacks for this object.
 	network_callbacks_map_[network_key] = std::vector<
 	    android::sp<fi::w1::wpa_supplicant::INetworkCallback>>();
+
+	// Invoke the |OnNetworkAdded| method on all registered callbacks.
+	callWithEachIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&fi::w1::wpa_supplicant::IIfaceCallback::OnNetworkAdded,
+		std::placeholders::_1,
+		ssid->id));
 	return 0;
 }
 
@@ -190,6 +210,14 @@ int BinderManager::unregisterNetwork(
 		}
 	}
 	network_callbacks_map_.erase(network_callback_map_iter);
+
+	// Invoke the |OnNetworkRemoved| method on all registered callbacks.
+	callWithEachIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&fi::w1::wpa_supplicant::IIfaceCallback::OnNetworkRemoved,
+		std::placeholders::_1,
+		ssid->id));
 	return 0;
 }
 
@@ -453,5 +481,76 @@ int BinderManager::registerForDeathAndAddCallbackBinderObjectToList(
 		return 1;
 	}
 	return 0;
+}
+
+/**
+ * Helper function to invoke the provided callback method on all the
+ * registered |ISupplicantCallback| callback binder objects.
+ *
+ * @param method Pointer to the required binder method from
+ * |ISupplicantCallback|.
+ */
+void BinderManager::callWithEachSupplicantCallback(
+    const std::function<android::binder::Status(
+	android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>)> &method)
+{
+	for (const auto &callback : supplicant_callbacks_) {
+		method(callback);
+	}
+}
+
+/**
+ * Helper fucntion to invoke the provided callback method on all the
+ * registered |IIfaceCallback| callback binder objects for the specified
+ * |ifname|.
+ *
+ * @param ifname Name of the corresponding interface.
+ * @param method Pointer to the required binder method from |IIfaceCallback|.
+ */
+void BinderManager::callWithEachIfaceCallback(
+    const std::string &ifname,
+    const std::function<android::binder::Status(
+	android::sp<fi::w1::wpa_supplicant::IIfaceCallback>)> &method)
+{
+	if (ifname.empty())
+		return;
+
+	auto iface_callback_map_iter = iface_callbacks_map_.find(ifname);
+	if (iface_callback_map_iter == iface_callbacks_map_.end())
+		return;
+	const auto &iface_callback_list = iface_callback_map_iter->second;
+	for (const auto &callback : iface_callback_list) {
+		method(callback);
+	}
+}
+
+/**
+ * Helper function to invoke the provided callback method on all the
+ * registered |INetworkCallback| callback binder objects for the specified
+ * |ifname| & |network_id|.
+ *
+ * @param ifname Name of the corresponding interface.
+ * @param network_id ID of the corresponding network.
+ * @param method Pointer to the required binder method from |INetworkCallback|.
+ */
+void BinderManager::callWithEachNetworkCallback(
+    const std::string &ifname, int network_id,
+    const std::function<android::binder::Status(
+	android::sp<fi::w1::wpa_supplicant::INetworkCallback>)> &method)
+{
+	if (ifname.empty() || network_id < 0)
+		return;
+
+	// Generate the key to be used to lookup the network.
+	const std::string network_key =
+	    getNetworkObjectMapKey(ifname, network_id);
+	auto network_callback_map_iter =
+	    network_callbacks_map_.find(network_key);
+	if (network_callback_map_iter == network_callbacks_map_.end())
+		return;
+	const auto &network_callback_list = network_callback_map_iter->second;
+	for (const auto &callback : network_callback_list) {
+		method(callback);
+	}
 }
 } // namespace wpa_supplicant_binder
