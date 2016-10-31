@@ -13,7 +13,7 @@
 #include "config.h"
 #include "wpa_supplicant_i.h"
 #include "wps_supplicant.h"
-#include "binder/binder.h"
+#include "hidl/hidl.h"
 #include "dbus/dbus_common.h"
 #include "dbus/dbus_old.h"
 #include "dbus/dbus_new.h"
@@ -35,11 +35,11 @@ int wpas_notify_supplicant_initialized(struct wpa_global *global)
 	}
 #endif /* CONFIG_DBUS */
 
-#ifdef CONFIG_BINDER
-	global->binder = wpas_binder_init(global);
-	if (!global->binder)
+#ifdef CONFIG_HIDL
+	global->hidl = wpas_hidl_init(global);
+	if (!global->hidl)
 		return -1;
-#endif /* CONFIG_BINDER */
+#endif /* CONFIG_HIDL */
 
 	return 0;
 }
@@ -52,10 +52,10 @@ void wpas_notify_supplicant_deinitialized(struct wpa_global *global)
 		wpas_dbus_deinit(global->dbus);
 #endif /* CONFIG_DBUS */
 
-#ifdef CONFIG_BINDER
-	if (global->binder)
-		wpas_binder_deinit(global->binder);
-#endif /* CONFIG_BINDER */
+#ifdef CONFIG_HIDL
+	if (global->hidl)
+		wpas_hidl_deinit(global->hidl);
+#endif /* CONFIG_HIDL */
 }
 
 
@@ -70,7 +70,7 @@ int wpas_notify_iface_added(struct wpa_supplicant *wpa_s)
 	if (wpas_dbus_register_interface(wpa_s))
 		return -1;
 
-	if (wpas_binder_register_interface(wpa_s))
+	if (wpas_hidl_register_interface(wpa_s))
 		return -1;
 
 	return 0;
@@ -88,7 +88,7 @@ void wpas_notify_iface_removed(struct wpa_supplicant *wpa_s)
 	/* unregister interface in new DBus ctrl iface */
 	wpas_dbus_unregister_interface(wpa_s);
 
-	wpas_binder_unregister_interface(wpa_s);
+	wpas_hidl_unregister_interface(wpa_s);
 }
 
 
@@ -134,7 +134,7 @@ void wpas_notify_state_changed(struct wpa_supplicant *wpa_s,
 				  wpa_s->current_ssid->ssid_len) : "");
 #endif /* ANDROID */
 
-	wpas_binder_notify_state_changed(wpa_s);
+	wpas_hidl_notify_state_changed(wpa_s);
 }
 
 
@@ -222,7 +222,7 @@ void wpas_notify_network_request(struct wpa_supplicant *wpa_s,
 
 	wpas_dbus_signal_network_request(wpa_s, ssid, rtype, default_txt);
 
-	wpas_binder_notify_network_request(wpa_s, ssid, rtype, default_txt);
+	wpas_hidl_notify_network_request(wpa_s, ssid, rtype, default_txt);
 }
 
 
@@ -334,7 +334,7 @@ void wpas_notify_network_added(struct wpa_supplicant *wpa_s,
 	 */
 	if (!ssid->p2p_group && wpa_s->global->p2p_group_formation != wpa_s) {
 		wpas_dbus_register_network(wpa_s, ssid);
-		wpas_binder_register_network(wpa_s, ssid);
+		wpas_hidl_register_network(wpa_s, ssid);
 	}
 }
 
@@ -367,7 +367,7 @@ void wpas_notify_network_removed(struct wpa_supplicant *wpa_s,
 	if (!ssid->p2p_group && wpa_s->global->p2p_group_formation != wpa_s &&
 	    !wpa_s->p2p_mgmt) {
 		wpas_dbus_unregister_network(wpa_s, ssid->id);
-		wpas_binder_unregister_network(wpa_s, ssid);
+		wpas_hidl_unregister_network(wpa_s, ssid);
 	}
 	if (network_is_persistent_group(ssid))
 		wpas_notify_persistent_group_removed(wpa_s, ssid);
