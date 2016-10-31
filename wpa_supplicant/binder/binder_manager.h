@@ -172,6 +172,68 @@ private:
 	};
 };
 
-} // namespace wpa_supplicant_binder
+// The binder interface uses some values which are the same as internal ones to
+// avoid nasty runtime conversion functions.  So, adding compile time asserts
+// to guard against any internal changes breaking the binder interface.
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_NONE == WPA_KEY_MGMT_NONE,
+    "KeyMgmt value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_WPA_PSK == WPA_KEY_MGMT_PSK,
+    "KeyMgmt value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_WPA_EAP ==
+	WPA_KEY_MGMT_IEEE8021X,
+    "KeyMgmt value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_IEEE8021X ==
+	WPA_KEY_MGMT_IEEE8021X_NO_WPA,
+    "KeyMgmt value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::PROTO_MASK_WPA == WPA_PROTO_WPA,
+    "Proto value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::PROTO_MASK_RSN == WPA_PROTO_RSN,
+    "Proto value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::PROTO_MASK_OSEN == WPA_PROTO_OSEN,
+    "Proto value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_OPEN == WPA_AUTH_ALG_OPEN,
+    "AuthAlg value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_SHARED ==
+	WPA_AUTH_ALG_SHARED,
+    "AuthAlg value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_LEAP == WPA_AUTH_ALG_LEAP,
+    "AuthAlg value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_WEP40 ==
+	WPA_CIPHER_WEP40,
+    "GroupCipher value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_WEP104 ==
+	WPA_CIPHER_WEP104,
+    "GroupCipher value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_TKIP == WPA_CIPHER_TKIP,
+    "GroupCipher value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_CCMP == WPA_CIPHER_CCMP,
+    "GroupCipher value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_NONE ==
+	WPA_CIPHER_NONE,
+    "PairwiseCipher value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_TKIP ==
+	WPA_CIPHER_TKIP,
+    "PairwiseCipher value mismatch");
+static_assert(
+    fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_CCMP ==
+	WPA_CIPHER_CCMP,
+    "PairwiseCipher value mismatch");
 
+} // namespace wpa_supplicant_binder
 #endif // WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H
