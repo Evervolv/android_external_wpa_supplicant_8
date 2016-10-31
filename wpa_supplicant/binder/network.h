@@ -105,6 +105,8 @@ public:
 	android::binder::Status Enable(bool no_connect) override;
 	android::binder::Status Disable() override;
 	android::binder::Status Select() override;
+	android::binder::Status SendNetworkResponse(
+	    int type, const std::string &param) override;
 
 private:
 	struct wpa_ssid *retrieveNetworkPtr();

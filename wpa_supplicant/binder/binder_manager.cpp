@@ -223,8 +223,6 @@ int BinderManager::unregisterNetwork(
  *
  * @param wpa_s |wpa_supplicant| struct corresponding to the interface on which
  * the state change event occured.
- *
- * @return 0 on success, 1 on failure.
  */
 int BinderManager::notifyStateChange(struct wpa_supplicant *wpa_s)
 {
@@ -232,7 +230,6 @@ int BinderManager::notifyStateChange(struct wpa_supplicant *wpa_s)
 		return 1;
 
 	const std::string ifname(wpa_s->ifname);
-
 	if (iface_object_map_.find(ifname) == iface_object_map_.end())
 		return 1;
 
@@ -253,6 +250,35 @@ int BinderManager::notifyStateChange(struct wpa_supplicant *wpa_s)
 	    std::bind(
 		&fi::w1::wpa_supplicant::IIfaceCallback::OnStateChanged,
 		std::placeholders::_1, state, bssid, network_id, ssid));
+	return 0;
+}
+
+/**
+ * Notify all listeners about a request on a particular network.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface on which
+ * the network is present.
+ * @param ssid |wpa_ssid| struct corresponding to the network.
+ * @param type type of request.
+ * @param param addition params associated with the request.
+ */
+int BinderManager::notifyNetworkRequest(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid, int type,
+    const char *param)
+{
+	if (!wpa_s || !ssid)
+		return 1;
+
+	const std::string network_key =
+	    getNetworkObjectMapKey(wpa_s->ifname, ssid->id);
+	if (network_object_map_.find(network_key) == network_object_map_.end())
+		return 1;
+
+	callWithEachNetworkCallback(
+	    wpa_s->ifname, ssid->id,
+	    std::bind(
+		&fi::w1::wpa_supplicant::INetworkCallback::OnNetworkRequest,
+		std::placeholders::_1, type, param));
 	return 0;
 }
 

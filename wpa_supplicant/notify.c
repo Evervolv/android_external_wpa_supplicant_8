@@ -221,6 +221,8 @@ void wpas_notify_network_request(struct wpa_supplicant *wpa_s,
 		return;
 
 	wpas_dbus_signal_network_request(wpa_s, ssid, rtype, default_txt);
+
+	wpas_binder_notify_network_request(wpa_s, ssid, rtype, default_txt);
 }
 
 
