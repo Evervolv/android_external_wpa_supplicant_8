@@ -23,11 +23,22 @@ android::binder::Status Iface::GetName(std::string *iface_name_out)
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
 		return android::binder::Status::fromServiceSpecificError(
-		    ERROR_IFACE_UNKNOWN,
+		    ERROR_IFACE_INVALID,
 		    "wpa_supplicant does not control this interface.");
 	}
 
 	*iface_name_out = ifname_;
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Iface::AddNetwork(
+    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object_out)
+{
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Iface::RemoveNetwork(int network_id)
+{
 	return android::binder::Status::ok();
 }
 
