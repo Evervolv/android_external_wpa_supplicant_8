@@ -18,9 +18,7 @@
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
-#include "../config.h"
-#include "../notify.h"
-#include "../wpa_supplicant_i.h"
+#include "wpa_supplicant_i.h"
 }
 
 namespace wpa_supplicant_binder {
