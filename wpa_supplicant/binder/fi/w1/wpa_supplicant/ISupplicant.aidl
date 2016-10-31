@@ -10,11 +10,12 @@
 package fi.w1.wpa_supplicant;
 
 import fi.w1.wpa_supplicant.ParcelableIfaceParams;
+import fi.w1.wpa_supplicant.ISupplicantCallback;
 import fi.w1.wpa_supplicant.IIface;
 
 /**
  * Interface exposed by the wpa_supplicant binder service registered
- * with the service manager with name: fi.w1.wpa_supplicant.
+ * with the service manager with name: wpa_supplicant.
  */
 @utf8InCpp
 interface ISupplicant {
@@ -97,4 +98,15 @@ interface ISupplicant {
 	 * @return true if set, false otherwise.
 	 */
 	boolean GetDebugShowKeys();
+
+	/**
+	 * Register for callbacks from the wpa_supplicant service.
+	 *
+	 * These callbacks are invoked for global events that are not specific
+	 * to any interface or network.
+	 *
+	 * @param callback Binder object reference to a |ISupplicantCallback|
+	 *        instance.
+	 */
+	void RegisterCallback(in ISupplicantCallback callback);
 }

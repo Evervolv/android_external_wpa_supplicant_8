@@ -9,6 +9,7 @@
 
 package fi.w1.wpa_supplicant;
 
+import fi.w1.wpa_supplicant.IIfaceCallback;
 import fi.w1.wpa_supplicant.INetwork;
 
 /**
@@ -58,4 +59,14 @@ interface IIface {
 	 * @return Binder object representing the network.
 	 */
 	INetwork GetNetwork(in int id);
+
+	/**
+	 * Register for callbacks from this interface.
+	 *
+	 * These callbacks are invoked for events that are specific to this interface.
+	 *
+	 * @param callback Binder object reference to a |IIfaceCallback|
+	 *        instance.
+	 */
+	void RegisterCallback(in IIfaceCallback callback);
 }

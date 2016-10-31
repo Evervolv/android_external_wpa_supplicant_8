@@ -14,7 +14,7 @@
 
 #include "fi/w1/wpa_supplicant/BnSupplicant.h"
 #include "fi/w1/wpa_supplicant/IIface.h"
-#include "fi/w1/wpa_supplicant/ISupplicantCallbacks.h"
+#include "fi/w1/wpa_supplicant/ISupplicantCallback.h"
 
 extern "C" {
 #include "utils/common.h"
@@ -52,6 +52,9 @@ public:
 	android::binder::Status
 	GetDebugShowTimestamp(bool *show_timestamp_out) override;
 	android::binder::Status GetDebugShowKeys(bool *show_keys_out) override;
+	android::binder::Status RegisterCallback(
+	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
+		&callback) override;
 
 private:
 	int convertDebugLevelToInternalLevel(
@@ -62,7 +65,7 @@ private:
 	/* Raw pointer to the global structure maintained by the core. */
 	struct wpa_global *wpa_global_;
 	/* All the callback objects registered by the clients. */
-	std::vector<android::sp<fi::w1::wpa_supplicant::ISupplicantCallbacks>>
+	std::vector<android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>>
 	    callbacks_;
 
 	DISALLOW_COPY_AND_ASSIGN(Supplicant);

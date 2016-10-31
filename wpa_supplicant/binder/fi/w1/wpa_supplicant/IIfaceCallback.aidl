@@ -9,13 +9,14 @@
 
 package fi.w1.wpa_supplicant;
 
-import android.os.PersistableBundle;
-
 /**
- * Callback Interface exposed by the wpa_supplicant service. Clients need
- * to host an instance of this binder object and pass a reference of the object
- * to wpa_supplicant via the registerCallbacksObject method.
+ * Callback Interface exposed by the wpa_supplicant service
+ * for each interface (IIface).
+ *
+ * Clients need to host an instance of this binder object and
+ * pass a reference of the object to wpa_supplicant via the
+ * corresponding |IIface.registerCallback| method.
  */
 @utf8InCpp
-interface ISupplicantCallbacks {
+interface IIfaceCallback {
 }
