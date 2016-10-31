@@ -18,4 +18,17 @@ package fi.w1.wpa_supplicant;
  */
 @utf8InCpp
 interface ISupplicantCallback {
+	/**
+	 * Used to indicate that a new interface has been created.
+	 *
+	 * @param ifname Name of the network interface, e.g., wlan0
+	 */
+	oneway void OnInterfaceCreated(String ifname);
+
+	/**
+	 * Used to indicate that an interface has been removed.
+	 *
+	 * @param ifname Name of the network interface, e.g., wlan0
+	 */
+	oneway void OnInterfaceRemoved(String ifname);
 }
