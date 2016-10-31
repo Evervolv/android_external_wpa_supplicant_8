@@ -82,6 +82,7 @@ public:
 
 private:
 	struct wpa_ssid *retrieveNetworkPtr();
+	struct wpa_supplicant *retrieveIfacePtr();
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
 	// the lifetime of the process.
