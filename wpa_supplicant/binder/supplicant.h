@@ -10,6 +10,8 @@
 #ifndef WPA_SUPPLICANT_BINDER_SUPPLICANT_H
 #define WPA_SUPPLICANT_BINDER_SUPPLICANT_H
 
+#include <android-base/macros.h>
+
 #include "fi/w1/wpa_supplicant/BnSupplicant.h"
 #include "fi/w1/wpa_supplicant/IIface.h"
 #include "fi/w1/wpa_supplicant/ISupplicantCallbacks.h"
@@ -31,7 +33,7 @@ class Supplicant : public fi::w1::wpa_supplicant::BnSupplicant
 {
 public:
 	Supplicant(struct wpa_global *global);
-	virtual ~Supplicant() = default;
+	~Supplicant() override = default;
 
 	android::binder::Status CreateInterface(
 	    const android::os::PersistableBundle &params,
@@ -48,6 +50,8 @@ private:
 	/* All the callback objects registered by the clients. */
 	std::vector<android::sp<fi::w1::wpa_supplicant::ISupplicantCallbacks>>
 	    callbacks_;
+
+	DISALLOW_COPY_AND_ASSIGN(Supplicant);
 };
 
 } /* namespace wpa_supplicant_binder */
