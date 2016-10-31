@@ -46,6 +46,7 @@ public:
 	registerNetwork(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
 	int
 	unregisterNetwork(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
+	int notifyStateChange(struct wpa_supplicant *wpa_s);
 
 	// Methods called from binder objects.
 	int getIfaceBinderObjectByIfname(
@@ -235,5 +236,12 @@ static_assert(
 	WPA_CIPHER_CCMP,
     "PairwiseCipher value mismatch");
 
+static_assert(
+    WPA_DISCONNECTED ==
+	fi::w1::wpa_supplicant::IIfaceCallback::STATE_DISCONNECTED,
+    "State value mismatch");
+static_assert(
+    WPA_COMPLETED == fi::w1::wpa_supplicant::IIfaceCallback::STATE_COMPLETED,
+    "State value mismatch");
 } // namespace wpa_supplicant_binder
 #endif // WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H
