@@ -42,20 +42,11 @@ android::binder::Status Iface::AddNetwork(
 		    "wpa_supplicant does not control this interface.");
 	}
 
-	struct wpa_ssid *ssid = wpa_config_add_network(wpa_s->conf);
+	struct wpa_ssid *ssid = wpa_supplicant_add_network(wpa_s);
 	if (!ssid) {
 		return android::binder::Status::fromServiceSpecificError(
 		    ERROR_GENERIC, "wpa_supplicant couldn't add this network.");
 	}
-
-	// This sequence of steps after network addition is following what is
-	// currently being done in |ctrl_iface.c| & |dbus_new_handlers|.
-	// Notify the control interfaces about the network addition.
-	wpas_notify_network_added(wpa_s, ssid);
-	// Set the new network to be disabled.
-	ssid->disabled = 1;
-	// Set defaults for the new network.
-	wpa_config_set_network_defaults(ssid);
 
 	BinderManager *binder_manager = BinderManager::getInstance();
 	if (!binder_manager ||
@@ -77,13 +68,14 @@ android::binder::Status Iface::RemoveNetwork(int network_id)
 		    "wpa_supplicant does not control this interface.");
 	}
 
-	struct wpa_ssid *ssid = wpa_config_get_network(wpa_s->conf, network_id);
-	if (!ssid) {
+	int result = wpa_supplicant_remove_network(wpa_s, network_id);
+	if (result == -1) {
 		return android::binder::Status::fromServiceSpecificError(
 		    ERROR_NETWORK_UNKNOWN,
 		    "wpa_supplicant does not control this network.");
 	}
-	if (wpa_config_remove_network(wpa_s->conf, network_id)) {
+
+	if (result == -2) {
 		return android::binder::Status::fromServiceSpecificError(
 		    ERROR_GENERIC,
 		    "wpa_supplicant couldn't remove this network.");
@@ -150,5 +142,4 @@ wpa_supplicant *Iface::retrieveIfacePtr()
 	return wpa_supplicant_get_iface(
 	    (struct wpa_global *)wpa_global_, ifname_.c_str());
 }
-
 } // namespace wpa_supplicant_binder
