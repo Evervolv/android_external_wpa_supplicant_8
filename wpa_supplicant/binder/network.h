@@ -42,6 +42,43 @@ public:
 	android::binder::Status RegisterCallback(
 	    const android::sp<fi::w1::wpa_supplicant::INetworkCallback>
 		&callback) override;
+	android::binder::Status
+	SetSSID(const std::vector<uint8_t> &ssid) override;
+	android::binder::Status
+	SetBSSID(const std::vector<uint8_t> &bssid) override;
+	android::binder::Status SetScanSSID(bool enable) override;
+	android::binder::Status SetKeyMgmt(int32_t key_mgmt_mask) override;
+	android::binder::Status SetProto(int32_t proto_mask) override;
+	android::binder::Status SetAuthAlg(int32_t auth_alg_mask) override;
+	android::binder::Status
+	SetGroupCipher(int32_t group_cipher_mask) override;
+	android::binder::Status
+	SetPairwiseCipher(int32_t pairwise_cipher_mask) override;
+	android::binder::Status
+	SetPskPassphrase(const std::string &psk) override;
+	android::binder::Status
+	SetWepKey(int key_idx, const std::vector<uint8_t> &wep_key) override;
+	android::binder::Status SetWepTxKeyIdx(int32_t wep_tx_key_idx) override;
+	android::binder::Status SetRequirePMF(bool enable) override;
+	android::binder::Status GetSSID(std::vector<uint8_t> *ssid) override;
+	android::binder::Status GetBSSID(std::vector<uint8_t> *bssid) override;
+	android::binder::Status GetScanSSID(bool *enable) override;
+	android::binder::Status GetKeyMgmt(int32_t *key_mgmt_mask) override;
+	android::binder::Status GetProto(int32_t *proto_mask) override;
+	android::binder::Status GetAuthAlg(int32_t *auth_alg_mask) override;
+	android::binder::Status
+	GetGroupCipher(int32_t *group_cipher_mask) override;
+	android::binder::Status
+	GetPairwiseCipher(int32_t *pairwise_cipher_mask) override;
+	android::binder::Status GetPskPassphrase(std::string *psk) override;
+	android::binder::Status
+	GetWepKey(int key_idx, std::vector<uint8_t> *wep_key) override;
+	android::binder::Status
+	GetWepTxKeyIdx(int32_t *wep_tx_key_idx) override;
+	android::binder::Status GetRequirePMF(bool *enable) override;
+	android::binder::Status Enable(bool no_connect) override;
+	android::binder::Status Disable() override;
+	android::binder::Status Select() override;
 
 private:
 	struct wpa_ssid *retrieveNetworkPtr();
