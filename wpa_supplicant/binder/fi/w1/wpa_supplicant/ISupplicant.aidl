@@ -18,11 +18,12 @@ import fi.w1.wpa_supplicant.IIface;
  */
 @utf8InCpp
 interface ISupplicant {
-	/* Error values returned by the service to RPC method calls. */
-	const int ERROR_INVALID_ARGS = 1;
-	const int ERROR_UNKNOWN = 2;
-	const int ERROR_IFACE_EXISTS = 3;
-	const int ERROR_IFACE_UNKNOWN = 4;
+	/* Non-specific error encountered */
+	const int ERROR_GENERIC = 1;
+	/* Iface being added already exists */
+	const int ERROR_IFACE_EXISTS = 2;
+	/* Iface being removed/retrieved does not exist */
+	const int ERROR_IFACE_UNKNOWN = 3;
 
 	/**
 	 * Registers a wireless interface in wpa_supplicant.

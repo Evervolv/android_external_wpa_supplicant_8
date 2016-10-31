@@ -10,7 +10,10 @@
 #ifndef WPA_SUPPLICANT_BINDER_IFACE_H
 #define WPA_SUPPLICANT_BINDER_IFACE_H
 
+#include <android-base/macros.h>
+
 #include "fi/w1/wpa_supplicant/BnIface.h"
+#include "fi/w1/wpa_supplicant/INetwork.h"
 
 extern "C" {
 #include "utils/common.h"
@@ -29,19 +32,25 @@ class Iface : public fi::w1::wpa_supplicant::BnIface
 {
 public:
 	Iface(struct wpa_global *wpa_global, const char ifname[]);
-	virtual ~Iface() = default;
+	~Iface() override = default;
 
 	// Binder methods exposed in aidl.
 	android::binder::Status GetName(std::string *iface_name_out) override;
+	android::binder::Status AddNetwork(
+	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object_out)
+	    override;
+	android::binder::Status RemoveNetwork(int network_id) override;
 
 private:
+	struct wpa_supplicant *retrieveIfacePtr();
+
 	// Reference to the global wpa_struct. This is assumed to be valid for
 	// the lifetime of the process.
 	const struct wpa_global *wpa_global_;
 	// Name of the iface this binder object controls
 	const std::string ifname_;
 
-	struct wpa_supplicant *retrieveIfacePtr();
+	DISALLOW_COPY_AND_ASSIGN(Iface);
 };
 
 } // namespace wpa_supplicant_binder
