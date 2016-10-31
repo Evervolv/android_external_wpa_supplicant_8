@@ -28,12 +28,26 @@ void wpas_binder_deinit(struct wpas_binder_priv *priv);
 #ifdef CONFIG_CTRL_IFACE_BINDER
 int wpas_binder_register_interface(struct wpa_supplicant *wpa_s);
 int wpas_binder_unregister_interface(struct wpa_supplicant *wpa_s);
+int wpas_binder_register_network(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
+int wpas_binder_unregister_network(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
 #else  /* CONFIG_CTRL_IFACE_BINDER */
 static inline int wpas_binder_register_interface(struct wpa_supplicant *wpa_s)
 {
 	return 0;
 }
 static inline int wpas_binder_unregister_interface(struct wpa_supplicant *wpa_s)
+{
+	return 0;
+}
+static inline int wpas_binder_register_network(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
+{
+	return 0;
+}
+static inline int wpas_binder_unregister_network(
+    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
 {
 	return 0;
 }
