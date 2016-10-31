@@ -70,6 +70,9 @@ int wpas_notify_iface_added(struct wpa_supplicant *wpa_s)
 	if (wpas_dbus_register_interface(wpa_s))
 		return -1;
 
+	if (wpas_binder_register_interface(wpa_s))
+		return -1;
+
 	return 0;
 }
 
@@ -84,6 +87,8 @@ void wpas_notify_iface_removed(struct wpa_supplicant *wpa_s)
 
 	/* unregister interface in new DBus ctrl iface */
 	wpas_dbus_unregister_interface(wpa_s);
+
+	wpas_binder_unregister_interface(wpa_s);
 }
 
 

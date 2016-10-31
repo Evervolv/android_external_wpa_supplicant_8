@@ -41,12 +41,16 @@ struct wpas_binder_priv *wpas_binder_init(struct wpa_global *global)
 		return NULL;
 	priv->global = global;
 
+	wpa_printf(MSG_DEBUG, "Initing binder control");
+
 	android::ProcessState::self()->setThreadPoolMaxThreadCount(0);
 	android::IPCThreadState::self()->disableBackgroundScheduling(true);
 	android::IPCThreadState::self()->setupPolling(&priv->binder_fd);
-	wpa_printf(MSG_INFO, "Process binder events on FD %d", priv->binder_fd);
 	if (priv->binder_fd < 0)
 		goto err;
+
+	wpa_printf(
+	    MSG_INFO, "Processing binder events on FD %d", priv->binder_fd);
 	/* Look for read events from the binder socket in the eloop. */
 	if (eloop_register_read_sock(
 		priv->binder_fd, wpas_binder_sock_handler, global, priv) < 0)
@@ -72,6 +76,8 @@ void wpas_binder_deinit(struct wpas_binder_priv *priv)
 	if (!priv)
 		return;
 
+	wpa_printf(MSG_DEBUG, "Deiniting binder control");
+
 	wpa_supplicant_binder::BinderManager::destroyInstance();
 	eloop_unregister_read_sock(priv->binder_fd);
 	android::IPCThreadState::shutdown();
@@ -81,6 +87,10 @@ int wpas_binder_register_interface(struct wpa_supplicant *wpa_s)
 {
 	if (!wpa_s->global->binder)
 		return 1;
+
+	wpa_printf(
+	    MSG_DEBUG, "Registering interface to binder control: %s",
+	    wpa_s->ifname);
 
 	wpa_supplicant_binder::BinderManager *binder_manager =
 	    wpa_supplicant_binder::BinderManager::getInstance();
@@ -94,6 +104,10 @@ int wpas_binder_unregister_interface(struct wpa_supplicant *wpa_s)
 {
 	if (!wpa_s->global->binder)
 		return 1;
+
+	wpa_printf(
+	    MSG_DEBUG, "Deregistering interface from binder control: %s",
+	    wpa_s->ifname);
 
 	wpa_supplicant_binder::BinderManager *binder_manager =
 	    wpa_supplicant_binder::BinderManager::getInstance();
