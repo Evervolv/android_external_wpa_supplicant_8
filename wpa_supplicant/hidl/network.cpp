@@ -8,58 +8,54 @@
  */
 
 #include "hidl_manager.h"
+#include "hidl_return_macros.h"
 #include "network.h"
 
 namespace {
-constexpr int kAllowedKeyMgmtMask =
-    (fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_NONE |
-     fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_WPA_PSK |
-     fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_WPA_EAP |
-     fi::w1::wpa_supplicant::INetwork::KEY_MGMT_MASK_IEEE8021X);
-constexpr int kAllowedProtoMask =
-    (fi::w1::wpa_supplicant::INetwork::PROTO_MASK_WPA |
-     fi::w1::wpa_supplicant::INetwork::PROTO_MASK_RSN |
-     fi::w1::wpa_supplicant::INetwork::PROTO_MASK_OSEN);
-constexpr int kAllowedAuthAlgMask =
-    (fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_OPEN |
-     fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_SHARED |
-     fi::w1::wpa_supplicant::INetwork::AUTH_ALG_MASK_LEAP);
-constexpr int kAllowedGroupCipherMask =
-    (fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_WEP40 |
-     fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_WEP104 |
-     fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_TKIP |
-     fi::w1::wpa_supplicant::INetwork::GROUP_CIPHER_MASK_CCMP);
-constexpr int kAllowedPairwiseCipherMask =
-    (fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_NONE |
-     fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_TKIP |
-     fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_CCMP);
+using android::hardware::wifi::supplicant::V1_0::ISupplicantNetwork;
+using android::hardware::wifi::supplicant::V1_0::SupplicantStatus;
 
-constexpr int kEapMethodMax =
-    fi::w1::wpa_supplicant::INetwork::EAP_METHOD_WFA_UNAUTH_TLS + 1;
-constexpr int kEapMethodMin = fi::w1::wpa_supplicant::INetwork::EAP_METHOD_PEAP;
+constexpr uint8_t kZeroBssid[6] = {0, 0, 0, 0, 0, 0};
+
+constexpr uint32_t kAllowedKeyMgmtMask =
+    (static_cast<uint32_t>(ISupplicantNetwork::KeyMgmtMask::NONE) |
+     static_cast<uint32_t>(ISupplicantNetwork::KeyMgmtMask::WPA_PSK) |
+     static_cast<uint32_t>(ISupplicantNetwork::KeyMgmtMask::WPA_EAP) |
+     static_cast<uint32_t>(ISupplicantNetwork::KeyMgmtMask::IEEE8021X));
+constexpr uint32_t kAllowedproto_mask =
+    (static_cast<uint32_t>(ISupplicantNetwork::ProtoMask::WPA) |
+     static_cast<uint32_t>(ISupplicantNetwork::ProtoMask::RSN) |
+     static_cast<uint32_t>(ISupplicantNetwork::ProtoMask::OSEN));
+constexpr uint32_t kAllowedauth_alg_mask =
+    (static_cast<uint32_t>(ISupplicantNetwork::AuthAlgMask::OPEN) |
+     static_cast<uint32_t>(ISupplicantNetwork::AuthAlgMask::SHARED) |
+     static_cast<uint32_t>(ISupplicantNetwork::AuthAlgMask::LEAP));
+constexpr uint32_t kAllowedgroup_cipher_mask =
+    (static_cast<uint32_t>(ISupplicantNetwork::GroupCipherMask::WEP40) |
+     static_cast<uint32_t>(ISupplicantNetwork::GroupCipherMask::WEP104) |
+     static_cast<uint32_t>(ISupplicantNetwork::GroupCipherMask::TKIP) |
+     static_cast<uint32_t>(ISupplicantNetwork::GroupCipherMask::CCMP));
+constexpr uint32_t kAllowedpairwise_cipher_mask =
+    (static_cast<uint32_t>(ISupplicantNetwork::PairwiseCipherMask::NONE) |
+     static_cast<uint32_t>(ISupplicantNetwork::PairwiseCipherMask::TKIP) |
+     static_cast<uint32_t>(ISupplicantNetwork::PairwiseCipherMask::CCMP));
+
+constexpr uint32_t kEapMethodMax =
+    static_cast<uint32_t>(ISupplicantNetwork::EapMethod::WFA_UNAUTH_TLS) + 1;
 constexpr char const *kEapMethodStrings[kEapMethodMax] = {
     "PEAP", "TLS", "TTLS", "PWD", "SIM", "AKA", "AKA'", "WFA-UNAUTH-TLS"};
-
-constexpr int kEapPhase2MethodMax =
-    fi::w1::wpa_supplicant::INetwork::EAP_PHASE2_METHOD_GTC + 1;
-constexpr int kEapPhase2MethodMin =
-    fi::w1::wpa_supplicant::INetwork::EAP_PHASE2_METHOD_NONE;
+constexpr uint32_t kEapPhase2MethodMax =
+    static_cast<uint32_t>(ISupplicantNetwork::EapPhase2Method::GTC) + 1;
 constexpr char const *kEapPhase2MethodStrings[kEapPhase2MethodMax] = {
     "NULL", "PAP", "MSCHAP", "MSCHAPV2", "GTC"};
 }  // namespace
 
-namespace wpa_supplicant_hidl {
-
-#define RETURN_IF_NETWORK_INVALID(wpa_ssid)                             \
-	{                                                               \
-		if (!wpa_ssid) {                                        \
-			return android::hidl::Status::                \
-			    fromServiceSpecificError(                   \
-				ERROR_NETWORK_INVALID,                  \
-				"wpa_supplicant does not control this " \
-				"network.");                            \
-		}                                                       \
-	}  // #define RETURN_IF_NETWORK_INVALID(wpa_ssid)
+namespace android {
+namespace hardware {
+namespace wifi {
+namespace supplicant {
+namespace V1_0 {
+namespace implementation {
 
 Network::Network(
     struct wpa_global *wpa_global, const char ifname[], int network_id)
@@ -67,74 +63,92 @@ Network::Network(
 {
 }
 
-android::hidl::Status Network::GetId(int *network_id_out)
+Return<void> Network::getId(getId_cb _hidl_cb)
 {
-	RETURN_IF_NETWORK_INVALID(retrieveNetworkPtr());
-	*network_id_out = network_id_;
-	return android::hidl::Status::ok();
+	uint32_t id = UINT32_MAX;
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID, id);
+	}
+
+	id = network_id_;
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, id);
 }
 
-android::hidl::Status Network::GetInterfaceName(std::string *ifname_out)
+Return<void> Network::getInterfaceName(getInterfaceName_cb _hidl_cb)
 {
-	RETURN_IF_NETWORK_INVALID(retrieveNetworkPtr());
-	*ifname_out = ifname_;
-	return android::hidl::Status::ok();
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID, ifname_);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, ifname_);
 }
 
-android::hidl::Status Network::RegisterCallback(
-    const android::sp<fi::w1::wpa_supplicant::INetworkCallback> &callback)
+Return<void> Network::registerCallback(
+    const sp<ISupplicantNetworkCallback> &callback,
+    registerCallback_cb _hidl_cb)
 {
-	RETURN_IF_NETWORK_INVALID(retrieveNetworkPtr());
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
+
 	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager ||
 	    hidl_manager->addNetworkCallbackHidlObject(
 		ifname_, network_id_, callback)) {
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC,
-		    "wpa_supplicant encountered a hidl error.");
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetSSID(const std::vector<uint8_t> &ssid)
+Return<void> Network::setSsid(
+    const hidl_vec<uint8_t> &ssid, setSsid_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	if (ssid.empty() || ssid.size() > SSID_MAX_LEN) {
-		const std::string error_msg = "Invalid SSID value length: " +
-					      std::to_string(ssid.size()) + ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
 	}
-	android::hidl::Status status = setByteArrayFieldAndResetState(
-	    ssid.data(), ssid.size(), &(wpa_ssid->ssid), &(wpa_ssid->ssid_len),
-	    "ssid");
-	if (status.isOk() && wpa_ssid->passphrase) {
+
+	if (ssid.size() == 0 ||
+	    ssid.size() >
+		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+					  SSID_MAX_LEN_IN_BYTES)) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
+	}
+
+	if (setByteArrayFieldAndResetState(
+		ssid.data(), ssid.size(), &(wpa_ssid->ssid),
+		&(wpa_ssid->ssid_len), "ssid")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	if (wpa_ssid->passphrase) {
 		wpa_config_update_psk(wpa_ssid);
 	}
-	return status;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetBSSID(const std::vector<uint8_t> &bssid)
+Return<void> Network::setBssid(
+    const hidl_array<uint8_t, 6 /* 6 */> &bssid, setBssid_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	if (!bssid.empty() && bssid.size() != BSSID_LEN) {
-		const std::string error_msg = "Invalid BSSID value length: " +
-					      std::to_string(bssid.size()) +
-					      ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
 	}
+
+	if (!bssid.data()) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
+	}
+
 	int prev_bssid_set = wpa_ssid->bssid_set;
 	u8 prev_bssid[ETH_ALEN];
 	os_memcpy(prev_bssid, wpa_ssid->bssid, ETH_ALEN);
-	// Empty array is used to clear out the BSSID value.
-	if (bssid.empty()) {
+	// Zero'ed array is used to clear out the BSSID value.
+	if (os_memcmp(bssid.data(), kZeroBssid, ETH_ALEN) == 0) {
 		wpa_ssid->bssid_set = 0;
 		wpa_printf(MSG_MSGDUMP, "BSSID any");
 	} else {
@@ -147,161 +161,163 @@ android::hidl::Status Network::SetBSSID(const std::vector<uint8_t> &bssid)
 	     os_memcmp(wpa_ssid->bssid, prev_bssid, ETH_ALEN) != 0)) {
 		wpas_notify_network_bssid_set_changed(wpa_s, wpa_ssid);
 	}
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetScanSSID(bool enable)
+Return<void> Network::setScanSsid(bool enable, setScanSsid_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
 	wpa_ssid->scan_ssid = enable ? 1 : 0;
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetKeyMgmt(int32_t key_mgmt_mask)
+Return<void> Network::setKeyMgmt(uint32_t key_mgmt_mask, setKeyMgmt_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
 	if (key_mgmt_mask & ~kAllowedKeyMgmtMask) {
-		const std::string error_msg = "Invalid key_mgmt value: " +
-					      std::to_string(key_mgmt_mask) +
-					      ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
 	wpa_ssid->key_mgmt = key_mgmt_mask;
 	wpa_printf(MSG_MSGDUMP, "key_mgmt: 0x%x", wpa_ssid->key_mgmt);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetProto(int32_t proto_mask)
+Return<void> Network::setProto(uint32_t proto_mask, setProto_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	if (proto_mask & ~kAllowedProtoMask) {
-		const std::string error_msg =
-		    "Invalid proto value: " + std::to_string(proto_mask) + ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (proto_mask & ~kAllowedproto_mask) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
 	wpa_ssid->proto = proto_mask;
 	wpa_printf(MSG_MSGDUMP, "proto: 0x%x", wpa_ssid->proto);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetAuthAlg(int32_t auth_alg_mask)
+Return<void> Network::setAuthAlg(
+    uint32_t auth_alg_mask,
+    std::function<void(const SupplicantStatus &status)> _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	if (auth_alg_mask & ~kAllowedAuthAlgMask) {
-		const std::string error_msg = "Invalid auth_alg value: " +
-					      std::to_string(auth_alg_mask) +
-					      ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (auth_alg_mask & ~kAllowedauth_alg_mask) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
 	wpa_ssid->auth_alg = auth_alg_mask;
 	wpa_printf(MSG_MSGDUMP, "auth_alg: 0x%x", wpa_ssid->auth_alg);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetGroupCipher(int32_t group_cipher_mask)
+Return<void> Network::setGroupCipher(
+    uint32_t group_cipher_mask, setGroupCipher_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	if (group_cipher_mask & ~kAllowedGroupCipherMask) {
-		const std::string error_msg =
-		    "Invalid group_cipher value: " +
-		    std::to_string(group_cipher_mask) + ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (group_cipher_mask & ~kAllowedgroup_cipher_mask) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
 	wpa_ssid->group_cipher = group_cipher_mask;
 	wpa_printf(MSG_MSGDUMP, "group_cipher: 0x%x", wpa_ssid->group_cipher);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetPairwiseCipher(int32_t pairwise_cipher_mask)
+Return<void> Network::setPairwiseCipher(
+    uint32_t pairwise_cipher_mask, setPairwiseCipher_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	if (pairwise_cipher_mask & ~kAllowedPairwiseCipherMask) {
-		const std::string error_msg =
-		    "Invalid pairwise_cipher value: " +
-		    std::to_string(pairwise_cipher_mask) + ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (pairwise_cipher_mask & ~kAllowedpairwise_cipher_mask) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
 	wpa_ssid->pairwise_cipher = pairwise_cipher_mask;
 	wpa_printf(
 	    MSG_MSGDUMP, "pairwise_cipher: 0x%x", wpa_ssid->pairwise_cipher);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetPskPassphrase(const std::string &psk)
+Return<void> Network::setPskPassphrase(
+    const hidl_string &psk, setPskPassphrase_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
 	if (isPskPassphraseValid(psk)) {
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    "Invalid Psk passphrase value.");
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
 	if (wpa_ssid->passphrase &&
 	    os_strlen(wpa_ssid->passphrase) == psk.size() &&
 	    os_memcmp(wpa_ssid->passphrase, psk.c_str(), psk.size()) == 0) {
-		return android::hidl::Status::ok();
+		HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 	}
 	// Flag to indicate if raw psk is calculated or not using
 	// |wpa_config_update_psk|. Deferred if ssid not already set.
 	wpa_ssid->psk_set = 0;
-	android::hidl::Status status = setStringKeyFieldAndResetState(
-	    psk.data(), &(wpa_ssid->passphrase), "psk passphrase");
-	if (status.isOk() && wpa_ssid->ssid_len) {
+	if (setStringKeyFieldAndResetState(
+		psk.c_str(), &(wpa_ssid->passphrase), "psk passphrase")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	if (wpa_ssid->ssid_len) {
 		wpa_config_update_psk(wpa_ssid);
 	}
-	return status;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetWepKey(
-    int key_idx, const std::vector<uint8_t> &wep_key)
+Return<void> Network::setWepKey(
+    uint32_t key_idx, const hidl_vec<uint8_t> &wep_key, setWepKey_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	if (key_idx < 0 || key_idx >= WEP_KEYS_MAX_NUM) {
-		const std::string error_msg =
-		    "Invalid Wep Key index: " + std::to_string(key_idx) + ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
 	}
-	if (wep_key.size() != WEP40_KEY_LEN &&
-	    wep_key.size() != WEP104_KEY_LEN) {
-		const std::string error_msg = "Invalid Wep Key value length: " +
-					      std::to_string(wep_key.size()) +
-					      ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+
+	if (key_idx >=
+	    static_cast<uint32_t>(
+		ISupplicantNetwork::ParamSizeLimits::WEP_KEYS_MAX_NUM)) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
+	}
+	if (wep_key.size() !=
+		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+					  WEP40_KEY_LEN_IN_BYTES) &&
+	    wep_key.size() !=
+		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+					  WEP104_KEY_LEN_IN_BYTES)) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
 	os_memcpy(wpa_ssid->wep_key[key_idx], wep_key.data(), wep_key.size());
 	wpa_ssid->wep_key_len[key_idx] = wep_key.size();
@@ -310,61 +326,60 @@ android::hidl::Status Network::SetWepKey(
 	    MSG_MSGDUMP, msg_dump_title.c_str(), wpa_ssid->wep_key[key_idx],
 	    wpa_ssid->wep_key_len[key_idx]);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetWepTxKeyIdx(int32_t wep_tx_key_idx)
+Return<void> Network::setWepTxKeyIdx(
+    uint32_t key_idx, setWepTxKeyIdx_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	if (wep_tx_key_idx < 0 || wep_tx_key_idx >= WEP_KEYS_MAX_NUM) {
-		const std::string error_msg = "Invalid Wep Key index: " +
-					      std::to_string(wep_tx_key_idx) +
-					      ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
 	}
-	wpa_ssid->wep_tx_keyidx = wep_tx_key_idx;
+
+	if (key_idx >=
+	    static_cast<uint32_t>(
+		ISupplicantNetwork::ParamSizeLimits::WEP_KEYS_MAX_NUM)) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
+	}
+	wpa_ssid->wep_tx_keyidx = key_idx;
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetRequirePMF(bool enable)
+Return<void> Network::setRequirePmf(bool enable, setRequirePmf_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
 	wpa_ssid->ieee80211w =
 	    enable ? MGMT_FRAME_PROTECTION_REQUIRED : NO_MGMT_FRAME_PROTECTION;
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapMethod(int32_t method)
+Return<void> Network::setEapMethod(
+    ISupplicantNetwork::EapMethod method, setEapMethod_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 	int retrieved_vendor, retrieved_method;
 
-	if (method < kEapMethodMin || method >= kEapMethodMax) {
-		const std::string error_msg =
-		    "Invalid EAP method: " + std::to_string(method) + ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
-	}
-	const char *method_str = kEapMethodStrings[method];
+	const char *method_str =
+	    kEapMethodStrings[static_cast<uint32_t>(method)];
 	// This string lookup is needed to check if the device supports the
 	// corresponding EAP type.
 	retrieved_method = eap_peer_get_type(method_str, &retrieved_vendor);
 	if (retrieved_vendor == EAP_VENDOR_IETF &&
 	    retrieved_method == EAP_TYPE_NONE) {
-		const std::string error_msg = "Cannot get EAP method type: " +
-					      std::to_string(method) + ".";
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC, error_msg.c_str());
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 
 	if (wpa_ssid->eap.eap_methods) {
@@ -378,8 +393,7 @@ android::hidl::Status Network::SetEapMethod(int32_t method)
 	wpa_ssid->eap.eap_methods =
 	    (eap_method_type *)os_malloc(sizeof(eap_method_type) * 2);
 	if (!wpa_ssid->eap.eap_methods) {
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC, "Memory allocation failed.");
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 	wpa_ssid->eap.eap_methods[0].vendor = retrieved_vendor;
 	wpa_ssid->eap.eap_methods[0].method = retrieved_method;
@@ -399,284 +413,424 @@ android::hidl::Status Network::SetEapMethod(int32_t method)
 	    MSG_MSGDUMP, "eap methods", (u8 *)wpa_ssid->eap.eap_methods,
 	    sizeof(eap_method_type) * 2);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapPhase2Method(int32_t method)
+Return<void> Network::setEapPhase2Method(
+    ISupplicantNetwork::EapPhase2Method method, setEapPhase2Method_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	if (method < kEapPhase2MethodMin || method >= kEapMethodMax) {
-		const std::string error_msg = "Invalid EAP Phase2 method: " +
-					      std::to_string(method) + ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
 	}
-	return setStringFieldAndResetState(
-	    kEapPhase2MethodStrings[method], &(wpa_ssid->eap.phase2),
-	    "eap phase2");
-}
 
-android::hidl::Status Network::SetEapIdentity(
-    const std::vector<uint8_t> &identity)
-{
-	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	return setByteArrayFieldAndResetState(
-	    identity.data(), identity.size(), &(wpa_ssid->eap.identity),
-	    &(wpa_ssid->eap.identity_len), "eap identity");
-}
-
-android::hidl::Status Network::SetEapAnonymousIdentity(
-    const std::vector<uint8_t> &identity)
-{
-	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	return setByteArrayFieldAndResetState(
-	    identity.data(), identity.size(),
-	    &(wpa_ssid->eap.anonymous_identity),
-	    &(wpa_ssid->eap.anonymous_identity_len), "eap anonymous_identity");
-}
-
-android::hidl::Status Network::SetEapPassword(
-    const std::vector<uint8_t> &password)
-{
-	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	android::hidl::Status status = setByteArrayKeyFieldAndResetState(
-	    password.data(), password.size(), &(wpa_ssid->eap.password),
-	    &(wpa_ssid->eap.password_len), "eap password");
-	if (status.isOk()) {
-		wpa_ssid->eap.flags &= ~EAP_CONFIG_FLAGS_PASSWORD_NTHASH;
-		wpa_ssid->eap.flags &= ~EAP_CONFIG_FLAGS_EXT_PASSWORD;
+	if (setStringFieldAndResetState(
+		kEapPhase2MethodStrings[static_cast<uint32_t>(method)],
+		&(wpa_ssid->eap.phase2), "eap phase2")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
-	return status;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapCACert(const std::string &path)
+Return<void> Network::setEapIdentity(
+    const hidl_vec<uint8_t> &identity, setEapIdentity_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	return setStringFieldAndResetState(
-	    path.c_str(), &(wpa_ssid->eap.ca_cert), "eap ca_cert");
+	if (setByteArrayFieldAndResetState(
+		identity.data(), identity.size(), &(wpa_ssid->eap.identity),
+		&(wpa_ssid->eap.identity_len), "eap identity")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapCAPath(const std::string &path)
+Return<void> Network::setEapAnonymousIdentity(
+    const hidl_vec<uint8_t> &identity, setEapAnonymousIdentity_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	return setStringFieldAndResetState(
-	    path.c_str(), &(wpa_ssid->eap.ca_path), "eap ca_path");
+	if (setByteArrayFieldAndResetState(
+		identity.data(), identity.size(),
+		&(wpa_ssid->eap.anonymous_identity),
+		&(wpa_ssid->eap.anonymous_identity_len),
+		"eap anonymous_identity")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapClientCert(const std::string &path)
+Return<void> Network::setEapPassword(
+    const hidl_vec<uint8_t> &password, setEapPassword_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	return setStringFieldAndResetState(
-	    path.c_str(), &(wpa_ssid->eap.client_cert), "eap client_cert");
+	if (setByteArrayKeyFieldAndResetState(
+		password.data(), password.size(), &(wpa_ssid->eap.password),
+		&(wpa_ssid->eap.password_len), "eap password")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	wpa_ssid->eap.flags &= ~EAP_CONFIG_FLAGS_PASSWORD_NTHASH;
+	wpa_ssid->eap.flags &= ~EAP_CONFIG_FLAGS_EXT_PASSWORD;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapPrivateKey(const std::string &path)
+Return<void> Network::setEapCACert(
+    const hidl_string &path, setEapCACert_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	return setStringFieldAndResetState(
-	    path.c_str(), &(wpa_ssid->eap.private_key), "eap private_key");
+	if (setStringFieldAndResetState(
+		path.c_str(), &(wpa_ssid->eap.ca_cert), "eap ca_cert")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapSubjectMatch(const std::string &match)
-
+Return<void> Network::setEapCAPath(
+    const hidl_string &path, setEapCAPath_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	return setStringFieldAndResetState(
-	    match.c_str(), &(wpa_ssid->eap.subject_match), "eap subject_match");
+	if (setStringFieldAndResetState(
+		path.c_str(), &(wpa_ssid->eap.ca_path), "eap ca_path")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapAltSubjectMatch(const std::string &match)
+Return<void> Network::setEapClientCert(
+    const hidl_string &path, setEapClientCert_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	return setStringFieldAndResetState(
-	    match.c_str(), &(wpa_ssid->eap.altsubject_match),
-	    "eap altsubject_match");
+	if (setStringFieldAndResetState(
+		path.c_str(), &(wpa_ssid->eap.client_cert),
+		"eap client_cert")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapEngine(bool enable)
+Return<void> Network::setEapPrivateKey(
+    const hidl_string &path, setEapPrivateKey_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
+
+	if (setStringFieldAndResetState(
+		path.c_str(), &(wpa_ssid->eap.private_key),
+		"eap private_key")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
+}
+
+Return<void> Network::setEapSubjectMatch(
+    const hidl_string &match, setEapSubjectMatch_cb _hidl_cb)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
+
+	if (setStringFieldAndResetState(
+		match.c_str(), &(wpa_ssid->eap.subject_match),
+		"eap subject_match")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
+}
+
+Return<void> Network::setEapAltSubjectMatch(
+    const hidl_string &match, setEapAltSubjectMatch_cb _hidl_cb)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
+
+	if (setStringFieldAndResetState(
+		match.c_str(), &(wpa_ssid->eap.altsubject_match),
+		"eap altsubject_match")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
+}
+
+Return<void> Network::setEapEngine(bool enable, setEapEngine_cb _hidl_cb)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
 	wpa_ssid->eap.engine = enable ? 1 : 0;
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapEngineID(const std::string &id)
+Return<void> Network::setEapEngineID(
+    const hidl_string &id, setEapEngineID_cb _hidl_cb)
 
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	return setStringFieldAndResetState(
-	    id.c_str(), &(wpa_ssid->eap.engine_id), "eap engine_id");
-	return android::hidl::Status::ok();
+	if (setStringFieldAndResetState(
+		id.c_str(), &(wpa_ssid->eap.engine_id), "eap engine_id")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SetEapDomainSuffixMatch(
-    const std::string &match)
-
+Return<void> Network::setEapDomainSuffixMatch(
+    const hidl_string &match, setEapDomainSuffixMatch_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	return setStringFieldAndResetState(
-	    match.c_str(), &(wpa_ssid->eap.domain_suffix_match),
-	    "eap domain_suffix_match");
+	if (setStringFieldAndResetState(
+		match.c_str(), &(wpa_ssid->eap.domain_suffix_match),
+		"eap domain_suffix_match")) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::GetSSID(std::vector<uint8_t> *ssid)
+Return<void> Network::getSsid(getSsid_cb _hidl_cb)
 {
+	std::vector<uint8_t> ssid;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID, ssid);
+	}
 
-	ssid->assign(wpa_ssid->ssid, wpa_ssid->ssid + wpa_ssid->ssid_len);
-	return android::hidl::Status::ok();
+	ssid.assign(wpa_ssid->ssid, wpa_ssid->ssid + wpa_ssid->ssid_len);
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, ssid);
 }
 
-android::hidl::Status Network::GetBSSID(std::vector<uint8_t> *bssid)
+Return<void> Network::getBssid(getBssid_cb _hidl_cb)
 {
+	hidl_array<uint8_t, 6> bssid;
+	os_memcpy(bssid.data(), kZeroBssid, ETH_ALEN);
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID, bssid);
+	}
 
 	if (wpa_ssid->bssid_set) {
-		bssid->assign(wpa_ssid->bssid, wpa_ssid->bssid + ETH_ALEN);
-	} else {
-		bssid->clear();
+		os_memcpy(bssid.data(), wpa_ssid->bssid, ETH_ALEN);
 	}
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, bssid);
 }
 
-android::hidl::Status Network::GetScanSSID(bool *enable)
+Return<void> Network::getScanSsid(getScanSsid_cb _hidl_cb)
 {
+	bool enabled = false;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID, enabled);
+	}
 
-	*enable = (wpa_ssid->scan_ssid == 1);
-	return android::hidl::Status::ok();
+	enabled = (wpa_ssid->scan_ssid == 1);
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, enabled);
 }
 
-android::hidl::Status Network::GetKeyMgmt(int32_t *key_mgmt_mask)
+Return<void> Network::getKeyMgmt(getKeyMgmt_cb _hidl_cb)
 {
+	uint32_t key_mgmt_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-	*key_mgmt_mask = wpa_ssid->key_mgmt;
-	return android::hidl::Status::ok();
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+		    key_mgmt_mask);
+	}
+
+	key_mgmt_mask = wpa_ssid->key_mgmt;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, key_mgmt_mask);
 }
 
-android::hidl::Status Network::GetProto(int32_t *proto_mask)
+Return<void> Network::getProto(getProto_cb _hidl_cb)
 {
+	uint32_t proto_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-	*proto_mask = wpa_ssid->proto;
-	return android::hidl::Status::ok();
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID, proto_mask);
+	}
+
+	proto_mask = wpa_ssid->proto;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, proto_mask);
 }
 
-android::hidl::Status Network::GetAuthAlg(int32_t *auth_alg_mask)
+Return<void> Network::getAuthAlg(getAuthAlg_cb _hidl_cb)
 {
+	uint32_t auth_alg_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-	*auth_alg_mask = wpa_ssid->auth_alg;
-	return android::hidl::Status::ok();
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+		    auth_alg_mask);
+	}
+
+	auth_alg_mask = wpa_ssid->auth_alg;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, auth_alg_mask);
 }
 
-android::hidl::Status Network::GetGroupCipher(int32_t *group_cipher_mask)
+Return<void> Network::getGroupCipher(getGroupCipher_cb _hidl_cb)
 {
+	uint32_t group_cipher_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-	*group_cipher_mask = wpa_ssid->group_cipher;
-	return android::hidl::Status::ok();
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+		    group_cipher_mask);
+	}
+
+	group_cipher_mask = wpa_ssid->group_cipher;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, group_cipher_mask);
 }
 
-android::hidl::Status Network::GetPairwiseCipher(
-    int32_t *pairwise_cipher_mask)
+Return<void> Network::getPairwiseCipher(getPairwiseCipher_cb _hidl_cb)
 {
+	uint32_t pairwise_cipher_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-	*pairwise_cipher_mask = wpa_ssid->pairwise_cipher;
-	return android::hidl::Status::ok();
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+		    pairwise_cipher_mask);
+	}
+
+	pairwise_cipher_mask = wpa_ssid->pairwise_cipher;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, pairwise_cipher_mask);
 }
 
-android::hidl::Status Network::GetPskPassphrase(std::string *psk)
+Return<void> Network::getPskPassphrase(getPskPassphrase_cb _hidl_cb)
 {
+	hidl_string psk;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID, psk);
+	}
 
 	if (wpa_ssid->passphrase) {
-		*psk = wpa_ssid->passphrase;
-	} else {
-		*psk = std::string();
+		psk = wpa_ssid->passphrase;
 	}
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, psk);
 }
 
-android::hidl::Status Network::GetWepKey(
-    int key_idx, std::vector<uint8_t> *wep_key)
+Return<void> Network::getWepKey(uint32_t key_idx, getWepKey_cb _hidl_cb)
 {
+	std::vector<uint8_t> wep_key;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	if (key_idx < 0 || key_idx >= WEP_KEYS_MAX_NUM) {
-		const std::string error_msg =
-		    "Invalid Wep Key index: " + std::to_string(key_idx) + ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID, wep_key);
+		return Void();
 	}
 
-	wep_key->assign(
+	if (key_idx >=
+	    static_cast<uint32_t>(
+		ISupplicantNetwork::ParamSizeLimits::WEP_KEYS_MAX_NUM)) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_ARGS_INVALID, wep_key);
+	}
+
+	wep_key.assign(
 	    wpa_ssid->wep_key[key_idx],
 	    wpa_ssid->wep_key[key_idx] + wpa_ssid->wep_key_len[key_idx]);
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, wep_key);
 }
 
-android::hidl::Status Network::GetWepTxKeyIdx(int32_t *wep_tx_key_idx)
+Return<void> Network::getWepTxKeyIdx(getWepTxKeyIdx_cb _hidl_cb)
 {
+	uint32_t wep_tx_key_idx = UINT32_MAX;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-	*wep_tx_key_idx = wpa_ssid->wep_tx_keyidx;
-	return android::hidl::Status::ok();
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+		    wep_tx_key_idx);
+	}
+
+	wep_tx_key_idx = wpa_ssid->wep_tx_keyidx;
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, wep_tx_key_idx);
 }
 
-android::hidl::Status Network::GetRequirePMF(bool *enable)
+Return<void> Network::getRequirePmf(getRequirePmf_cb _hidl_cb)
 {
+	bool enabled = false;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_NETWORK_INVALID, enabled);
+	}
 
-	*enable = (wpa_ssid->ieee80211w == MGMT_FRAME_PROTECTION_REQUIRED);
-	return android::hidl::Status::ok();
+	enabled = (wpa_ssid->ieee80211w == MGMT_FRAME_PROTECTION_REQUIRED);
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, enabled);
 }
 
-android::hidl::Status Network::Enable(bool no_connect)
+Return<void> Network::enable(bool no_connect, enable_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
-	if (wpa_ssid->disabled == 2) {
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC,
-		    "Cannot use Enable with persistent P2P group");
+	if (wpa_ssid->disabled != 0) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
@@ -687,80 +841,178 @@ android::hidl::Status Network::Enable(bool no_connect)
 		wpa_s->scan_min_time.usec = 0;
 		wpa_supplicant_enable_network(wpa_s, wpa_ssid);
 	}
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::Disable()
+Return<void> Network::disable(disable_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
 	if (wpa_ssid->disabled == 2) {
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC,
-		    "Cannot use Disable with persistent P2P group");
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	wpa_supplicant_disable_network(wpa_s, wpa_ssid);
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::Select()
+Return<void> Network::select(select_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
 
 	if (wpa_ssid->disabled == 2) {
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC,
-		    "Cannot use Select with persistent P2P group");
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	wpa_s->scan_min_time.sec = 0;
 	wpa_s->scan_min_time.usec = 0;
 	wpa_supplicant_select_network(wpa_s, wpa_ssid);
-	return android::hidl::Status::ok();
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-android::hidl::Status Network::SendNetworkResponse(
-    int type, const std::string &param)
+Return<void> Network::sendNetworkEapSimGsmAuthResponse(
+    const ISupplicantNetwork::NetworkResponseEapSimGsmAuthParams &params,
+    sendNetworkEapSimGsmAuthResponse_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	RETURN_IF_NETWORK_INVALID(wpa_ssid);
-
-	if (type < NETWORK_RSP_UNKNOWN || type > NETWORK_RSP_EXT_CERT_CHECK) {
-		const std::string error_msg =
-		    "Invalid network response type: " + std::to_string(type) +
-		    ".";
-		return android::hidl::Status::fromExceptionCode(
-		    android::hidl::Status::EX_ILLEGAL_ARGUMENT,
-		    error_msg.c_str());
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
 	}
 
-	enum wpa_ctrl_req_type rtype = (enum wpa_ctrl_req_type)type;
+	// Convert the incoming parameters to a string to pass to
+	// wpa_supplicant.
+	std::string ctrl_rsp_param;
+	uint32_t kc_hex_len = params.kc.size() * 2 + 1;
+	char *kc_hex = (char *)malloc(kc_hex_len);
+	uint32_t sres_hex_len = params.sres.size() * 2 + 1;
+	char *sres_hex = (char *)malloc(sres_hex_len);
+	if (!kc_hex || !sres_hex) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	wpa_snprintf_hex(
+	    kc_hex, kc_hex_len, params.kc.data(), params.kc.size());
+	wpa_snprintf_hex(
+	    sres_hex, sres_hex_len, params.sres.data(), params.sres.size());
+	ctrl_rsp_param += "kc:";
+	ctrl_rsp_param += kc_hex;
+	ctrl_rsp_param += " sres:";
+	ctrl_rsp_param += sres_hex;
+
+	enum wpa_ctrl_req_type rtype = WPA_CTRL_REQ_SIM;
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (wpa_supplicant_ctrl_rsp_handle(
-		wpa_s, wpa_ssid, rtype, param.c_str())) {
-		const std::string error_msg =
-		    "Failed handling network response: " +
-		    std::to_string(type) + ".";
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC, error_msg.c_str());
+		wpa_s, wpa_ssid, rtype, ctrl_rsp_param.c_str())) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 	eapol_sm_notify_ctrl_response(wpa_s->eapol);
-	wpa_hexdump_ascii(
-	    MSG_DEBUG, "network response param", (const u8 *)param.c_str(),
-	    param.size());
-	return android::hidl::Status::ok();
+	wpa_hexdump_ascii_key(
+	    MSG_DEBUG, "network sim gsm auth response param",
+	    (const u8 *)ctrl_rsp_param.c_str(), ctrl_rsp_param.size());
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
+}
+
+Return<void> Network::sendNetworkEapSimUmtsAuthResponse(
+    const ISupplicantNetwork::NetworkResponseEapSimUmtsAuthParams &params,
+    sendNetworkEapSimUmtsAuthResponse_cb _hidl_cb)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
+
+	// Convert the incoming parameters to a string to pass to
+	// wpa_supplicant.
+	std::string ctrl_rsp_param;
+	uint32_t ik_hex_len = params.ik.size() * 2 + 1;
+	char *ik_hex = (char *)malloc(ik_hex_len);
+	uint32_t ck_hex_len = params.ck.size() * 2 + 1;
+	char *ck_hex = (char *)malloc(ck_hex_len);
+	uint32_t res_hex_len = params.res.size() * 2 + 1;
+	char *res_hex = (char *)malloc(res_hex_len);
+	if (!ik_hex || !ck_hex || !res_hex) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	wpa_snprintf_hex(
+	    ik_hex, ik_hex_len, params.ik.data(), params.ik.size());
+	wpa_snprintf_hex(
+	    ck_hex, ck_hex_len, params.ck.data(), params.ck.size());
+	wpa_snprintf_hex(
+	    res_hex, res_hex_len, params.res.data(), params.res.size());
+	ctrl_rsp_param += "ik:";
+	ctrl_rsp_param += ik_hex;
+	ctrl_rsp_param += "ck:";
+	ctrl_rsp_param += ck_hex;
+	ctrl_rsp_param += " res:";
+	ctrl_rsp_param += res_hex;
+
+	enum wpa_ctrl_req_type rtype = WPA_CTRL_REQ_SIM;
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (wpa_supplicant_ctrl_rsp_handle(
+		wpa_s, wpa_ssid, rtype, ctrl_rsp_param.c_str())) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	eapol_sm_notify_ctrl_response(wpa_s->eapol);
+	wpa_hexdump_ascii_key(
+	    MSG_DEBUG, "network sim umts auth response param",
+	    (const u8 *)ctrl_rsp_param.c_str(), ctrl_rsp_param.size());
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
+}
+
+Return<void> Network::sendNetworkEapIdentityResponse(
+    const hidl_vec<uint8_t> &identity,
+    sendNetworkEapIdentityResponse_cb _hidl_cb)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+	}
+
+	// Convert the incoming parameters to a string to pass to
+	// wpa_supplicant.
+	uint32_t identity_hex_len = identity.size() * 2 + 1;
+	char *identity_hex = (char *)malloc(identity_hex_len);
+	std::string ctrl_rsp_param;
+	if (!identity_hex) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	wpa_snprintf_hex(
+	    identity_hex, identity_hex_len, identity.data(), identity.size());
+	ctrl_rsp_param = identity_hex;
+
+	enum wpa_ctrl_req_type rtype = WPA_CTRL_REQ_EAP_IDENTITY;
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (wpa_supplicant_ctrl_rsp_handle(
+		wpa_s, wpa_ssid, rtype, ctrl_rsp_param.c_str())) {
+		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	eapol_sm_notify_ctrl_response(wpa_s->eapol);
+	wpa_hexdump_ascii_key(
+	    MSG_DEBUG, "network identity response param",
+	    (const u8 *)ctrl_rsp_param.c_str(), ctrl_rsp_param.size());
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
 /**
  * Retrieve the underlying |wpa_ssid| struct pointer for
  * this network.
- * If the underlying network is removed or the interface this network belong to
- * is removed, all RPC method calls on this object will return failure.
+ * If the underlying network is removed or the interface
+ * this network belong to
+ * is removed, all RPC method calls on this object will
+ * return failure.
  */
 struct wpa_ssid *Network::retrieveNetworkPtr()
 {
@@ -771,7 +1023,8 @@ struct wpa_ssid *Network::retrieveNetworkPtr()
 }
 
 /**
- * Retrieve the underlying |wpa_supplicant| struct pointer for
+ * Retrieve the underlying |wpa_supplicant| struct
+ * pointer for
  * this network.
  */
 struct wpa_supplicant *Network::retrieveIfacePtr()
@@ -785,10 +1038,14 @@ struct wpa_supplicant *Network::retrieveIfacePtr()
  *
  * Returns 0 if valid, 1 otherwise.
  */
-int Network::isPskPassphraseValid(const std::string &psk)
+int Network::isPskPassphraseValid(const hidl_string &psk)
 {
-	if (psk.size() < PSK_PASSPHRASE_MIN_LEN ||
-	    psk.size() > PSK_PASSPHRASE_MAX_LEN) {
+	if (psk.size() <
+		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+					  PSK_PASSPHRASE_MIN_LEN_IN_BYTES) ||
+	    psk.size() >
+		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+					  PSK_PASSPHRASE_MAX_LEN_IN_BYTES)) {
 		return 1;
 	}
 	if (has_ctrl_char((u8 *)psk.c_str(), psk.size())) {
@@ -798,7 +1055,8 @@ int Network::isPskPassphraseValid(const std::string &psk)
 }
 
 /**
- * Reset internal wpa_supplicant state machine state after params update (except
+ * Reset internal wpa_supplicant state machine state
+ * after params update (except
  * bssid).
  */
 void Network::resetInternalStateAfterParamsUpdate()
@@ -810,8 +1068,10 @@ void Network::resetInternalStateAfterParamsUpdate()
 
 	if (wpa_s->current_ssid == wpa_ssid || wpa_s->current_ssid == NULL) {
 		/*
-		 * Invalidate the EAP session cache if anything in the
-		 * current or previously used configuration changes.
+		 * Invalidate the EAP session cache if
+		 * anything in the
+		 * current or previously used
+		 * configuration changes.
 		 */
 		eapol_sm_invalidate_cached_session(wpa_s->eapol);
 	}
@@ -822,7 +1082,7 @@ void Network::resetInternalStateAfterParamsUpdate()
  * instance for this network.
  * This function frees any existing data in these fields.
  */
-android::hidl::Status Network::setStringFieldAndResetState(
+int Network::setStringFieldAndResetState(
     const char *value, uint8_t **to_update_field, const char *hexdump_prefix)
 {
 	return setStringFieldAndResetState(
@@ -834,7 +1094,7 @@ android::hidl::Status Network::setStringFieldAndResetState(
  * instance for this network.
  * This function frees any existing data in these fields.
  */
-android::hidl::Status Network::setStringFieldAndResetState(
+int Network::setStringFieldAndResetState(
     const char *value, char **to_update_field, const char *hexdump_prefix)
 {
 	int value_len = strlen(value);
@@ -843,13 +1103,12 @@ android::hidl::Status Network::setStringFieldAndResetState(
 	}
 	*to_update_field = dup_binstr(value, value_len);
 	if (!(*to_update_field)) {
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC, "Memory allocation failed.");
+		return 1;
 	}
 	wpa_hexdump_ascii(
 	    MSG_MSGDUMP, hexdump_prefix, *to_update_field, value_len);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+	return 0;
 }
 
 /**
@@ -857,7 +1116,7 @@ android::hidl::Status Network::setStringFieldAndResetState(
  * instance for this network.
  * This function frees any existing data in these fields.
  */
-android::hidl::Status Network::setStringKeyFieldAndResetState(
+int Network::setStringKeyFieldAndResetState(
     const char *value, char **to_update_field, const char *hexdump_prefix)
 {
 	int value_len = strlen(value);
@@ -866,13 +1125,12 @@ android::hidl::Status Network::setStringKeyFieldAndResetState(
 	}
 	*to_update_field = dup_binstr(value, value_len);
 	if (!(*to_update_field)) {
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC, "Memory allocation failed.");
+		return 1;
 	}
 	wpa_hexdump_ascii_key(
 	    MSG_MSGDUMP, hexdump_prefix, *to_update_field, value_len);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+	return 0;
 }
 
 /**
@@ -880,7 +1138,7 @@ android::hidl::Status Network::setStringKeyFieldAndResetState(
  * field in |wpa_ssid| structue instance for this network.
  * This function frees any existing data in these fields.
  */
-android::hidl::Status Network::setByteArrayFieldAndResetState(
+int Network::setByteArrayFieldAndResetState(
     const uint8_t *value, const size_t value_len, uint8_t **to_update_field,
     size_t *to_update_field_len, const char *hexdump_prefix)
 {
@@ -889,8 +1147,7 @@ android::hidl::Status Network::setByteArrayFieldAndResetState(
 	}
 	*to_update_field = (uint8_t *)os_malloc(value_len);
 	if (!(*to_update_field)) {
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC, "Memory allocation failed.");
+		return 1;
 	}
 	os_memcpy(*to_update_field, value, value_len);
 	*to_update_field_len = value_len;
@@ -899,7 +1156,7 @@ android::hidl::Status Network::setByteArrayFieldAndResetState(
 	    MSG_MSGDUMP, hexdump_prefix, *to_update_field,
 	    *to_update_field_len);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+	return 0;
 }
 
 /**
@@ -907,7 +1164,7 @@ android::hidl::Status Network::setByteArrayFieldAndResetState(
  * length field in |wpa_ssid| structue instance for this network.
  * This function frees any existing data in these fields.
  */
-android::hidl::Status Network::setByteArrayKeyFieldAndResetState(
+int Network::setByteArrayKeyFieldAndResetState(
     const uint8_t *value, const size_t value_len, uint8_t **to_update_field,
     size_t *to_update_field_len, const char *hexdump_prefix)
 {
@@ -916,8 +1173,7 @@ android::hidl::Status Network::setByteArrayKeyFieldAndResetState(
 	}
 	*to_update_field = (uint8_t *)os_malloc(value_len);
 	if (!(*to_update_field)) {
-		return android::hidl::Status::fromServiceSpecificError(
-		    ERROR_GENERIC, "Memory allocation failed.");
+		return 1;
 	}
 	os_memcpy(*to_update_field, value, value_len);
 	*to_update_field_len = value_len;
@@ -926,7 +1182,12 @@ android::hidl::Status Network::setByteArrayKeyFieldAndResetState(
 	    MSG_MSGDUMP, hexdump_prefix, *to_update_field,
 	    *to_update_field_len);
 	resetInternalStateAfterParamsUpdate();
-	return android::hidl::Status::ok();
+	return 0;
 }
 
-}  // namespace wpa_supplicant_hidl
+}  // namespace implementation
+}  // namespace V1_0
+}  // namespace wifi
+}  // namespace supplicant
+}  // namespace hardware
+}  // namespace android

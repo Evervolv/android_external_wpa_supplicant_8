@@ -12,8 +12,9 @@
 
 #include <android-base/macros.h>
 
-#include "fi/w1/wpa_supplicant/BnIface.h"
-#include "fi/w1/wpa_supplicant/INetwork.h"
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantIface.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantIfaceCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantNetwork.h>
 
 extern "C" {
 #include "utils/common.h"
@@ -22,55 +23,66 @@ extern "C" {
 #include "driver_i.h"
 }
 
-namespace wpa_supplicant_hidl {
+namespace android {
+namespace hardware {
+namespace wifi {
+namespace supplicant {
+namespace V1_0 {
+namespace implementation {
 
 /**
  * Implementation of Iface hidl object. Each unique hidl
  * object is used for control operations on a specific interface
  * controlled by wpa_supplicant.
  */
-class Iface : public fi::w1::wpa_supplicant::BnIface
+class Iface : public android::hardware::wifi::supplicant::V1_0::ISupplicantIface
 {
 public:
-	Iface(struct wpa_global *wpa_global, const char ifname[]);
+	Iface(struct wpa_global* wpa_global, const char ifname[]);
 	~Iface() override = default;
 
-	// Hidl methods exposed in aidl.
-	android::hidl::Status GetName(std::string *iface_name_out) override;
-	android::hidl::Status AddNetwork(
-	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object_out)
-	    override;
-	android::hidl::Status RemoveNetwork(int network_id) override;
-	android::hidl::Status GetNetwork(
-	    int network_id,
-	    android::sp<fi::w1::wpa_supplicant::INetwork> *network_object_out)
-	    override;
-	android::hidl::Status RegisterCallback(
-	    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
-	    override;
-	android::hidl::Status Reassociate() override;
-	android::hidl::Status Reconnect() override;
-	android::hidl::Status Disconnect() override;
-	android::hidl::Status SetPowerSave(bool enable) override;
-	android::hidl::Status InitiateTDLSDiscover(
-	    const std::vector<uint8_t> &mac_address) override;
-	android::hidl::Status InitiateTDLSSetup(
-	    const std::vector<uint8_t> &mac_address) override;
-	android::hidl::Status InitiateTDLSTeardown(
-	    const std::vector<uint8_t> &mac_address) override;
+	// Hidl methods exposed.
+	Return<void> getName(getName_cb _hidl_cb) override;
+	Return<void> addNetwork(addNetwork_cb _hidl_cb) override;
+	Return<void> removeNetwork(
+	    uint32_t id, removeNetwork_cb _hidl_cb) override;
+	Return<void> getNetwork(uint32_t id, getNetwork_cb _hidl_cb) override;
+	Return<void> listNetworks(listNetworks_cb _hidl_cb) override;
+	Return<void> registerCallback(
+	    const sp<ISupplicantIfaceCallback>& callback,
+	    registerCallback_cb _hidl_cb) override;
+	Return<void> reassociate(reassociate_cb _hidl_cb) override;
+	Return<void> reconnect(reconnect_cb _hidl_cb) override;
+	Return<void> disconnect(disconnect_cb _hidl_cb) override;
+	Return<void> setPowerSave(
+	    bool enable, setPowerSave_cb _hidl_cb) override;
+	Return<void> initiateTdlsDiscover(
+	    const hidl_array<uint8_t, 6 /* 6 */>& mac_address,
+	    initiateTdlsDiscover_cb _hidl_cb) override;
+	Return<void> initiateTdlsSetup(
+	    const hidl_array<uint8_t, 6 /* 6 */>& mac_address,
+	    initiateTdlsSetup_cb _hidl_cb) override;
+	Return<void> initiateTdlsTeardown(
+	    const hidl_array<uint8_t, 6 /* 6 */>& mac_address,
+	    initiateTdlsTeardown_cb _hidl_cb) override;
 
 private:
-	struct wpa_supplicant *retrieveIfacePtr();
+	struct wpa_supplicant* retrieveIfacePtr();
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
 	// the lifetime of the process.
-	const struct wpa_global *wpa_global_;
+	const struct wpa_global* wpa_global_;
 	// Name of the iface this hidl object controls
 	const std::string ifname_;
 
 	DISALLOW_COPY_AND_ASSIGN(Iface);
 };
 
-}  // namespace wpa_supplicant_hidl
+}  // namespace implementation
+}  // namespace V1_0
+}  // namespace wifi
+}  // namespace supplicant
+}  // namespace hardware
+}  // namespace android
 
 #endif  // WPA_SUPPLICANT_HIDL_IFACE_H
