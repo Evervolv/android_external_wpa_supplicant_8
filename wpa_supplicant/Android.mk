@@ -1673,8 +1673,11 @@ LOCAL_CPPFLAGS := $(L_CPPFLAGS)
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_C_INCLUDES := $(INCLUDES)
 LOCAL_SRC_FILES := \
-    binder/binder.cpp binder/binder_manager.cpp \
-    binder/supplicant.cpp binder/iface.cpp
+    binder/binder.cpp \
+    binder/binder_manager.cpp \
+    binder/iface.cpp \
+    binder/network.cpp \
+    binder/supplicant.cpp
 LOCAL_SHARED_LIBRARIES := \
     libbinder \
     libutils
