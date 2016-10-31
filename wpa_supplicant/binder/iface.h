@@ -28,15 +28,22 @@ namespace wpa_supplicant_binder {
 class Iface : public fi::w1::wpa_supplicant::BnIface
 {
 public:
-	Iface(struct wpa_supplicant *wpa_s);
+	Iface(struct wpa_global *wpa_global, const char ifname[]);
 	virtual ~Iface() = default;
 
+	// Binder methods exposed in aidl.
+	android::binder::Status GetName(std::string *iface_name_out) override;
+
 private:
-	/* Raw pointer to the structure maintained by the core for this
-	 * interface. */
-	struct wpa_supplicant *wpa_s_;
+	// Reference to the global wpa_struct. This is assumed to be valid for
+	// the lifetime of the process.
+	const struct wpa_global *wpa_global_;
+	// Name of the iface this binder object controls
+	const std::string ifname_;
+
+	struct wpa_supplicant *retrieveIfacePtr();
 };
 
-} /* namespace wpa_supplicant_binder */
+} // namespace wpa_supplicant_binder
 
-#endif /* WPA_SUPPLICANT_BINDER_IFACE_H */
+#endif // WPA_SUPPLICANT_BINDER_IFACE_H
