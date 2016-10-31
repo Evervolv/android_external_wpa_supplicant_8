@@ -47,6 +47,9 @@ public:
 	android::binder::Status RegisterCallback(
 	    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback> &callback)
 	    override;
+	android::binder::Status Reassociate() override;
+	android::binder::Status Reconnect() override;
+	android::binder::Status Disconnect() override;
 
 private:
 	struct wpa_supplicant *retrieveIfacePtr();
