@@ -85,7 +85,7 @@ void wpas_binder_deinit(struct wpas_binder_priv *priv)
 
 int wpas_binder_register_interface(struct wpa_supplicant *wpa_s)
 {
-	if (!wpa_s->global->binder)
+	if (!wpa_s->global->binder || !wpa_s)
 		return 1;
 
 	wpa_printf(
@@ -102,7 +102,7 @@ int wpas_binder_register_interface(struct wpa_supplicant *wpa_s)
 
 int wpas_binder_unregister_interface(struct wpa_supplicant *wpa_s)
 {
-	if (!wpa_s->global->binder)
+	if (!wpa_s->global->binder || !wpa_s)
 		return 1;
 
 	wpa_printf(
