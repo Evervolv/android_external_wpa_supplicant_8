@@ -47,6 +47,9 @@ public:
 	int unregisterNetwork(
 	    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
 	int notifyStateChange(struct wpa_supplicant *wpa_s);
+	int notifyNetworkRequest(
+	    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid, int type,
+	    const char *param);
 
 	// Methods called from binder objects.
 	int getIfaceBinderObjectByIfname(
@@ -243,5 +246,22 @@ static_assert(
 static_assert(
     WPA_COMPLETED == fi::w1::wpa_supplicant::IIfaceCallback::STATE_COMPLETED,
     "State value mismatch");
+
+static_assert(
+    WPA_CTRL_REQ_UNKNOWN ==
+	fi::w1::wpa_supplicant::INetwork::NETWORK_RSP_UNKNOWN,
+    "Network Rsp value mismatch");
+static_assert(
+    WPA_CTRL_REQ_EXT_CERT_CHECK ==
+	fi::w1::wpa_supplicant::INetwork::NETWORK_RSP_EXT_CERT_CHECK,
+    "Network Rsp value mismatch");
+static_assert(
+    WPA_CTRL_REQ_UNKNOWN ==
+	fi::w1::wpa_supplicant::INetworkCallback::NETWORK_REQ_UNKNOWN,
+    "Network Req value mismatch");
+static_assert(
+    WPA_CTRL_REQ_EXT_CERT_CHECK ==
+	fi::w1::wpa_supplicant::INetworkCallback::NETWORK_REQ_EXT_CERT_CHECK,
+    "Network Req value mismatch");
 }  // namespace wpa_supplicant_binder
 #endif  // WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H

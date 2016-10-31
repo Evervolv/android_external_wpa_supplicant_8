@@ -92,6 +92,21 @@ interface INetwork {
 	const int EAP_PHASE2_METHOD_GTC = 4;
 
 	/**
+	 * Various response types to be sent for the network using
+	 * |SendNetworkResponse|.
+	 */
+	const int NETWORK_RSP_UNKNOWN = 0;
+	const int NETWORK_RSP_EAP_IDENTITY = 1;
+	const int NETWORK_RSP_EAP_PASSWORD = 2;
+	const int NETWORK_RSP_EAP_NEW_PASSWORD = 3;
+	const int NETWORK_RSP_EAP_PIN = 4;
+	const int NETWORK_RSP_EAP_OTP = 5;
+	const int NETWORK_RSP_EAP_PASSPHRASE = 6;
+	const int NETWORK_RSP_SIM = 7;
+	const int NETWORK_RSP_PSK_PASSPHRASE = 8;
+	const int NETWORK_RSP_EXT_CERT_CHECK = 9;
+
+	/**
 	 * Retrieves the ID allocated to this network by wpa_supplicant.
 	 *
 	 * This is not the |SSID| of the network, but an internal identifier for
@@ -353,4 +368,21 @@ interface INetwork {
 	 * Initiate connection to this network.
 	 */
 	void Select();
+
+	/**
+	 * Used to send a response to the request received on this particular network.
+	 * The type of response is one of the |NETWORK_RSP_| values above and depending on
+	 * the request type may include additional params.
+	 *
+	 * The request for the response must have been triggered via the corresponding
+	 * |INetworkCallback.OnNetworkRequest| call.
+	 *
+	 * @param type Type of response. This will be one of the |NETWORK_RSP_|*
+	 *        values above.
+	 * @param param Additional param associated with the response.
+	 *        For ex: NETWORK_RSP_SIM request type may contain either
+	 *        "GSM-FAIL" or "UMTS-FAIL" param to indicate the failure for
+	 *        external GSM or 3G authentication.
+	 */
+	void SendNetworkResponse(int type, String param);
 }
