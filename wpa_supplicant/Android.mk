@@ -1650,15 +1650,17 @@ LOCAL_MODULE := libwpa_binder_interface
 LOCAL_AIDL_INCLUDES := \
     $(LOCAL_PATH)/binder \
     frameworks/native/aidl/binder
-LOCAL_EXPORT_C_INCLUDE_DIRS := \
-    $(LOCAL_PATH)/binder
 LOCAL_CPPFLAGS := $(L_CPPFLAGS)
+LOCAL_C_INCLUDES = \
+    $(LOCAL_PATH)/binder/include
 LOCAL_SRC_FILES := \
     binder/binder_constants.cpp \
     binder/fi/w1/wpa_supplicant/ISupplicant.aidl \
     binder/fi/w1/wpa_supplicant/ISupplicantCallbacks.aidl \
     binder/fi/w1/wpa_supplicant/IIface.aidl
 LOCAL_SHARED_LIBRARIES := libbinder
+LOCAL_EXPORT_C_INCLUDE_DIRS := \
+    $(LOCAL_PATH)/binder/include
 include $(BUILD_STATIC_LIBRARY)
 
 ### Binder service library ###

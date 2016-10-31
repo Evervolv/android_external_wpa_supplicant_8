@@ -9,8 +9,8 @@
 
 #include <binder/IServiceManager.h>
 
-#include "binder_constants.h"
 #include "binder_manager.h"
+#include "wpa_supplicant_binder/binder_constants.h"
 
 extern "C" {
 #include "utils/common.h"
