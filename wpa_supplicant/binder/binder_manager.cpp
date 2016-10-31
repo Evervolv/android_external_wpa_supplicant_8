@@ -37,8 +37,8 @@ void BinderManager::destroyInstance()
 
 int BinderManager::registerBinderService(struct wpa_global *global)
 {
-	/* Create the main binder service object and register with
-	 * system service manager. */
+	// Create the main binder service object and register with system
+	// ServiceManager.
 	supplicant_object_ = new Supplicant(global);
 	android::String16 service_name(binder_constants::kServiceName);
 	android::defaultServiceManager()->addService(
@@ -46,55 +46,73 @@ int BinderManager::registerBinderService(struct wpa_global *global)
 	return 0;
 }
 
+/**
+ * Register an interface to binder manager.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface.
+ *
+ * @return 0 on success, 1 on failure.
+ */
 int BinderManager::registerInterface(struct wpa_supplicant *wpa_s)
 {
 	if (!wpa_s)
 		return 1;
 
-	/* Using the corresponding wpa_supplicant pointer as key to our
-	 * object map. */
-	const void *iface_key = wpa_s;
+	// Using the corresponding ifname as key to our object map.
+	const std::string ifname(wpa_s->ifname);
 
-	/* Return failure if we already have an object for that iface_key. */
-	if (iface_object_map_.find(iface_key) != iface_object_map_.end())
+	// Return failure if we already have an object for that |ifname|.
+	if (iface_object_map_.find(ifname) != iface_object_map_.end())
 		return 1;
 
-	iface_object_map_[iface_key] = new Iface(wpa_s->global, wpa_s->ifname);
-	if (!iface_object_map_[iface_key].get())
+	iface_object_map_[ifname] = new Iface(wpa_s->global, wpa_s->ifname);
+	if (!iface_object_map_[ifname].get())
 		return 1;
-
-	wpa_s->binder_object_key = iface_key;
 
 	return 0;
 }
 
+/**
+ * Unregister an interface from binder manager.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface.
+ *
+ * @return 0 on success, 1 on failure.
+ */
 int BinderManager::unregisterInterface(struct wpa_supplicant *wpa_s)
 {
-	if (!wpa_s || !wpa_s->binder_object_key)
+	if (!wpa_s)
 		return 1;
 
-	const void *iface_key = wpa_s;
-	if (iface_object_map_.find(iface_key) == iface_object_map_.end())
+	const std::string ifname(wpa_s->ifname);
+	if (iface_object_map_.find(ifname) == iface_object_map_.end())
 		return 1;
 
 	/* Delete the corresponding iface object from our map. */
-	iface_object_map_.erase(iface_key);
-	wpa_s->binder_object_key = NULL;
+	iface_object_map_.erase(ifname);
 	return 0;
 }
 
-int BinderManager::getIfaceBinderObjectByKey(
-    const void *iface_object_key,
+/**
+ * Retrieve the |IIface| binder object reference using the provided ifname.
+ *
+ * @param ifname Name of the corresponding interface.
+ * @param iface_object Binder reference corresponding to the iface.
+ *
+ * @return 0 on success, 1 on failure.
+ */
+int BinderManager::getIfaceBinderObjectByIfname(
+    const std::string &ifname,
     android::sp<fi::w1::wpa_supplicant::IIface> *iface_object)
 {
-	if (!iface_object_key || !iface_object)
+	if (ifname.empty() || !iface_object)
 		return 1;
 
-	if (iface_object_map_.find(iface_object_key) == iface_object_map_.end())
+	if (iface_object_map_.find(ifname) == iface_object_map_.end())
 		return 1;
 
-	*iface_object = iface_object_map_[iface_object_key];
+	*iface_object = iface_object_map_[ifname];
 	return 0;
 }
 
-} /* namespace wpa_supplicant_binder */
+} // namespace wpa_supplicant_binder
