@@ -75,6 +75,24 @@ private:
 	const std::string
 	getNetworkObjectMapKey(const std::string &ifname, int network_id);
 
+	void removeSupplicantCallbackBinderObject(
+	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
+		&callback);
+	void removeIfaceCallbackBinderObject(
+	    const std::string &ifname,
+	    const android::sp<fi::w1::wpa_supplicant::IIfaceCallback>
+		&callback);
+	void removeNetworkCallbackBinderObject(
+	    const std::string &ifname, int network_id,
+	    const android::sp<fi::w1::wpa_supplicant::INetworkCallback>
+		&callback);
+	template <class CallbackType>
+	int registerForDeathAndAddCallbackBinderObjectToList(
+	    const android::sp<CallbackType> &callback,
+	    const std::function<void(const android::sp<CallbackType> &)>
+		&on_binder_died_fctor,
+	    std::vector<android::sp<CallbackType>> &callback_list);
+
 	// Singleton instance of this class.
 	static BinderManager *instance_;
 	// The main binder service object.
@@ -87,6 +105,57 @@ private:
 	// wpa_supplicant. This map is keyed in by the corresponding
 	// |ifname| & |network_id|.
 	std::map<const std::string, android::sp<Network>> network_object_map_;
+
+	// Callback registered for the main binder service object.
+	std::vector<android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>>
+	    supplicant_callbacks_;
+	// Map of all the callbacks registered for interface specific
+	// binder objects controlled by wpa_supplicant.  This map is keyed in by
+	// the corresponding |ifname|.
+	std::map<
+	    const std::string,
+	    std::vector<android::sp<fi::w1::wpa_supplicant::IIfaceCallback>>>
+	    iface_callbacks_map_;
+	// Map of all the callbacks registered for network specific
+	// binder objects controlled by wpa_supplicant.  This map is keyed in by
+	// the corresponding |ifname| & |network_id|.
+	std::map<
+	    const std::string,
+	    std::vector<android::sp<fi::w1::wpa_supplicant::INetworkCallback>>>
+	    network_callbacks_map_;
+
+	/**
+	 * Helper class used to deregister the callback object reference from
+	 * our
+	 * callback list on the death of the binder object.
+	 * This class stores a reference of the callback binder object and a
+	 * function to be called to indicate the death of the binder object.
+	 */
+	template <class CallbackType>
+	class CallbackObjectDeathNotifier
+	    : public android::IBinder::DeathRecipient
+	{
+	public:
+		CallbackObjectDeathNotifier(
+		    const android::sp<CallbackType> &callback,
+		    const std::function<void(const android::sp<CallbackType> &)>
+			&on_binder_died)
+		    : callback_(callback), on_binder_died_(on_binder_died)
+		{
+		}
+		void binderDied(
+		    const android::wp<android::IBinder> & /* who */) override
+		{
+			on_binder_died_(callback_);
+		}
+
+	private:
+		// The callback binder object reference.
+		const android::sp<CallbackType> callback_;
+		// Callback function to be called when the binder dies.
+		const std::function<void(const android::sp<CallbackType> &)>
+		    on_binder_died_;
+	};
 };
 
 } // namespace wpa_supplicant_binder
