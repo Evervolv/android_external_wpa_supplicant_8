@@ -164,6 +164,32 @@ android::binder::Status Network::SetPskPassphrase(const std::string &psk)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (isPskPassphraseValid(psk)) {
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    "Invalid Psk passphrase value.");
+	}
+	if (wpa_ssid->passphrase &&
+	    os_strlen(wpa_ssid->passphrase) == psk.size() &&
+	    os_memcmp(wpa_ssid->passphrase, psk.c_str(), psk.size()) == 0) {
+		return android::binder::Status::ok();
+	}
+	// Flag to indicate if raw psk is calculated or not using
+	// |wpa_config_update_psk|. Deferred if ssid not already set.
+	wpa_ssid->psk_set = 0;
+	str_clear_free(wpa_ssid->passphrase);
+	wpa_ssid->passphrase = dup_binstr(psk.c_str(), psk.size());
+	if (!wpa_ssid->passphrase) {
+		return android::binder::Status::fromExceptionCode(
+		    ERROR_GENERIC, "Memory allocation failed.");
+	}
+	if (wpa_ssid->ssid_len) {
+		wpa_config_update_psk(wpa_ssid);
+	}
+	wpa_hexdump_ascii_key(
+	    MSG_MSGDUMP, "PSK (ASCII passphrase)", (u8 *)wpa_ssid->passphrase,
+	    psk.size());
 	return android::binder::Status::ok();
 }
 
@@ -172,6 +198,29 @@ Network::SetWepKey(int key_idx, const std::vector<uint8_t> &wep_key)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (key_idx < 0 || key_idx >= WEP_KEYS_MAX_NUM) {
+		const std::string error_msg =
+		    "Invalid Wep Key index: " + std::to_string(key_idx) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	if (wep_key.size() != WEP40_KEY_LEN &&
+	    wep_key.size() != WEP104_KEY_LEN) {
+		const std::string error_msg = "Invalid Wep Key value length: " +
+					      std::to_string(wep_key.size()) +
+					      ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	os_memcpy(wpa_ssid->wep_key[key_idx], wep_key.data(), wep_key.size());
+	wpa_ssid->wep_key_len[key_idx] = wep_key.size();
+	std::string msg_dump_title("wep_key" + std::to_string(key_idx));
+	wpa_hexdump_key(
+	    MSG_MSGDUMP, msg_dump_title.c_str(), wpa_ssid->wep_key[key_idx],
+	    wpa_ssid->wep_key_len[key_idx]);
 	return android::binder::Status::ok();
 }
 
@@ -179,6 +228,16 @@ android::binder::Status Network::SetWepTxKeyIdx(int32_t wep_tx_key_idx)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (wep_tx_key_idx < 0 || wep_tx_key_idx >= WEP_KEYS_MAX_NUM) {
+		const std::string error_msg = "Invalid Wep Key index: " +
+					      std::to_string(wep_tx_key_idx) +
+					      ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	wpa_ssid->wep_tx_keyidx = wep_tx_key_idx;
 	return android::binder::Status::ok();
 }
 
@@ -260,6 +319,12 @@ android::binder::Status Network::GetPskPassphrase(std::string *psk)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (wpa_ssid->passphrase) {
+		*psk = wpa_ssid->passphrase;
+	} else {
+		*psk = std::string();
+	}
 	return android::binder::Status::ok();
 }
 
@@ -268,6 +333,18 @@ Network::GetWepKey(int key_idx, std::vector<uint8_t> *wep_key)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+
+	if (key_idx < 0 || key_idx >= WEP_KEYS_MAX_NUM) {
+		const std::string error_msg =
+		    "Invalid Wep Key index: " + std::to_string(key_idx) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+
+	wep_key->assign(
+	    wpa_ssid->wep_key[key_idx],
+	    wpa_ssid->wep_key[key_idx] + wpa_ssid->wep_key_len[key_idx]);
 	return android::binder::Status::ok();
 }
 
@@ -275,6 +352,7 @@ android::binder::Status Network::GetWepTxKeyIdx(int32_t *wep_tx_key_idx)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	*wep_tx_key_idx = wpa_ssid->wep_tx_keyidx;
 	return android::binder::Status::ok();
 }
 
@@ -363,5 +441,22 @@ struct wpa_supplicant *Network::retrieveIfacePtr()
 {
 	return wpa_supplicant_get_iface(
 	    (struct wpa_global *)wpa_global_, ifname_.c_str());
+}
+
+/**
+ * Check if the provided psk passhrase is valid or not.
+ *
+ * Returns 0 if valid, 1 otherwise.
+ */
+int Network::isPskPassphraseValid(const std::string &psk)
+{
+	if (psk.size() < PSK_PASSPHRASE_MIN_LEN ||
+	    psk.size() > PSK_PASSPHRASE_MAX_LEN) {
+		return 1;
+	}
+	if (has_ctrl_char((u8 *)psk.c_str(), psk.size())) {
+		return 1;
+	}
+	return 0;
 }
 } // namespace wpa_supplicant_binder
