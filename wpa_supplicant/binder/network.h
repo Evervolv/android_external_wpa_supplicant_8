@@ -21,6 +21,7 @@ extern "C" {
 #include "wpa_supplicant_i.h"
 #include "notify.h"
 #include "eapol_supp/eapol_supp_sm.h"
+#include "eap_peer/eap.h"
 #include "rsn_supp/wpa.h"
 }
 
@@ -110,6 +111,23 @@ private:
 	struct wpa_supplicant *retrieveIfacePtr();
 	int isPskPassphraseValid(const std::string &psk);
 	void resetInternalStateAfterParamsUpdate();
+	android::binder::Status setStringFieldAndResetState(
+	    const char *value, uint8_t **to_update_field,
+	    const char *hexdump_prefix);
+	android::binder::Status setStringFieldAndResetState(
+	    const char *value, char **to_update_field,
+	    const char *hexdump_prefix);
+	android::binder::Status setStringKeyFieldAndResetState(
+	    const char *value, char **to_update_field,
+	    const char *hexdump_prefix);
+	android::binder::Status setByteArrayFieldAndResetState(
+	    const uint8_t *value, const size_t value_len,
+	    uint8_t **to_update_field, size_t *to_update_field_len,
+	    const char *hexdump_prefix);
+	android::binder::Status setByteArrayKeyFieldAndResetState(
+	    const uint8_t *value, const size_t value_len,
+	    uint8_t **to_update_field, size_t *to_update_field_len,
+	    const char *hexdump_prefix);
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
 	// the lifetime of the process.
