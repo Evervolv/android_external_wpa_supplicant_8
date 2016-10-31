@@ -16,7 +16,7 @@ Supplicant::Supplicant(struct wpa_global *global) : wpa_global_(global) {}
 
 android::binder::Status Supplicant::CreateInterface(
     const android::os::PersistableBundle &params,
-    android::sp<fi::w1::wpa_supplicant::IIface> *aidl_return)
+    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 {
 	android::String16 driver, ifname, confname, bridge_ifname;
 
@@ -65,7 +65,7 @@ android::binder::Status Supplicant::CreateInterface(
 
 		if (!binder_manager ||
 		    binder_manager->getIfaceBinderObjectByIfname(
-			wpa_s->ifname, aidl_return)) {
+			wpa_s->ifname, iface_object_out)) {
 			status =
 			    android::binder::Status::fromServiceSpecificError(
 				ERROR_GENERIC,
@@ -101,7 +101,7 @@ android::binder::Status Supplicant::RemoveInterface(const std::string &ifname)
 
 android::binder::Status Supplicant::GetInterface(
     const std::string &ifname,
-    android::sp<fi::w1::wpa_supplicant::IIface> *aidl_return)
+    android::sp<fi::w1::wpa_supplicant::IIface> *iface_object_out)
 {
 	struct wpa_supplicant *wpa_s;
 
@@ -115,7 +115,7 @@ android::binder::Status Supplicant::GetInterface(
 	BinderManager *binder_manager = BinderManager::getInstance();
 	if (!binder_manager ||
 	    binder_manager->getIfaceBinderObjectByIfname(
-		wpa_s->ifname, aidl_return)) {
+		wpa_s->ifname, iface_object_out)) {
 		return android::binder::Status::fromServiceSpecificError(
 		    ERROR_GENERIC,
 		    "wpa_supplicant encountered a binder error.");
@@ -124,4 +124,116 @@ android::binder::Status Supplicant::GetInterface(
 	return android::binder::Status::ok();
 }
 
+android::binder::Status
+Supplicant::SetDebugParams(int level, bool show_timestamp, bool show_keys)
+{
+	int internal_level;
+	if (convertDebugLevelToInternalLevel(level, &internal_level)) {
+		const std::string error_msg =
+		    "invalid debug level: " + std::to_string(level);
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	if (wpa_supplicant_set_debug_params(
+		wpa_global_, internal_level, show_timestamp, show_keys)) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC,
+		    "wpa_supplicant could not set debug params.");
+	}
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Supplicant::GetDebugLevel(int *level_out)
+{
+	if (convertDebugLevelToExternalLevel(wpa_debug_level, level_out)) {
+		const std::string error_msg =
+		    "invalid debug level: " + std::to_string(wpa_debug_level);
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	return android::binder::Status::ok();
+}
+
+android::binder::Status
+Supplicant::GetDebugShowTimestamp(bool *show_timestamp_out)
+{
+	*show_timestamp_out = wpa_debug_timestamp ? true : false;
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Supplicant::GetDebugShowKeys(bool *show_keys_out)
+{
+	*show_keys_out = wpa_debug_show_keys ? true : false;
+	return android::binder::Status::ok();
+}
+
+/**
+ * Helper function to convert the debug level parameter from the binder
+ * interface values to internal values.
+ */
+int Supplicant::convertDebugLevelToInternalLevel(
+    int external_level, int *internal_level)
+{
+	switch (external_level) {
+	case DEBUG_LEVEL_EXCESSIVE:
+		*internal_level = MSG_EXCESSIVE;
+		return 0;
+	case DEBUG_LEVEL_MSGDUMP:
+		*internal_level = MSG_MSGDUMP;
+		return 0;
+	case DEBUG_LEVEL_DEBUG:
+		*internal_level = MSG_DEBUG;
+		return 0;
+	case DEBUG_LEVEL_INFO:
+		*internal_level = MSG_INFO;
+		return 0;
+	case DEBUG_LEVEL_WARNING:
+		*internal_level = MSG_WARNING;
+		return 0;
+	case DEBUG_LEVEL_ERROR:
+		*internal_level = MSG_ERROR;
+		return 0;
+	default:
+		wpa_printf(
+		    MSG_ERROR, "Invalid external log level: %d",
+		    external_level);
+		return 1;
+	}
+}
+
+/**
+ * Helper function to convert the debug level parameter from the internal values
+ * to binder interface values.
+ */
+int Supplicant::convertDebugLevelToExternalLevel(
+    int internal_level, int *external_level)
+{
+	switch (internal_level) {
+	case MSG_EXCESSIVE:
+		*external_level = DEBUG_LEVEL_EXCESSIVE;
+		return 0;
+	case MSG_MSGDUMP:
+		*external_level = DEBUG_LEVEL_MSGDUMP;
+		return 0;
+	case MSG_DEBUG:
+		*external_level = DEBUG_LEVEL_DEBUG;
+		return 0;
+	case MSG_INFO:
+		*external_level = DEBUG_LEVEL_INFO;
+		return 0;
+	case MSG_WARNING:
+		*external_level = DEBUG_LEVEL_WARNING;
+		return 0;
+	case MSG_ERROR:
+		*external_level = DEBUG_LEVEL_ERROR;
+		return 0;
+	default:
+		wpa_printf(
+		    MSG_ERROR, "Invalid internal log level: %d",
+		    internal_level);
+		return 1;
+	}
+}
 } /* namespace wpa_supplicant_binder */
