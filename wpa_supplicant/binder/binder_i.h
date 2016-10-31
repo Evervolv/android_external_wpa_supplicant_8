@@ -12,7 +12,7 @@
 
 #ifdef _cplusplus
 extern "C" {
-#endif // _cplusplus
+#endif  // _cplusplus
 
 struct wpas_binder_priv
 {

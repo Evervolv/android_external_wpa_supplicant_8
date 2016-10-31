@@ -79,8 +79,7 @@ int BinderManager::registerInterface(struct wpa_supplicant *wpa_s)
 	// Invoke the |OnInterfaceCreated| method on all registered callbacks.
 	callWithEachSupplicantCallback(std::bind(
 	    &fi::w1::wpa_supplicant::ISupplicantCallback::OnInterfaceCreated,
-	    std::placeholders::_1,
-	    ifname));
+	    std::placeholders::_1, ifname));
 	return 0;
 }
 
@@ -123,8 +122,7 @@ int BinderManager::unregisterInterface(struct wpa_supplicant *wpa_s)
 	// Invoke the |OnInterfaceRemoved| method on all registered callbacks.
 	callWithEachSupplicantCallback(std::bind(
 	    &fi::w1::wpa_supplicant::ISupplicantCallback::OnInterfaceRemoved,
-		std::placeholders::_1,
-	    ifname));
+	    std::placeholders::_1, ifname));
 	return 0;
 }
 
@@ -164,8 +162,7 @@ int BinderManager::registerNetwork(
 	    wpa_s->ifname,
 	    std::bind(
 		&fi::w1::wpa_supplicant::IIfaceCallback::OnNetworkAdded,
-		std::placeholders::_1,
-		ssid->id));
+		std::placeholders::_1, ssid->id));
 	return 0;
 }
 
@@ -204,9 +201,10 @@ int BinderManager::unregisterNetwork(
 		if (android::IInterface::asBinder(callback)->unlinkToDeath(
 			nullptr, callback.get()) != android::OK) {
 			wpa_printf(
-			    MSG_ERROR, "Error deregistering for death "
-				       "notification for "
-				       "network callback object");
+			    MSG_ERROR,
+			    "Error deregistering for death "
+			    "notification for "
+			    "network callback object");
 		}
 	}
 	network_callbacks_map_.erase(network_callback_map_iter);
@@ -403,8 +401,8 @@ int BinderManager::addNetworkCallbackBinderObject(
  * @param ifname Name of the corresponding interface.
  * @param network_id ID of the corresponding network.
  */
-const std::string
-BinderManager::getNetworkObjectMapKey(const std::string &ifname, int network_id)
+const std::string BinderManager::getNetworkObjectMapKey(
+    const std::string &ifname, int network_id)
 {
 	return ifname + "_" + std::to_string(network_id);
 }
@@ -503,14 +501,16 @@ int BinderManager::registerForDeathAndAddCallbackBinderObjectToList(
 	// Use the |callback.get()| as cookie so that we don't need to
 	// store a reference to this |CallbackObjectDeathNotifier| instance
 	// to use in |unlinkToDeath| later.
-	// NOTE: This may cause an immediate callback if the object is already dead,
+	// NOTE: This may cause an immediate callback if the object is already
+	// dead,
 	// so add it to the list before we register for callback!
 	callback_list.push_back(callback);
 	if (android::IInterface::asBinder(callback)->linkToDeath(
 		death_notifier, callback.get()) != android::OK) {
 		wpa_printf(
-		    MSG_ERROR, "Error registering for death notification for "
-			       "supplicant callback object");
+		    MSG_ERROR,
+		    "Error registering for death notification for "
+		    "supplicant callback object");
 		callback_list.erase(
 		    std::remove(
 			callback_list.begin(), callback_list.end(), callback),
@@ -590,4 +590,4 @@ void BinderManager::callWithEachNetworkCallback(
 		method(callback);
 	}
 }
-} // namespace wpa_supplicant_binder
+}  // namespace wpa_supplicant_binder

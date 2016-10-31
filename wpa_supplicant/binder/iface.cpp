@@ -12,16 +12,16 @@
 
 namespace wpa_supplicant_binder {
 
-#define RETURN_IF_IFACE_INVALID(wpa_s)                                         \
-	{                                                                      \
-		if (!wpa_s) {                                                  \
-			return android::binder::Status::                       \
-			    fromServiceSpecificError(                          \
-				ERROR_IFACE_INVALID, "wpa_supplicant does "    \
-						     "not control this "       \
-						     "interface.");            \
-		}                                                              \
-	} // #define RETURN_IF_IFACE_INVALID(wpa_s)
+#define RETURN_IF_IFACE_INVALID(wpa_s)                                  \
+	{                                                               \
+		if (!wpa_s) {                                           \
+			return android::binder::Status::                \
+			    fromServiceSpecificError(                   \
+				ERROR_IFACE_INVALID,                    \
+				"wpa_supplicant does not control this " \
+				"interface.");                          \
+		}                                                       \
+	}  // #define RETURN_IF_IFACE_INVALID(wpa_s)
 
 Iface::Iface(struct wpa_global *wpa_global, const char ifname[])
     : wpa_global_(wpa_global), ifname_(ifname)
@@ -175,4 +175,4 @@ wpa_supplicant *Iface::retrieveIfacePtr()
 	return wpa_supplicant_get_iface(
 	    (struct wpa_global *)wpa_global_, ifname_.c_str());
 }
-} // namespace wpa_supplicant_binder
+}  // namespace wpa_supplicant_binder
