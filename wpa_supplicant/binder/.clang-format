@@ -1,4 +1,4 @@
-BasedOnStyle: LLVM
+BasedOnStyle: Google
 IndentWidth: 8
 UseTab: Always
 BreakBeforeBraces: Mozilla

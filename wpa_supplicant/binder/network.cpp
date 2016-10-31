@@ -46,20 +46,20 @@ constexpr int kEapPhase2MethodMin =
     fi::w1::wpa_supplicant::INetwork::EAP_PHASE2_METHOD_NONE;
 constexpr char const *kEapPhase2MethodStrings[kEapPhase2MethodMax] = {
     "NULL", "PAP", "MSCHAP", "MSCHAPV2", "GTC"};
-} // namespace
+}  // namespace
 
 namespace wpa_supplicant_binder {
 
-#define RETURN_IF_NETWORK_INVALID(wpa_ssid)                                    \
-	{                                                                      \
-		if (!wpa_ssid) {                                               \
-			return android::binder::Status::                       \
-			    fromServiceSpecificError(                          \
-				ERROR_NETWORK_INVALID, "wpa_supplicant does "  \
-						       "not control this "     \
-						       "network.");            \
-		}                                                              \
-	} // #define RETURN_IF_NETWORK_INVALID(wpa_ssid)
+#define RETURN_IF_NETWORK_INVALID(wpa_ssid)                             \
+	{                                                               \
+		if (!wpa_ssid) {                                        \
+			return android::binder::Status::                \
+			    fromServiceSpecificError(                   \
+				ERROR_NETWORK_INVALID,                  \
+				"wpa_supplicant does not control this " \
+				"network.");                            \
+		}                                                       \
+	}  // #define RETURN_IF_NETWORK_INVALID(wpa_ssid)
 
 Network::Network(
     struct wpa_global *wpa_global, const char ifname[], int network_id)
@@ -282,8 +282,8 @@ android::binder::Status Network::SetPskPassphrase(const std::string &psk)
 	return status;
 }
 
-android::binder::Status
-Network::SetWepKey(int key_idx, const std::vector<uint8_t> &wep_key)
+android::binder::Status Network::SetWepKey(
+    int key_idx, const std::vector<uint8_t> &wep_key)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
@@ -420,8 +420,8 @@ android::binder::Status Network::SetEapPhase2Method(int32_t method)
 	    "eap phase2");
 }
 
-android::binder::Status
-Network::SetEapIdentity(const std::vector<uint8_t> &identity)
+android::binder::Status Network::SetEapIdentity(
+    const std::vector<uint8_t> &identity)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
@@ -431,8 +431,8 @@ Network::SetEapIdentity(const std::vector<uint8_t> &identity)
 	    &(wpa_ssid->eap.identity_len), "eap identity");
 }
 
-android::binder::Status
-Network::SetEapAnonymousIdentity(const std::vector<uint8_t> &identity)
+android::binder::Status Network::SetEapAnonymousIdentity(
+    const std::vector<uint8_t> &identity)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
@@ -443,8 +443,8 @@ Network::SetEapAnonymousIdentity(const std::vector<uint8_t> &identity)
 	    &(wpa_ssid->eap.anonymous_identity_len), "eap anonymous_identity");
 }
 
-android::binder::Status
-Network::SetEapPassword(const std::vector<uint8_t> &password)
+android::binder::Status Network::SetEapPassword(
+    const std::vector<uint8_t> &password)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
@@ -535,8 +535,8 @@ android::binder::Status Network::SetEapEngineID(const std::string &id)
 	return android::binder::Status::ok();
 }
 
-android::binder::Status
-Network::SetEapDomainSuffixMatch(const std::string &match)
+android::binder::Status Network::SetEapDomainSuffixMatch(
+    const std::string &match)
 
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -610,8 +610,8 @@ android::binder::Status Network::GetGroupCipher(int32_t *group_cipher_mask)
 	return android::binder::Status::ok();
 }
 
-android::binder::Status
-Network::GetPairwiseCipher(int32_t *pairwise_cipher_mask)
+android::binder::Status Network::GetPairwiseCipher(
+    int32_t *pairwise_cipher_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
@@ -632,8 +632,8 @@ android::binder::Status Network::GetPskPassphrase(std::string *psk)
 	return android::binder::Status::ok();
 }
 
-android::binder::Status
-Network::GetWepKey(int key_idx, std::vector<uint8_t> *wep_key)
+android::binder::Status Network::GetWepKey(
+    int key_idx, std::vector<uint8_t> *wep_key)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
@@ -898,4 +898,4 @@ android::binder::Status Network::setByteArrayKeyFieldAndResetState(
 	return android::binder::Status::ok();
 }
 
-} // namespace wpa_supplicant_binder
+}  // namespace wpa_supplicant_binder
