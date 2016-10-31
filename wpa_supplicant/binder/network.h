@@ -39,6 +39,9 @@ public:
 	android::binder::Status GetId(int *network_id_out) override;
 	android::binder::Status
 	GetInterfaceName(std::string *ifname_out) override;
+	android::binder::Status RegisterCallback(
+	    const android::sp<fi::w1::wpa_supplicant::INetworkCallback>
+		&callback) override;
 
 private:
 	struct wpa_ssid *retrieveNetworkPtr();

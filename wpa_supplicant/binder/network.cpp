@@ -7,6 +7,7 @@
  * See README for more details.
  */
 
+#include "binder_manager.h"
 #include "network.h"
 
 namespace wpa_supplicant_binder {
@@ -40,6 +41,26 @@ android::binder::Status Network::GetInterfaceName(std::string *ifname_out)
 	}
 
 	*ifname_out = ifname_;
+	return android::binder::Status::ok();
+}
+
+android::binder::Status Network::RegisterCallback(
+    const android::sp<fi::w1::wpa_supplicant::INetworkCallback> &callback)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_NETWORK_INVALID,
+		    "wpa_supplicant does not control this network.");
+	}
+	BinderManager *binder_manager = BinderManager::getInstance();
+	if (!binder_manager ||
+	    binder_manager->addNetworkCallbackBinderObject(
+		ifname_, network_id_, callback)) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC,
+		    "wpa_supplicant encountered a binder error.");
+	}
 	return android::binder::Status::ok();
 }
 
