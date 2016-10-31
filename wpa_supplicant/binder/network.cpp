@@ -33,6 +33,19 @@ constexpr int kAllowedPairwiseCipherMask =
     (fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_NONE |
      fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_TKIP |
      fi::w1::wpa_supplicant::INetwork::PAIRWISE_CIPHER_MASK_CCMP);
+
+constexpr int kEapMethodMax =
+    fi::w1::wpa_supplicant::INetwork::EAP_METHOD_WFA_UNAUTH_TLS + 1;
+constexpr int kEapMethodMin = fi::w1::wpa_supplicant::INetwork::EAP_METHOD_PEAP;
+constexpr char const *kEapMethodStrings[kEapMethodMax] = {
+    "PEAP", "TLS", "TTLS", "PWD", "SIM", "AKA", "AKA'", "WFA-UNAUTH-TLS"};
+
+constexpr int kEapPhase2MethodMax =
+    fi::w1::wpa_supplicant::INetwork::EAP_PHASE2_METHOD_GTC + 1;
+constexpr int kEapPhase2MethodMin =
+    fi::w1::wpa_supplicant::INetwork::EAP_PHASE2_METHOD_NONE;
+constexpr char const *kEapPhase2MethodStrings[kEapPhase2MethodMax] = {
+    "NULL", "PAP", "MSCHAP", "MSCHAPV2", "GTC"};
 } // namespace
 
 namespace wpa_supplicant_binder {
@@ -95,26 +108,14 @@ android::binder::Status Network::SetSSID(const std::vector<uint8_t> &ssid)
 		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
 		    error_msg.c_str());
 	}
-	// Free any existing ssid string.
-	if (wpa_ssid->ssid) {
-		os_free(wpa_ssid);
-	}
-	// This array needs to be a null terminated!.
-	wpa_ssid->ssid = (uint8_t *)os_malloc(ssid.size() + 1);
-	if (!wpa_ssid->ssid) {
-		return android::binder::Status::fromExceptionCode(
-		    ERROR_GENERIC, "Memory allocation failed.");
-	}
-	os_memcpy(wpa_ssid->ssid, ssid.data(), ssid.size());
-	wpa_ssid->ssid[ssid.size()] = '\0';
-	wpa_ssid->ssid_len = ssid.size();
-	if (wpa_ssid->passphrase) {
+
+	android::binder::Status status = setByteArrayKeyFieldAndResetState(
+	    ssid.data(), ssid.size(), &(wpa_ssid->ssid), &(wpa_ssid->ssid_len),
+	    "ssid");
+	if (status.isOk() && wpa_ssid->passphrase) {
 		wpa_config_update_psk(wpa_ssid);
 	}
-	wpa_hexdump_ascii(
-	    MSG_MSGDUMP, "SSID", wpa_ssid->ssid, wpa_ssid->ssid_len);
-	resetInternalStateAfterParamsUpdate();
-	return android::binder::Status::ok();
+	return status;
 }
 
 android::binder::Status Network::SetBSSID(const std::vector<uint8_t> &bssid)
@@ -273,20 +274,12 @@ android::binder::Status Network::SetPskPassphrase(const std::string &psk)
 	// Flag to indicate if raw psk is calculated or not using
 	// |wpa_config_update_psk|. Deferred if ssid not already set.
 	wpa_ssid->psk_set = 0;
-	str_clear_free(wpa_ssid->passphrase);
-	wpa_ssid->passphrase = dup_binstr(psk.c_str(), psk.size());
-	if (!wpa_ssid->passphrase) {
-		return android::binder::Status::fromExceptionCode(
-		    ERROR_GENERIC, "Memory allocation failed.");
-	}
-	if (wpa_ssid->ssid_len) {
+	android::binder::Status status = setStringKeyFieldAndResetState(
+	    psk.data(), &(wpa_ssid->passphrase), "psk passphrase");
+	if (status.isOk() && wpa_ssid->ssid_len) {
 		wpa_config_update_psk(wpa_ssid);
 	}
-	wpa_hexdump_ascii_key(
-	    MSG_MSGDUMP, "PSK (ASCII passphrase)", (u8 *)wpa_ssid->passphrase,
-	    psk.size());
-	resetInternalStateAfterParamsUpdate();
-	return android::binder::Status::ok();
+	return status;
 }
 
 android::binder::Status
@@ -354,7 +347,59 @@ android::binder::Status Network::SetEapMethod(int32_t method)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
+	int retrieved_vendor, retrieved_method;
 
+	if (method < kEapMethodMin || method >= kEapMethodMax) {
+		const std::string error_msg =
+		    "Invalid EAP method: " + std::to_string(method) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	const char *method_str = kEapMethodStrings[method];
+	// This string lookup is needed to check if the device supports the
+	// corresponding EAP type.
+	retrieved_method = eap_peer_get_type(method_str, &retrieved_vendor);
+	if (retrieved_vendor == EAP_VENDOR_IETF &&
+	    retrieved_method == EAP_TYPE_NONE) {
+		const std::string error_msg = "Cannot get EAP method type: " +
+					      std::to_string(method) + ".";
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, error_msg.c_str());
+	}
+
+	if (wpa_ssid->eap.eap_methods) {
+		os_free(wpa_ssid->eap.eap_methods);
+	}
+	// wpa_supplicant can support setting multiple eap methods for each
+	// network. But, this is not really used by Android. So, just adding
+	// support for setting one EAP method for each network. The additional
+	// |eap_method_type| member in the array is used to indicate the end
+	// of list.
+	wpa_ssid->eap.eap_methods =
+	    (eap_method_type *)os_malloc(sizeof(eap_method_type) * 2);
+	if (!wpa_ssid->eap.eap_methods) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, "Memory allocation failed.");
+	}
+	wpa_ssid->eap.eap_methods[0].vendor = retrieved_vendor;
+	wpa_ssid->eap.eap_methods[0].method = retrieved_method;
+	wpa_ssid->eap.eap_methods[1].vendor = EAP_VENDOR_IETF;
+	wpa_ssid->eap.eap_methods[1].method = EAP_TYPE_NONE;
+
+	wpa_ssid->leap = 0;
+	wpa_ssid->non_leap = 0;
+	if (retrieved_vendor == EAP_VENDOR_IETF &&
+	    retrieved_method == EAP_TYPE_LEAP) {
+		wpa_ssid->leap++;
+	} else {
+		wpa_ssid->non_leap++;
+	}
+
+	wpa_hexdump(
+	    MSG_MSGDUMP, "eap methods", (u8 *)wpa_ssid->eap.eap_methods,
+	    sizeof(eap_method_type) * 2);
+	resetInternalStateAfterParamsUpdate();
 	return android::binder::Status::ok();
 }
 
@@ -363,7 +408,16 @@ android::binder::Status Network::SetEapPhase2Method(int32_t method)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	if (method < kEapPhase2MethodMin || method >= kEapMethodMax) {
+		const std::string error_msg = "Invalid EAP Phase2 method: " +
+					      std::to_string(method) + ".";
+		return android::binder::Status::fromExceptionCode(
+		    android::binder::Status::EX_ILLEGAL_ARGUMENT,
+		    error_msg.c_str());
+	}
+	return setStringFieldAndResetState(
+	    kEapPhase2MethodStrings[method], &(wpa_ssid->eap.phase2),
+	    "eap phase2");
 }
 
 android::binder::Status
@@ -372,7 +426,9 @@ Network::SetEapIdentity(const std::vector<uint8_t> &identity)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	return setByteArrayFieldAndResetState(
+	    identity.data(), identity.size(), &(wpa_ssid->eap.identity),
+	    &(wpa_ssid->eap.identity_len), "eap identity");
 }
 
 android::binder::Status
@@ -381,7 +437,10 @@ Network::SetEapAnonymousIdentity(const std::vector<uint8_t> &identity)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	return setByteArrayFieldAndResetState(
+	    identity.data(), identity.size(),
+	    &(wpa_ssid->eap.anonymous_identity),
+	    &(wpa_ssid->eap.anonymous_identity_len), "eap anonymous_identity");
 }
 
 android::binder::Status
@@ -390,7 +449,14 @@ Network::SetEapPassword(const std::vector<uint8_t> &password)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	android::binder::Status status = setByteArrayKeyFieldAndResetState(
+	    password.data(), password.size(), &(wpa_ssid->eap.password),
+	    &(wpa_ssid->eap.password_len), "eap password");
+	if (status.isOk()) {
+		wpa_ssid->eap.flags &= ~EAP_CONFIG_FLAGS_PASSWORD_NTHASH;
+		wpa_ssid->eap.flags &= ~EAP_CONFIG_FLAGS_EXT_PASSWORD;
+	}
+	return status;
 }
 
 android::binder::Status Network::SetEapCACert(const std::string &path)
@@ -398,7 +464,8 @@ android::binder::Status Network::SetEapCACert(const std::string &path)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	return setStringFieldAndResetState(
+	    path.c_str(), &(wpa_ssid->eap.ca_cert), "eap ca_cert");
 }
 
 android::binder::Status Network::SetEapCAPath(const std::string &path)
@@ -406,7 +473,8 @@ android::binder::Status Network::SetEapCAPath(const std::string &path)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	return setStringFieldAndResetState(
+	    path.c_str(), &(wpa_ssid->eap.ca_path), "eap ca_path");
 }
 
 android::binder::Status Network::SetEapClientCert(const std::string &path)
@@ -414,7 +482,8 @@ android::binder::Status Network::SetEapClientCert(const std::string &path)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	return setStringFieldAndResetState(
+	    path.c_str(), &(wpa_ssid->eap.client_cert), "eap client_cert");
 }
 
 android::binder::Status Network::SetEapPrivateKey(const std::string &path)
@@ -422,7 +491,8 @@ android::binder::Status Network::SetEapPrivateKey(const std::string &path)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	return setStringFieldAndResetState(
+	    path.c_str(), &(wpa_ssid->eap.private_key), "eap private_key");
 }
 
 android::binder::Status Network::SetEapSubjectMatch(const std::string &match)
@@ -431,7 +501,8 @@ android::binder::Status Network::SetEapSubjectMatch(const std::string &match)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	return setStringFieldAndResetState(
+	    match.c_str(), &(wpa_ssid->eap.subject_match), "eap subject_match");
 }
 
 android::binder::Status Network::SetEapAltSubjectMatch(const std::string &match)
@@ -439,7 +510,9 @@ android::binder::Status Network::SetEapAltSubjectMatch(const std::string &match)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	return setStringFieldAndResetState(
+	    match.c_str(), &(wpa_ssid->eap.altsubject_match),
+	    "eap altsubject_match");
 }
 
 android::binder::Status Network::SetEapEngine(bool enable)
@@ -447,6 +520,7 @@ android::binder::Status Network::SetEapEngine(bool enable)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
+	wpa_ssid->eap.engine = enable ? 1 : 0;
 	return android::binder::Status::ok();
 }
 
@@ -456,6 +530,8 @@ android::binder::Status Network::SetEapEngineID(const std::string &id)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
+	return setStringFieldAndResetState(
+	    id.c_str(), &(wpa_ssid->eap.engine_id), "eap engine_id");
 	return android::binder::Status::ok();
 }
 
@@ -466,7 +542,9 @@ Network::SetEapDomainSuffixMatch(const std::string &match)
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	RETURN_IF_NETWORK_INVALID(wpa_ssid);
 
-	return android::binder::Status::ok();
+	return setStringFieldAndResetState(
+	    match.c_str(), &(wpa_ssid->eap.domain_suffix_match),
+	    "eap domain_suffix_match");
 }
 
 android::binder::Status Network::GetSSID(std::vector<uint8_t> *ssid)
@@ -707,4 +785,117 @@ void Network::resetInternalStateAfterParamsUpdate()
 		eapol_sm_invalidate_cached_session(wpa_s->eapol);
 	}
 }
+
+/**
+ * Helper function to set value in a string field in |wpa_ssid| structue
+ * instance for this network.
+ * This function frees any existing data in these fields.
+ */
+android::binder::Status Network::setStringFieldAndResetState(
+    const char *value, uint8_t **to_update_field, const char *hexdump_prefix)
+{
+	return setStringFieldAndResetState(
+	    value, (char **)to_update_field, hexdump_prefix);
+}
+
+/**
+ * Helper function to set value in a string field in |wpa_ssid| structue
+ * instance for this network.
+ * This function frees any existing data in these fields.
+ */
+android::binder::Status Network::setStringFieldAndResetState(
+    const char *value, char **to_update_field, const char *hexdump_prefix)
+{
+	int value_len = strlen(value);
+	if (*to_update_field) {
+		os_free(*to_update_field);
+	}
+	*to_update_field = dup_binstr(value, value_len);
+	if (!(*to_update_field)) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, "Memory allocation failed.");
+	}
+	wpa_hexdump_ascii(
+	    MSG_MSGDUMP, hexdump_prefix, *to_update_field, value_len);
+	resetInternalStateAfterParamsUpdate();
+	return android::binder::Status::ok();
+}
+
+/**
+ * Helper function to set value in a string key field in |wpa_ssid| structue
+ * instance for this network.
+ * This function frees any existing data in these fields.
+ */
+android::binder::Status Network::setStringKeyFieldAndResetState(
+    const char *value, char **to_update_field, const char *hexdump_prefix)
+{
+	int value_len = strlen(value);
+	if (*to_update_field) {
+		str_clear_free(*to_update_field);
+	}
+	*to_update_field = dup_binstr(value, value_len);
+	if (!(*to_update_field)) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, "Memory allocation failed.");
+	}
+	wpa_hexdump_ascii_key(
+	    MSG_MSGDUMP, hexdump_prefix, *to_update_field, value_len);
+	resetInternalStateAfterParamsUpdate();
+	return android::binder::Status::ok();
+}
+
+/**
+ * Helper function to set value in a string field with a corresponding length
+ * field in |wpa_ssid| structue instance for this network.
+ * This function frees any existing data in these fields.
+ */
+android::binder::Status Network::setByteArrayFieldAndResetState(
+    const uint8_t *value, const size_t value_len, uint8_t **to_update_field,
+    size_t *to_update_field_len, const char *hexdump_prefix)
+{
+	if (*to_update_field) {
+		os_free(*to_update_field);
+	}
+	*to_update_field = (uint8_t *)os_malloc(value_len);
+	if (!(*to_update_field)) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, "Memory allocation failed.");
+	}
+	os_memcpy(*to_update_field, value, value_len);
+	*to_update_field_len = value_len;
+
+	wpa_hexdump_ascii(
+	    MSG_MSGDUMP, hexdump_prefix, *to_update_field,
+	    *to_update_field_len);
+	resetInternalStateAfterParamsUpdate();
+	return android::binder::Status::ok();
+}
+
+/**
+ * Helper function to set value in a string key field with a corresponding
+ * length field in |wpa_ssid| structue instance for this network.
+ * This function frees any existing data in these fields.
+ */
+android::binder::Status Network::setByteArrayKeyFieldAndResetState(
+    const uint8_t *value, const size_t value_len, uint8_t **to_update_field,
+    size_t *to_update_field_len, const char *hexdump_prefix)
+{
+	if (*to_update_field) {
+		bin_clear_free(*to_update_field, *to_update_field_len);
+	}
+	*to_update_field = (uint8_t *)os_malloc(value_len);
+	if (!(*to_update_field)) {
+		return android::binder::Status::fromServiceSpecificError(
+		    ERROR_GENERIC, "Memory allocation failed.");
+	}
+	os_memcpy(*to_update_field, value, value_len);
+	*to_update_field_len = value_len;
+
+	wpa_hexdump_ascii_key(
+	    MSG_MSGDUMP, hexdump_prefix, *to_update_field,
+	    *to_update_field_len);
+	resetInternalStateAfterParamsUpdate();
+	return android::binder::Status::ok();
+}
+
 } // namespace wpa_supplicant_binder
