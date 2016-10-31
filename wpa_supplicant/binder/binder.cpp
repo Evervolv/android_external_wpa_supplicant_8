@@ -85,7 +85,7 @@ void wpas_binder_deinit(struct wpas_binder_priv *priv)
 
 int wpas_binder_register_interface(struct wpa_supplicant *wpa_s)
 {
-	if (!wpa_s->global->binder || !wpa_s)
+	if (!wpa_s || !wpa_s->global->binder)
 		return 1;
 
 	wpa_printf(
@@ -102,7 +102,7 @@ int wpas_binder_register_interface(struct wpa_supplicant *wpa_s)
 
 int wpas_binder_unregister_interface(struct wpa_supplicant *wpa_s)
 {
-	if (!wpa_s->global->binder || !wpa_s)
+	if (!wpa_s || !wpa_s->global->binder)
 		return 1;
 
 	wpa_printf(
@@ -120,7 +120,7 @@ int wpas_binder_unregister_interface(struct wpa_supplicant *wpa_s)
 int wpas_binder_register_network(
     struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
 {
-	if (!wpa_s->global->binder || !wpa_s || !ssid)
+	if (!wpa_s || !wpa_s->global->binder || !ssid)
 		return 1;
 
 	wpa_printf(
@@ -137,7 +137,7 @@ int wpas_binder_register_network(
 int wpas_binder_unregister_network(
     struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
 {
-	if (!wpa_s->global->binder || !wpa_s || !ssid)
+	if (!wpa_s || !wpa_s->global->binder || !ssid)
 		return 1;
 
 	wpa_printf(
@@ -150,4 +150,21 @@ int wpas_binder_unregister_network(
 		return 1;
 
 	return binder_manager->unregisterNetwork(wpa_s, ssid);
+}
+
+int wpas_binder_notify_state_changed(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s || !wpa_s->global->binder || !ssid)
+		return 1;
+
+	wpa_printf(
+	    MSG_DEBUG, "Notifying state change event to binder control: %d",
+	    wpa_s->wpa_state);
+
+	wpa_supplicant_binder::BinderManager *binder_manager =
+	    wpa_supplicant_binder::BinderManager::getInstance();
+	if (!binder_manager)
+		return 1;
+
+	return binder_manager->notifyStateChange(wpa_s);
 }

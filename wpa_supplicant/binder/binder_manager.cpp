@@ -216,8 +216,45 @@ int BinderManager::unregisterNetwork(
 	    wpa_s->ifname,
 	    std::bind(
 		&fi::w1::wpa_supplicant::IIfaceCallback::OnNetworkRemoved,
-		std::placeholders::_1,
-		ssid->id));
+		std::placeholders::_1, ssid->id));
+	return 0;
+}
+
+/**
+ * Notify all listeners about any state changes on a particular interface.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface on which
+ * the state change event occured.
+ *
+ * @return 0 on success, 1 on failure.
+ */
+int BinderManager::notifyStateChange(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return 1;
+
+	const std::string ifname(wpa_s->ifname);
+
+	if (iface_object_map_.find(ifname) == iface_object_map_.end())
+		return 1;
+
+	// Invoke the |OnStateChanged| method on all registered callbacks.
+	int state = wpa_s->wpa_state;
+	std::vector<uint8_t> bssid(wpa_s->bssid, wpa_s->bssid + ETH_ALEN);
+	int network_id =
+	    fi::w1::wpa_supplicant::IIfaceCallback::NETWORK_ID_INVALID;
+	std::vector<uint8_t> ssid;
+	if (wpa_s->current_ssid) {
+		network_id = wpa_s->current_ssid->id;
+		ssid.assign(
+		    wpa_s->current_ssid->ssid,
+		    wpa_s->current_ssid->ssid + wpa_s->current_ssid->ssid_len);
+	}
+	callWithEachIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&fi::w1::wpa_supplicant::IIfaceCallback::OnStateChanged,
+		std::placeholders::_1, state, bssid, network_id, ssid));
 	return 0;
 }
 
