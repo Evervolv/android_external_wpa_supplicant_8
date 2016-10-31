@@ -42,10 +42,10 @@ public:
 	int registerBinderService(struct wpa_global *global);
 	int registerInterface(struct wpa_supplicant *wpa_s);
 	int unregisterInterface(struct wpa_supplicant *wpa_s);
-	int
-	registerNetwork(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
-	int
-	unregisterNetwork(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
+	int registerNetwork(
+	    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
+	int unregisterNetwork(
+	    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid);
 	int notifyStateChange(struct wpa_supplicant *wpa_s);
 
 	// Methods called from binder objects.
@@ -73,8 +73,8 @@ private:
 	BinderManager(const BinderManager &) = default;
 	BinderManager &operator=(const BinderManager &) = default;
 
-	const std::string
-	getNetworkObjectMapKey(const std::string &ifname, int network_id);
+	const std::string getNetworkObjectMapKey(
+	    const std::string &ifname, int network_id);
 
 	void removeSupplicantCallbackBinderObject(
 	    const android::sp<fi::w1::wpa_supplicant::ISupplicantCallback>
@@ -243,5 +243,5 @@ static_assert(
 static_assert(
     WPA_COMPLETED == fi::w1::wpa_supplicant::IIfaceCallback::STATE_COMPLETED,
     "State value mismatch");
-} // namespace wpa_supplicant_binder
-#endif // WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H
+}  // namespace wpa_supplicant_binder
+#endif  // WPA_SUPPLICANT_BINDER_BINDER_MANAGER_H
