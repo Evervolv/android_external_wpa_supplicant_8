@@ -1219,6 +1219,20 @@ int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 					      struct wpa_ssid *ssid,
 					      const char *field,
 					      const char *value);
+/**
+ * wpa_supplicant_ctrl_rsp_handle - Handle a control response
+ * @wpa_s: Pointer to wpa_supplicant data
+ * @ssid: Pointer to the network block the reply is for
+ * @field: field the response is a reply for
+ * @value: value (ie, password, etc) for @field
+ * Returns: 0 on success, non-zero on error
+ *
+ * Helper function to handle replies to control interface requests.
+ */
+int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
+				   struct wpa_ssid *ssid,
+				   enum wpa_ctrl_req_type rtype,
+				   const char *value);
 
 void ibss_mesh_setup_freq(struct wpa_supplicant *wpa_s,
 			  const struct wpa_ssid *ssid,
