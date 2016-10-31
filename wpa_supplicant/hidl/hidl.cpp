@@ -7,9 +7,8 @@
  * See README for more details.
  */
 
-#include <hidl/IPCThreadState.h>
-#include <hidl/IServiceManager.h>
-#include <hidl/ProcessState.h>
+#include <hwbinder/IPCThreadState.h>
+#include <hwbinder/ProcessState.h>
 
 #include "hidl_manager.h"
 
@@ -21,19 +20,22 @@ extern "C" {
 #include "utils/includes.h"
 }
 
+using android::hardware::ProcessState;
+using android::hardware::IPCThreadState;
+using android::hardware::wifi::supplicant::V1_0::implementation::HidlManager;
+
 void wpas_hidl_sock_handler(
     int /* sock */, void * /* eloop_ctx */, void *sock_ctx)
 {
 	struct wpas_hidl_priv *priv = (wpas_hidl_priv *)sock_ctx;
-	wpa_printf(
-	    MSG_DEBUG, "Processing hidl events on FD %d", priv->hidl_fd);
-	android::IPCThreadState::self()->handlePolledCommands();
+	wpa_printf(MSG_DEBUG, "Processing hidl events on FD %d", priv->hidl_fd);
+	IPCThreadState::self()->handlePolledCommands();
 }
 
 struct wpas_hidl_priv *wpas_hidl_init(struct wpa_global *global)
 {
 	struct wpas_hidl_priv *priv;
-	wpa_supplicant_hidl::HidlManager *hidl_manager;
+	HidlManager *hidl_manager;
 
 	priv = (wpas_hidl_priv *)os_zalloc(sizeof(*priv));
 	if (!priv)
@@ -42,25 +44,24 @@ struct wpas_hidl_priv *wpas_hidl_init(struct wpa_global *global)
 
 	wpa_printf(MSG_DEBUG, "Initing hidl control");
 
-	android::ProcessState::self()->setThreadPoolMaxThreadCount(0);
-	android::IPCThreadState::self()->disableBackgroundScheduling(true);
-	android::IPCThreadState::self()->setupPolling(&priv->hidl_fd);
+	ProcessState::self()->setThreadPoolMaxThreadCount(0);
+	IPCThreadState::self()->disableBackgroundScheduling(true);
+	IPCThreadState::self()->setupPolling(&priv->hidl_fd);
 	if (priv->hidl_fd < 0)
 		goto err;
 
-	wpa_printf(
-	    MSG_INFO, "Processing hidl events on FD %d", priv->hidl_fd);
-	/* Look for read events from the hidl socket in the eloop. */
+	wpa_printf(MSG_INFO, "Processing hidl events on FD %d", priv->hidl_fd);
+	// Look for read events from the hidl socket in the eloop.
 	if (eloop_register_read_sock(
 		priv->hidl_fd, wpas_hidl_sock_handler, global, priv) < 0)
 		goto err;
 
-	hidl_manager = wpa_supplicant_hidl::HidlManager::getInstance();
+	hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager)
 		goto err;
 	hidl_manager->registerHidlService(global);
-	/* We may not need to store this hidl manager reference in the
-	 * global data strucure because we've made it a singleton class. */
+	// We may not need to store this hidl manager reference in the
+	// global data strucure because we've made it a singleton class.
 	priv->hidl_manager = (void *)hidl_manager;
 
 	return priv;
@@ -76,9 +77,9 @@ void wpas_hidl_deinit(struct wpas_hidl_priv *priv)
 
 	wpa_printf(MSG_DEBUG, "Deiniting hidl control");
 
-	wpa_supplicant_hidl::HidlManager::destroyInstance();
+	HidlManager::destroyInstance();
 	eloop_unregister_read_sock(priv->hidl_fd);
-	android::IPCThreadState::shutdown();
+	IPCThreadState::shutdown();
 	os_free(priv);
 }
 
@@ -91,8 +92,7 @@ int wpas_hidl_register_interface(struct wpa_supplicant *wpa_s)
 	    MSG_DEBUG, "Registering interface to hidl control: %s",
 	    wpa_s->ifname);
 
-	wpa_supplicant_hidl::HidlManager *hidl_manager =
-	    wpa_supplicant_hidl::HidlManager::getInstance();
+	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager)
 		return 1;
 
@@ -108,8 +108,7 @@ int wpas_hidl_unregister_interface(struct wpa_supplicant *wpa_s)
 	    MSG_DEBUG, "Deregistering interface from hidl control: %s",
 	    wpa_s->ifname);
 
-	wpa_supplicant_hidl::HidlManager *hidl_manager =
-	    wpa_supplicant_hidl::HidlManager::getInstance();
+	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager)
 		return 1;
 
@@ -125,8 +124,7 @@ int wpas_hidl_register_network(
 	wpa_printf(
 	    MSG_DEBUG, "Registering network to hidl control: %d", ssid->id);
 
-	wpa_supplicant_hidl::HidlManager *hidl_manager =
-	    wpa_supplicant_hidl::HidlManager::getInstance();
+	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager)
 		return 1;
 
@@ -140,11 +138,9 @@ int wpas_hidl_unregister_network(
 		return 1;
 
 	wpa_printf(
-	    MSG_DEBUG, "Deregistering network from hidl control: %d",
-	    ssid->id);
+	    MSG_DEBUG, "Deregistering network from hidl control: %d", ssid->id);
 
-	wpa_supplicant_hidl::HidlManager *hidl_manager =
-	    wpa_supplicant_hidl::HidlManager::getInstance();
+	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager)
 		return 1;
 
@@ -160,8 +156,7 @@ int wpas_hidl_notify_state_changed(struct wpa_supplicant *wpa_s)
 	    MSG_DEBUG, "Notifying state change event to hidl control: %d",
 	    wpa_s->wpa_state);
 
-	wpa_supplicant_hidl::HidlManager *hidl_manager =
-	    wpa_supplicant_hidl::HidlManager::getInstance();
+	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager)
 		return 1;
 
@@ -179,8 +174,7 @@ int wpas_hidl_notify_network_request(
 	    MSG_DEBUG, "Notifying network request to hidl control: %d",
 	    ssid->id);
 
-	wpa_supplicant_hidl::HidlManager *hidl_manager =
-	    wpa_supplicant_hidl::HidlManager::getInstance();
+	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager)
 		return 1;
 

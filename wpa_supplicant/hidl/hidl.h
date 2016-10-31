@@ -12,7 +12,7 @@
 
 #ifdef _cplusplus
 extern "C" {
-#endif /* _cplusplus */
+#endif  // _cplusplus
 
 /**
  * This is the hidl RPC interface entry point to the wpa_supplicant core.
@@ -36,7 +36,7 @@ int wpas_hidl_notify_state_changed(struct wpa_supplicant *wpa_s);
 int wpas_hidl_notify_network_request(
     struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid,
     enum wpa_ctrl_req_type rtype, const char *default_txt);
-#else  /* CONFIG_CTRL_IFACE_HIDL */
+#else   // CONFIG_CTRL_IFACE_HIDL
 static inline int wpas_hidl_register_interface(struct wpa_supplicant *wpa_s)
 {
 	return 0;
@@ -65,10 +65,10 @@ static inline int wpas_hidl_notify_network_request(
 {
 	return 0;
 }
-#endif /* CONFIG_CTRL_IFACE_HIDL */
+#endif  // CONFIG_CTRL_IFACE_HIDL
 
 #ifdef _cplusplus
 }
-#endif /* _cplusplus */
+#endif  // _cplusplus
 
-#endif /* WPA_SUPPLICANT_HIDL_HIDL_H */
+#endif  // WPA_SUPPLICANT_HIDL_HIDL_H
