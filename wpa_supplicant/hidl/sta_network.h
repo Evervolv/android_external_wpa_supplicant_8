@@ -7,13 +7,13 @@
  * See README for more details.
  */
 
-#ifndef WPA_SUPPLICANT_HIDL_NETWORK_H
-#define WPA_SUPPLICANT_HIDL_NETWORK_H
+#ifndef WPA_SUPPLICANT_HIDL_STA_NETWORK_H
+#define WPA_SUPPLICANT_HIDL_STA_NETWORK_H
 
 #include <android-base/macros.h>
 
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantNetwork.h>
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantNetworkCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantStaNetwork.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantStaNetworkCallback.h>
 
 extern "C" {
 #include "utils/common.h"
@@ -34,22 +34,23 @@ namespace V1_0 {
 namespace implementation {
 
 /**
- * Implementation of Network hidl object. Each unique hidl
+ * Implementation of StaNetwork hidl object. Each unique hidl
  * object is used for control operations on a specific network
  * controlled by wpa_supplicant.
  */
-class Network : public ISupplicantNetwork
+class StaNetwork : public ISupplicantStaNetwork
 {
 public:
-	Network(
+	StaNetwork(
 	    struct wpa_global* wpa_global, const char ifname[], int network_id);
-	~Network() override = default;
+	~StaNetwork() override = default;
 
 	// Hidl methods exposed.
 	Return<void> getId(getId_cb _hidl_cb) override;
 	Return<void> getInterfaceName(getInterfaceName_cb _hidl_cb) override;
+	Return<void> getType(getType_cb _hidl_cb) override;
 	Return<void> registerCallback(
-	    const sp<ISupplicantNetworkCallback>& callback,
+	    const sp<ISupplicantStaNetworkCallback>& callback,
 	    registerCallback_cb _hidl_cb) override;
 	Return<void> setSsid(
 	    const hidl_vec<uint8_t>& ssid, setSsid_cb _hidl_cb) override;
@@ -78,10 +79,10 @@ public:
 	Return<void> setRequirePmf(
 	    bool enable, setRequirePmf_cb _hidl_cb) override;
 	Return<void> setEapMethod(
-	    ISupplicantNetwork::EapMethod method,
+	    ISupplicantStaNetwork::EapMethod method,
 	    setEapMethod_cb _hidl_cb) override;
 	Return<void> setEapPhase2Method(
-	    ISupplicantNetwork::EapPhase2Method method,
+	    ISupplicantStaNetwork::EapPhase2Method method,
 	    setEapPhase2Method_cb _hidl_cb) override;
 	Return<void> setEapIdentity(
 	    const hidl_vec<uint8_t>& identity,
@@ -129,11 +130,11 @@ public:
 	Return<void> disable(disable_cb _hidl_cb) override;
 	Return<void> select(select_cb _hidl_cb) override;
 	Return<void> sendNetworkEapSimGsmAuthResponse(
-	    const ISupplicantNetwork::NetworkResponseEapSimGsmAuthParams&
+	    const ISupplicantStaNetwork::NetworkResponseEapSimGsmAuthParams&
 		params,
 	    sendNetworkEapSimGsmAuthResponse_cb _hidl_cb) override;
 	Return<void> sendNetworkEapSimUmtsAuthResponse(
-	    const ISupplicantNetwork::NetworkResponseEapSimUmtsAuthParams&
+	    const ISupplicantStaNetwork::NetworkResponseEapSimUmtsAuthParams&
 		params,
 	    sendNetworkEapSimUmtsAuthResponse_cb _hidl_cb) override;
 	Return<void> sendNetworkEapIdentityResponse(
@@ -171,7 +172,7 @@ private:
 	// Id of the network this hidl object controls.
 	const int network_id_;
 
-	DISALLOW_COPY_AND_ASSIGN(Network);
+	DISALLOW_COPY_AND_ASSIGN(StaNetwork);
 };
 
 }  // namespace implementation
@@ -181,4 +182,4 @@ private:
 }  // namespace hardware
 }  // namespace android
 
-#endif  // WPA_SUPPLICANT_HIDL_NETWORK_H
+#endif  // WPA_SUPPLICANT_HIDL_STA_NETWORK_H
