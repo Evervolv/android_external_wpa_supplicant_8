@@ -45,6 +45,8 @@ static DEFINE_DL_LIST(stations); /* struct cli_txt_entry */
 static void print_help(FILE *stream, const char *cmd);
 static char ** list_cmd_list(void);
 static void hostapd_cli_receive(int sock, void *eloop_ctx, void *sock_ctx);
+static void update_stations(struct wpa_ctrl *ctrl);
+static void cli_event(const char *str);
 
 
 static void usage(void)
@@ -147,13 +149,45 @@ static void hostapd_cli_close_connection(void)
 }
 
 
+static int hostapd_cli_reconnect(const char *ifname)
+{
+	char *next_ctrl_ifname;
+
+	hostapd_cli_close_connection();
+
+	if (!ifname)
+		return -1;
+
+	next_ctrl_ifname = os_strdup(ifname);
+	os_free(ctrl_ifname);
+	ctrl_ifname = next_ctrl_ifname;
+	if (!ctrl_ifname)
+		return -1;
+
+	ctrl_conn = hostapd_cli_open_connection(ctrl_ifname);
+	if (!ctrl_conn)
+		return -1;
+	if (!interactive && !action_file)
+		return 0;
+	if (wpa_ctrl_attach(ctrl_conn) == 0) {
+		hostapd_cli_attached = 1;
+		register_event_handler(ctrl_conn);
+		update_stations(ctrl_conn);
+	} else {
+		printf("Warning: Failed to attach to hostapd.\n");
+	}
+	return 0;
+}
+
+
 static void hostapd_cli_msg_cb(char *msg, size_t len)
 {
+	cli_event(msg);
 	printf("%s\n", msg);
 }
 
 
-static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, char *cmd, int print)
+static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print)
 {
 	char buf[4096];
 	size_t len;
@@ -181,7 +215,7 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, char *cmd, int print)
 }
 
 
-static inline int wpa_ctrl_command(struct wpa_ctrl *ctrl, char *cmd)
+static inline int wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd)
 {
 	return _wpa_ctrl_command(ctrl, cmd, 1);
 }
@@ -283,6 +317,21 @@ static int hostapd_cli_cmd_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
 	else
 		snprintf(buf, sizeof(buf), "STA %s", argv[0]);
 	return wpa_ctrl_command(ctrl, buf);
+}
+
+
+static char ** hostapd_complete_sta(const char *str, int pos)
+{
+	int arg = get_cmd_arg_num(str, pos);
+	char **res = NULL;
+
+	switch (arg) {
+	case 1:
+		res = cli_txt_list_array(&stations);
+		break;
+	}
+
+	return res;
 }
 
 
@@ -701,8 +750,8 @@ static int hostapd_cli_cmd_get_config(struct wpa_ctrl *ctrl, int argc,
 }
 
 
-static int wpa_ctrl_command_sta(struct wpa_ctrl *ctrl, char *cmd,
-				char *addr, size_t addr_len)
+static int wpa_ctrl_command_sta(struct wpa_ctrl *ctrl, const char *cmd,
+				char *addr, size_t addr_len, int print)
 {
 	char buf[4096], *pos;
 	size_t len;
@@ -726,7 +775,8 @@ static int wpa_ctrl_command_sta(struct wpa_ctrl *ctrl, char *cmd,
 	buf[len] = '\0';
 	if (memcmp(buf, "FAIL", 4) == 0)
 		return -1;
-	printf("%s", buf);
+	if (print)
+		printf("%s", buf);
 
 	pos = buf;
 	while (*pos != '\0' && *pos != '\n')
@@ -742,13 +792,30 @@ static int hostapd_cli_cmd_all_sta(struct wpa_ctrl *ctrl, int argc,
 {
 	char addr[32], cmd[64];
 
-	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr)))
+	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 1))
 		return 0;
 	do {
 		snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
-	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr)) == 0);
+	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 1) == 0);
 
 	return -1;
+}
+
+
+static int hostapd_cli_cmd_list_sta(struct wpa_ctrl *ctrl, int argc,
+				    char *argv[])
+{
+	char addr[32], cmd[64];
+
+	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 0))
+		return 0;
+	do {
+		if (os_strcmp(addr, "") != 0)
+			printf("%s\n", addr);
+		os_snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
+	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 0) == 0);
+
+	return 0;
 }
 
 
@@ -888,6 +955,25 @@ static int hostapd_cli_cmd_level(struct wpa_ctrl *ctrl, int argc, char *argv[])
 }
 
 
+static void update_stations(struct wpa_ctrl *ctrl)
+{
+	char addr[32], cmd[64];
+
+	if (!ctrl || !interactive)
+		return;
+
+	cli_txt_list_flush(&stations);
+
+	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 0))
+		return;
+	do {
+		if (os_strcmp(addr, "") != 0)
+			cli_txt_list_add(&stations, addr);
+		os_snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
+	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 0) == 0);
+}
+
+
 static void hostapd_cli_get_interfaces(struct wpa_ctrl *ctrl,
 				       struct dl_list *interfaces)
 {
@@ -940,23 +1026,7 @@ static int hostapd_cli_cmd_interface(struct wpa_ctrl *ctrl, int argc,
 		hostapd_cli_list_interfaces(ctrl);
 		return 0;
 	}
-
-	hostapd_cli_close_connection();
-	os_free(ctrl_ifname);
-	ctrl_ifname = os_strdup(argv[0]);
-	if (ctrl_ifname == NULL)
-		return -1;
-
-	if (hostapd_cli_open_connection(ctrl_ifname)) {
-		printf("Connected to interface '%s.\n", ctrl_ifname);
-		if (wpa_ctrl_attach(ctrl_conn) == 0) {
-			hostapd_cli_attached = 1;
-			register_event_handler(ctrl_conn);
-		} else {
-			printf("Warning: Failed to attach to "
-			       "hostapd.\n");
-		}
-	} else {
+	if (hostapd_cli_reconnect(argv[0]) != 0) {
 		printf("Could not connect to interface '%s' - re-trying\n",
 			ctrl_ifname);
 	}
@@ -1185,14 +1255,14 @@ static int hostapd_cli_cmd_set_neighbor(struct wpa_ctrl *ctrl, int argc,
 	char cmd[2048];
 	int res;
 
-	if (argc < 3 || argc > 5) {
-		printf("Invalid set_neighbor command: needs 3-5 arguments\n");
+	if (argc < 3 || argc > 6) {
+		printf("Invalid set_neighbor command: needs 3-6 arguments\n");
 		return -1;
 	}
 
-	res = os_snprintf(cmd, sizeof(cmd), "SET_NEIGHBOR %s %s %s %s %s",
+	res = os_snprintf(cmd, sizeof(cmd), "SET_NEIGHBOR %s %s %s %s %s %s",
 			  argv[0], argv[1], argv[2], argc >= 4 ? argv[3] : "",
-			  argc == 5 ? argv[4] : "");
+			  argc >= 5 ? argv[4] : "", argc == 6 ? argv[5] : "");
 	if (os_snprintf_error(sizeof(cmd), res)) {
 		printf("Too long SET_NEIGHBOR command.\n");
 		return -1;
@@ -1275,10 +1345,12 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	  "= get MIB variables (dot1x, dot11, radius)" },
 	{ "relog", hostapd_cli_cmd_relog, NULL, NULL },
 	{ "status", hostapd_cli_cmd_status, NULL, NULL },
-	{ "sta", hostapd_cli_cmd_sta, NULL,
+	{ "sta", hostapd_cli_cmd_sta, hostapd_complete_sta,
 	  "<addr> = get MIB variables for one station" },
 	{ "all_sta", hostapd_cli_cmd_all_sta, NULL,
 	   "= get MIB variables for all stations" },
+	{ "list_sta", hostapd_cli_cmd_list_sta, NULL,
+	   "= list all stations" },
 	{ "new_sta", hostapd_cli_cmd_new_sta, NULL,
 	  "<addr> = add a new station" },
 	{ "deauthenticate", hostapd_cli_cmd_deauthenticate,
@@ -1504,19 +1576,8 @@ static void hostapd_cli_ping(void *eloop_ctx, void *timeout_ctx)
 		printf("Connection to hostapd lost - trying to reconnect\n");
 		hostapd_cli_close_connection();
 	}
-	if (!ctrl_conn) {
-		ctrl_conn = hostapd_cli_open_connection(ctrl_ifname);
-		if (ctrl_conn) {
-			printf("Connection to hostapd re-established\n");
-			if (wpa_ctrl_attach(ctrl_conn) == 0) {
-				hostapd_cli_attached = 1;
-				register_event_handler(ctrl_conn);
-			} else {
-				printf("Warning: Failed to attach to "
-				       "hostapd.\n");
-			}
-		}
-	}
+	if (!ctrl_conn && hostapd_cli_reconnect(ctrl_ifname) == 0)
+		printf("Connection to hostapd re-established\n");
 	if (ctrl_conn)
 		hostapd_cli_recv_pending(ctrl_conn, 1, 0);
 	eloop_register_timeout(ping_interval, 0, hostapd_cli_ping, NULL, NULL);
@@ -1611,17 +1672,34 @@ static char ** hostapd_cli_edit_completion_cb(void *ctx, const char *str,
 
 static void hostapd_cli_interactive(void)
 {
+	char *hfile = NULL;
+	char *home;
+
 	printf("\nInteractive mode\n\n");
+
+#ifdef CONFIG_HOSTAPD_CLI_HISTORY_DIR
+	home = CONFIG_HOSTAPD_CLI_HISTORY_DIR;
+#else /* CONFIG_HOSTAPD_CLI_HISTORY_DIR */
+	home = getenv("HOME");
+#endif /* CONFIG_HOSTAPD_CLI_HISTORY_DIR */
+	if (home) {
+		const char *fname = ".hostapd_cli_history";
+		int hfile_len = os_strlen(home) + 1 + os_strlen(fname) + 1;
+		hfile = os_malloc(hfile_len);
+		if (hfile)
+			os_snprintf(hfile, hfile_len, "%s/%s", home, fname);
+	}
 
 	eloop_register_signal_terminate(hostapd_cli_eloop_terminate, NULL);
 	edit_init(hostapd_cli_edit_cmd_cb, hostapd_cli_edit_eof_cb,
-		  hostapd_cli_edit_completion_cb, NULL, NULL, NULL);
+		  hostapd_cli_edit_completion_cb, NULL, hfile, NULL);
 	eloop_register_timeout(ping_interval, 0, hostapd_cli_ping, NULL, NULL);
 
 	eloop_run();
 
 	cli_txt_list_flush(&stations);
-	edit_deinit(NULL, NULL);
+	edit_deinit(hfile, NULL);
+	os_free(hfile);
 	eloop_cancel_timeout(hostapd_cli_ping, NULL, NULL);
 }
 
@@ -1748,7 +1826,7 @@ int main(int argc, char *argv[])
 				closedir(dir);
 			}
 		}
-		ctrl_conn = hostapd_cli_open_connection(ctrl_ifname);
+		hostapd_cli_reconnect(ctrl_ifname);
 		if (ctrl_conn) {
 			if (warning_displayed)
 				printf("Connection established.\n");
@@ -1769,17 +1847,8 @@ int main(int argc, char *argv[])
 		continue;
 	}
 
-	if (interactive || action_file) {
-		if (wpa_ctrl_attach(ctrl_conn) == 0) {
-			hostapd_cli_attached = 1;
-			register_event_handler(ctrl_conn);
-		} else {
-			printf("Warning: Failed to attach to hostapd.\n");
-			if (action_file)
-				return -1;
-		}
-	}
-
+	if (action_file && !hostapd_cli_attached)
+		return -1;
 	if (daemonize && os_daemonize(pid_file) && eloop_sock_requeue())
 		return -1;
 
