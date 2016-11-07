@@ -1047,6 +1047,16 @@ struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 			continue;
 		}
 
+#ifndef CONFIG_IBSS_RSN
+		if (ssid->mode == WPAS_MODE_IBSS &&
+		    !(ssid->key_mgmt & (WPA_KEY_MGMT_NONE |
+					WPA_KEY_MGMT_WPA_NONE))) {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"   skip - IBSS RSN not supported in the build");
+			continue;
+		}
+#endif /* !CONFIG_IBSS_RSN */
+
 #ifdef CONFIG_P2P
 		if (ssid->p2p_group &&
 		    !wpa_bss_get_vendor_ie(bss, P2P_IE_VENDOR_TYPE) &&
@@ -1332,6 +1342,17 @@ wpa_supplicant_pick_new_network(struct wpa_supplicant *wpa_s)
 		{
 			if (wpas_network_disabled(wpa_s, ssid))
 				continue;
+#ifndef CONFIG_IBSS_RSN
+			if (ssid->mode == WPAS_MODE_IBSS &&
+			    !(ssid->key_mgmt & (WPA_KEY_MGMT_NONE |
+						WPA_KEY_MGMT_WPA_NONE))) {
+				wpa_msg(wpa_s, MSG_INFO,
+					"IBSS RSN not supported in the build - cannot use the profile for SSID '%s'",
+					wpa_ssid_txt(ssid->ssid,
+						     ssid->ssid_len));
+				continue;
+			}
+#endif /* !CONFIG_IBSS_RSN */
 			if (ssid->mode == IEEE80211_MODE_IBSS ||
 			    ssid->mode == IEEE80211_MODE_AP ||
 			    ssid->mode == IEEE80211_MODE_MESH)
@@ -1474,11 +1495,18 @@ static int wpa_supplicant_need_to_roam(struct wpa_supplicant *wpa_s,
 }
 
 
-/* Return != 0 if no scan results could be fetched or if scan results should not
- * be shared with other virtual interfaces. */
+/*
+ * Return a negative value if no scan results could be fetched or if scan
+ * results should not be shared with other virtual interfaces.
+ * Return 0 if scan results were fetched and may be shared with other
+ * interfaces.
+ * Return 1 if scan results may be shared with other virtual interfaces but may
+ * not trigger any operations.
+ * Return 2 if the interface was removed and cannot be used.
+ */
 static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 					      union wpa_event_data *data,
-					      int own_request)
+					      int own_request, int update_only)
 {
 	struct wpa_scan_results *scan_res = NULL;
 	int ret = 0;
@@ -1528,6 +1556,11 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_NO_RANDOM_POOL */
 
+	if (update_only) {
+		ret = 1;
+		goto scan_work_done;
+	}
+
 	if (own_request && wpa_s->scan_res_handler &&
 	    !(data && data->scan_info.external_scan)) {
 		void (*scan_res_handler)(struct wpa_supplicant *wpa_s,
@@ -1536,7 +1569,7 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 		scan_res_handler = wpa_s->scan_res_handler;
 		wpa_s->scan_res_handler = NULL;
 		scan_res_handler(wpa_s, scan_res);
-		ret = -2;
+		ret = 1;
 		goto scan_work_done;
 	}
 
@@ -1672,8 +1705,9 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 		if (new_scan)
 			wpa_supplicant_rsn_preauth_scan_results(wpa_s);
 		/*
-		 * Do not notify other virtual radios of scan results since we do not
-		 * want them to start other associations at the same time.
+		 * Do not allow other virtual radios to trigger operations based
+		 * on these scan results since we do not want them to start
+		 * other associations at the same time.
 		 */
 		return 1;
 	} else {
@@ -1757,7 +1791,7 @@ static int wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 	struct wpa_supplicant *ifs;
 	int res;
 
-	res = _wpa_supplicant_event_scan_results(wpa_s, data, 1);
+	res = _wpa_supplicant_event_scan_results(wpa_s, data, 1, 0);
 	if (res == 2) {
 		/*
 		 * Interface may have been removed, so must not dereference
@@ -1765,7 +1799,8 @@ static int wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 		 */
 		return 1;
 	}
-	if (res != 0) {
+
+	if (res < 0) {
 		/*
 		 * If no scan results could be fetched, then no need to
 		 * notify those interfaces that did not actually request
@@ -1785,7 +1820,10 @@ static int wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 		if (ifs != wpa_s) {
 			wpa_printf(MSG_DEBUG, "%s: Updating scan results from "
 				   "sibling", ifs->ifname);
-			_wpa_supplicant_event_scan_results(ifs, data, 0);
+			res = _wpa_supplicant_event_scan_results(ifs, data, 0,
+								 res > 0);
+			if (res < 0)
+				return 0;
 		}
 	}
 
@@ -2041,6 +2079,19 @@ static int wpa_supplicant_event_associnfo(struct wpa_supplicant *wpa_s,
 	if (!found && data->assoc_info.req_ies)
 		wpa_sm_set_assoc_wpa_ie(wpa_s->wpa, NULL, 0);
 
+#ifdef CONFIG_FILS
+#ifdef CONFIG_SME
+	if (wpa_s->sme.auth_alg == WPA_AUTH_ALG_FILS &&
+	    (!data->assoc_info.resp_frame ||
+	     fils_process_assoc_resp(wpa_s->wpa,
+				     data->assoc_info.resp_frame,
+				     data->assoc_info.resp_frame_len) < 0)) {
+		wpa_supplicant_deauthenticate(wpa_s, WLAN_REASON_UNSPECIFIED);
+		return -1;
+	}
+#endif /* CONFIG_SME */
+#endif /* CONFIG_FILS */
+
 #ifdef CONFIG_IEEE80211R
 #ifdef CONFIG_SME
 	if (wpa_s->sme.auth_alg == WPA_AUTH_ALG_FT) {
@@ -2262,6 +2313,13 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 	ft_completed = wpa_ft_is_completed(wpa_s->wpa);
 	if (data && wpa_supplicant_event_associnfo(wpa_s, data) < 0)
 		return;
+	/*
+	 * FILS authentication can share the same mechanism to mark the
+	 * connection fully authenticated, so set ft_completed also based on
+	 * FILS result.
+	 */
+	if (!ft_completed)
+		ft_completed = wpa_fils_is_completed(wpa_s->wpa);
 
 	if (wpa_drv_get_bssid(wpa_s, bssid) < 0) {
 		wpa_dbg(wpa_s, MSG_ERROR, "Failed to get BSSID");
@@ -2518,6 +2576,7 @@ static void wpa_supplicant_event_disassoc_finish(struct wpa_supplicant *wpa_s,
 	struct wpa_bss *fast_reconnect = NULL;
 	struct wpa_ssid *fast_reconnect_ssid = NULL;
 	struct wpa_ssid *last_ssid;
+	struct wpa_bss *curr = NULL;
 
 	authenticating = wpa_s->wpa_state == WPA_AUTHENTICATING;
 	os_memcpy(prev_pending_bssid, wpa_s->pending_bssid, ETH_ALEN);
@@ -2532,6 +2591,19 @@ static void wpa_supplicant_event_disassoc_finish(struct wpa_supplicant *wpa_s,
 			"IBSS/WPA-None mode");
 		return;
 	}
+
+	if (!wpa_s->disconnected && wpa_s->wpa_state >= WPA_AUTHENTICATING &&
+	    reason_code == WLAN_REASON_DISASSOC_DUE_TO_INACTIVITY &&
+	    locally_generated)
+		/*
+		 * Remove the inactive AP (which is probably out of range) from
+		 * the BSS list after marking disassociation. In particular
+		 * mac80211-based drivers use the
+		 * WLAN_REASON_DISASSOC_DUE_TO_INACTIVITY reason code in
+		 * locally generated disconnection events for cases where the
+		 * AP does not reply anymore.
+		 */
+		curr = wpa_s->current_bss;
 
 	if (could_be_psk_mismatch(wpa_s, reason_code, locally_generated)) {
 		wpa_msg(wpa_s, MSG_INFO, "WPA: 4-Way Handshake failed - "
@@ -2593,6 +2665,9 @@ static void wpa_supplicant_event_disassoc_finish(struct wpa_supplicant *wpa_s,
 	}
 	last_ssid = wpa_s->current_ssid;
 	wpa_supplicant_mark_disassoc(wpa_s);
+
+	if (curr)
+		wpa_bss_remove(wpa_s, curr, "Connection to AP lost");
 
 	if (authenticating && (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME)) {
 		sme_disassoc_while_authenticating(wpa_s, prev_pending_bssid);
@@ -3219,14 +3294,16 @@ static void wpa_supplicant_update_channel_list(
 		free_hw_features(ifs);
 		ifs->hw.modes = wpa_drv_get_hw_feature_data(
 			ifs, &ifs->hw.num_modes, &ifs->hw.flags);
-	}
 
-	/* Restart sched_scan with updated channel list */
-	if (wpa_s->sched_scanning) {
-		wpa_dbg(wpa_s, MSG_DEBUG,
-			"Channel list changed restart sched scan.");
-		wpa_supplicant_cancel_sched_scan(wpa_s);
-		wpa_supplicant_req_scan(wpa_s, 0, 0);
+		/* Restart PNO/sched_scan with updated channel list */
+		if (ifs->pno) {
+			wpas_stop_pno(ifs);
+			wpas_start_pno(ifs);
+		} else if (ifs->sched_scanning && !ifs->pno_sched_pending) {
+			wpa_dbg(ifs, MSG_DEBUG,
+				"Channel list changed - restart sched_scan");
+			wpas_scan_restart_sched_scan(ifs);
+		}
 	}
 
 	wpas_p2p_update_channel_list(wpa_s, WPAS_P2P_CHANNEL_UPDATE_DRIVER);
@@ -4045,6 +4122,20 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 
 		if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED)
 			break;
+
+		/*
+		 * If the driver stopped scanning without being requested to,
+		 * request a new scan to continue scanning for networks.
+		 */
+		if (!wpa_s->sched_scan_stop_req &&
+		    wpa_s->wpa_state == WPA_SCANNING) {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"Restart scanning after unexpected sched_scan stop event");
+			wpa_supplicant_req_scan(wpa_s, 1, 0);
+			break;
+		}
+
+		wpa_s->sched_scan_stop_req = 0;
 
 		/*
 		 * Start a new sched scan to continue searching for more SSIDs
