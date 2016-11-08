@@ -5225,13 +5225,15 @@ struct wpa_supplicant * wpa_supplicant_add_iface(struct wpa_global *global,
 		return NULL;
 	}
 
-	if (iface->p2p_mgmt == 0) {
-		/* Notify the control interfaces about new iface */
-		if (wpas_notify_iface_added(wpa_s)) {
-			wpa_supplicant_deinit_iface(wpa_s, 1, 0);
-			return NULL;
-		}
+	/* Notify the control interfaces about new iface */
+	if (wpas_notify_iface_added(wpa_s)) {
+		wpa_supplicant_deinit_iface(wpa_s, 1, 0);
+		return NULL;
+	}
 
+	/* Notify the control interfaces about new networks for non p2p mgmt
+	 * ifaces. */
+	if (iface->p2p_mgmt == 0) {
 		for (ssid = wpa_s->conf->ssid; ssid; ssid = ssid->next)
 			wpas_notify_network_added(wpa_s, ssid);
 	}
