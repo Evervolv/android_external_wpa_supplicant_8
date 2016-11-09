@@ -543,11 +543,36 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 			wpas_connection_failed(wpa_s, bss->bssid);
 			return;
 		}
-		params.sae_data = wpabuf_head(resp);
-		params.sae_data_len = wpabuf_len(resp);
+		params.auth_data = wpabuf_head(resp);
+		params.auth_data_len = wpabuf_len(resp);
 		wpa_s->sme.sae.state = start ? SAE_COMMITTED : SAE_CONFIRMED;
 	}
 #endif /* CONFIG_SAE */
+
+	old_ssid = wpa_s->current_ssid;
+	wpa_s->current_ssid = ssid;
+	wpa_supplicant_rsn_supp_set_config(wpa_s, wpa_s->current_ssid);
+	wpa_supplicant_initiate_eapol(wpa_s);
+
+#ifdef CONFIG_FILS
+	/* TODO: FILS operations can in some cases be done between different
+	 * network_ctx (i.e., same credentials can be used with multiple
+	 * networks). */
+	if (params.auth_alg == WPA_AUTH_ALG_OPEN &&
+	    wpa_key_mgmt_fils(ssid->key_mgmt)) {
+		if (pmksa_cache_set_current(wpa_s->wpa, NULL, bss->bssid,
+					    ssid, 0) == 0)
+			wpa_printf(MSG_DEBUG,
+				   "SME: Try to use FILS with PMKSA caching");
+		resp = fils_build_auth(wpa_s->wpa);
+		if (resp) {
+			params.auth_alg = WPA_AUTH_ALG_FILS;
+			params.auth_data = wpabuf_head(resp);
+			params.auth_data_len = wpabuf_len(resp);
+			wpa_s->sme.auth_alg = WPA_AUTH_ALG_FILS;
+		}
+	}
+#endif /* CONFIG_FILS */
 
 	wpa_supplicant_cancel_sched_scan(wpa_s);
 	wpa_supplicant_cancel_scan(wpa_s);
@@ -558,10 +583,6 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 
 	wpa_clear_keys(wpa_s, bss->bssid);
 	wpa_supplicant_set_state(wpa_s, WPA_AUTHENTICATING);
-	old_ssid = wpa_s->current_ssid;
-	wpa_s->current_ssid = ssid;
-	wpa_supplicant_rsn_supp_set_config(wpa_s, wpa_s->current_ssid);
-	wpa_supplicant_initiate_eapol(wpa_s);
 	if (old_ssid != wpa_s->current_ssid)
 		wpas_notify_network_changed(wpa_s);
 
@@ -649,6 +670,10 @@ static void sme_auth_start_cb(struct wpa_radio_work *work, int deinit)
 		wpas_connect_work_done(wpa_s);
 		return;
 	}
+
+	/* Starting new connection, so clear the possibly used WPA IE from the
+	 * previous association. */
+	wpa_sm_set_assoc_wpa_ie(wpa_s->wpa, NULL, 0);
 
 	sme_send_authentication(wpa_s, cwork->bss, cwork->ssid, 1);
 }
@@ -933,6 +958,24 @@ void sme_event_auth(struct wpa_supplicant *wpa_s, union wpa_event_data *data)
 	}
 #endif /* CONFIG_IEEE80211R */
 
+#ifdef CONFIG_FILS
+	if (data->auth.auth_type == WLAN_AUTH_FILS_SK) {
+		if (fils_process_auth(wpa_s->wpa, data->auth.ies,
+				      data->auth.ies_len) < 0) {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"SME: FILS Authentication response processing failed");
+			wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_DISCONNECTED "bssid="
+				MACSTR
+				" reason=%d locally_generated=1",
+				MAC2STR(wpa_s->pending_bssid),
+				WLAN_REASON_DEAUTH_LEAVING);
+			wpas_connection_failed(wpa_s, wpa_s->pending_bssid);
+			wpa_supplicant_mark_disassoc(wpa_s);
+			return;
+		}
+	}
+#endif /* CONFIG_FILS */
+
 	sme_associate(wpa_s, ssid->mode, data->auth.peer,
 		      data->auth.auth_type);
 }
@@ -943,6 +986,9 @@ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
 {
 	struct wpa_driver_associate_params params;
 	struct ieee802_11_elems elems;
+#ifdef CONFIG_FILS
+	u8 nonces[2 * FILS_NONCE_LEN];
+#endif /* CONFIG_FILS */
 #ifdef CONFIG_HT_OVERRIDES
 	struct ieee80211_ht_capabilities htcaps;
 	struct ieee80211_ht_capabilities htcaps_mask;
@@ -953,6 +999,37 @@ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
 #endif /* CONFIG_VHT_OVERRIDES */
 
 	os_memset(&params, 0, sizeof(params));
+
+#ifdef CONFIG_FILS
+	if (auth_type == WLAN_AUTH_FILS_SK) {
+		struct wpabuf *buf;
+		const u8 *snonce, *anonce;
+
+		buf = fils_build_assoc_req(wpa_s->wpa, &params.fils_kek,
+					   &params.fils_kek_len, &snonce,
+					   &anonce);
+		if (!buf)
+			return;
+		/* TODO: Make wpa_s->sme.assoc_req_ie use dynamic allocation */
+		if (wpa_s->sme.assoc_req_ie_len + wpabuf_len(buf) >
+		    sizeof(wpa_s->sme.assoc_req_ie)) {
+			wpa_printf(MSG_ERROR,
+				   "FILS: Not enough buffer room for own AssocReq elements");
+			wpabuf_free(buf);
+			return;
+		}
+		os_memcpy(wpa_s->sme.assoc_req_ie + wpa_s->sme.assoc_req_ie_len,
+			  wpabuf_head(buf), wpabuf_len(buf));
+		wpa_s->sme.assoc_req_ie_len += wpabuf_len(buf);
+		wpabuf_free(buf);
+
+		os_memcpy(nonces, snonce, FILS_NONCE_LEN);
+		os_memcpy(nonces + FILS_NONCE_LEN, anonce, FILS_NONCE_LEN);
+		params.fils_nonces = nonces;
+		params.fils_nonces_len = sizeof(nonces);
+	}
+#endif /* CONFIG_FILS */
+
 	params.bssid = bssid;
 	params.ssid = wpa_s->sme.ssid;
 	params.ssid_len = wpa_s->sme.ssid_len;
