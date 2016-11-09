@@ -179,90 +179,6 @@ static int ieee802_11_parse_vendor_specific(const u8 *pos, size_t elen,
 }
 
 
-static int ieee802_11_parse_extension(const u8 *pos, size_t elen,
-				      struct ieee802_11_elems *elems,
-				      int show_errors)
-{
-	u8 ext_id;
-
-	if (elen < 1) {
-		if (show_errors) {
-			wpa_printf(MSG_MSGDUMP,
-				   "short information element (Ext)");
-		}
-		return -1;
-	}
-
-	ext_id = *pos++;
-	elen--;
-
-	switch (ext_id) {
-	case WLAN_EID_EXT_ASSOC_DELAY_INFO:
-		if (elen != 1)
-			break;
-		elems->assoc_delay_info = pos;
-		break;
-	case WLAN_EID_EXT_FILS_REQ_PARAMS:
-		if (elen < 3)
-			break;
-		elems->fils_req_params = pos;
-		elems->fils_req_params_len = elen;
-		break;
-	case WLAN_EID_EXT_FILS_KEY_CONFIRM:
-		elems->fils_key_confirm = pos;
-		elems->fils_key_confirm_len = elen;
-		break;
-	case WLAN_EID_EXT_FILS_SESSION:
-		if (elen != FILS_SESSION_LEN)
-			break;
-		elems->fils_session = pos;
-		break;
-	case WLAN_EID_EXT_FILS_HLP_CONTAINER:
-		if (elen < 2 * ETH_ALEN)
-			break;
-		elems->fils_hlp = pos;
-		elems->fils_hlp_len = elen;
-		break;
-	case WLAN_EID_EXT_FILS_IP_ADDR_ASSIGN:
-		if (elen < 1)
-			break;
-		elems->fils_ip_addr_assign = pos;
-		elems->fils_ip_addr_assign_len = elen;
-		break;
-	case WLAN_EID_EXT_KEY_DELIVERY:
-		if (elen < WPA_KEY_RSC_LEN)
-			break;
-		elems->key_delivery = pos;
-		elems->key_delivery_len = elen;
-		break;
-	case WLAN_EID_EXT_FILS_WRAPPED_DATA:
-		elems->fils_wrapped_data = pos;
-		elems->fils_wrapped_data_len = elen;
-		break;
-	case WLAN_EID_EXT_FILS_PUBLIC_KEY:
-		if (elen < 1)
-			break;
-		elems->fils_pk = pos;
-		elems->fils_pk_len = elen;
-		break;
-	case WLAN_EID_EXT_FILS_NONCE:
-		if (elen != FILS_NONCE_LEN)
-			break;
-		elems->fils_nonce = pos;
-		break;
-	default:
-		if (show_errors) {
-			wpa_printf(MSG_MSGDUMP,
-				   "IEEE 802.11 element parsing ignored unknown element extension (ext_id=%u elen=%u)",
-				   ext_id, (unsigned int) elen);
-		}
-		return -1;
-	}
-
-	return 0;
-}
-
-
 /**
  * ieee802_11_parse_elems - Parse information elements in management frames
  * @start: Pointer to the start of IEs
@@ -462,35 +378,6 @@ ParseRes ieee802_11_parse_elems(const u8 *start, size_t len,
 		case WLAN_EID_RRM_ENABLED_CAPABILITIES:
 			elems->rrm_enabled = pos;
 			elems->rrm_enabled_len = elen;
-			break;
-		case WLAN_EID_CAG_NUMBER:
-			elems->cag_number = pos;
-			elems->cag_number_len = elen;
-			break;
-		case WLAN_EID_AP_CSN:
-			if (elen < 1)
-				break;
-			elems->ap_csn = pos;
-			break;
-		case WLAN_EID_FILS_INDICATION:
-			if (elen < 2)
-				break;
-			elems->fils_indic = pos;
-			elems->fils_indic_len = elen;
-			break;
-		case WLAN_EID_DILS:
-			if (elen < 2)
-				break;
-			elems->dils = pos;
-			elems->dils_len = elen;
-			break;
-		case WLAN_EID_FRAGMENT:
-			/* TODO */
-			break;
-		case WLAN_EID_EXTENSION:
-			if (ieee802_11_parse_extension(pos, elen, elems,
-						       show_errors))
-				unknown++;
 			break;
 		default:
 			unknown++;
@@ -788,25 +675,6 @@ enum hostapd_hw_mode ieee80211_freq_to_channel_ext(unsigned int freq,
 			*op_class = 117;
 		else
 			*op_class = 115;
-
-		*channel = (freq - 5000) / 5;
-
-		return HOSTAPD_MODE_IEEE80211A;
-	}
-
-	/* 5 GHz, channels 52..64 */
-	if (freq >= 5260 && freq <= 5320) {
-		if ((freq - 5000) % 5)
-			return NUM_HOSTAPD_MODES;
-
-		if (vht_opclass)
-			*op_class = vht_opclass;
-		else if (sec_channel == 1)
-			*op_class = 119;
-		else if (sec_channel == -1)
-			*op_class = 120;
-		else
-			*op_class = 118;
 
 		*channel = (freq - 5000) / 5;
 

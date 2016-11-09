@@ -574,7 +574,6 @@ struct wpa_supplicant {
 	struct wpa_radio_work *scan_work;
 	int scanning;
 	int sched_scanning;
-	unsigned int sched_scan_stop_req:1;
 	int new_connection;
 
 	int eapol_received; /* number of EAPOL packets received after the
@@ -721,7 +720,7 @@ struct wpa_supplicant {
 		u8 ssid[SSID_MAX_LEN];
 		size_t ssid_len;
 		int freq;
-		u8 assoc_req_ie[300];
+		u8 assoc_req_ie[200];
 		size_t assoc_req_ie_len;
 		int mfp;
 		int ft_used;
@@ -1205,8 +1204,6 @@ size_t wpas_mbo_ie_bss_trans_reject(struct wpa_supplicant *wpa_s, u8 *pos,
 				    size_t len,
 				    enum mbo_transition_reject_reason reason);
 void wpas_mbo_update_cell_capa(struct wpa_supplicant *wpa_s, u8 mbo_cell_capa);
-struct wpabuf * mbo_build_anqp_buf(struct wpa_supplicant *wpa_s,
-				   struct wpa_bss *bss);
 
 /**
  * wpa_supplicant_ctrl_iface_ctrl_rsp_handle - Handle a control response
