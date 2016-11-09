@@ -21,9 +21,6 @@
 
 #include "common/defs.h"
 #include "common/ieee802_11_defs.h"
-#ifdef CONFIG_MACSEC
-#include "pae/ieee802_1x_kay.h"
-#endif /* CONFIG_MACSEC */
 #include "utils/list.h"
 
 #define HOSTAPD_CHAN_DISABLED 0x00000001
@@ -488,18 +485,17 @@ struct wpa_driver_auth_params {
 	int p2p;
 
 	/**
-	 * auth_data - Additional elements for Authentication frame
+	 * sae_data - SAE elements for Authentication frame
 	 *
 	 * This buffer starts with the Authentication transaction sequence
-	 * number field. If no special handling of such elements is needed, this
-	 * pointer is %NULL. This is used with SAE and FILS.
+	 * number field. If SAE is not used, this pointer is %NULL.
 	 */
-	const u8 *auth_data;
+	const u8 *sae_data;
 
 	/**
-	 * auth_data_len - Length of auth_data buffer in octets
+	 * sae_data_len - Length of sae_data buffer in octets
 	 */
-	size_t auth_data_len;
+	size_t sae_data_len;
 };
 
 /**
@@ -886,27 +882,6 @@ struct wpa_driver_associate_params {
 	 * AP as usual. Valid for DMG network only.
 	 */
 	int pbss;
-
-	/**
-	 * fils_kek - KEK for FILS association frame protection (AES-SIV)
-	 */
-	const u8 *fils_kek;
-
-	/**
-	 * fils_kek_len: Length of fils_kek in bytes
-	 */
-	size_t fils_kek_len;
-
-	/**
-	 * fils_nonces - Nonces for FILS association frame protection
-	 * (AES-SIV AAD)
-	 */
-	const u8 *fils_nonces;
-
-	/**
-	 * fils_nonces_len: Length of fils_nonce in bytes
-	 */
-	size_t fils_nonces_len;
 };
 
 enum hide_ssid {
@@ -1311,8 +1286,6 @@ struct wpa_driver_capa {
 #define WPA_DRIVER_FLAGS_FULL_AP_CLIENT_STATE	0x0000010000000000ULL
 /** Driver supports P2P Listen offload */
 #define WPA_DRIVER_FLAGS_P2P_LISTEN_OFFLOAD     0x0000020000000000ULL
-/** Driver supports FILS */
-#define WPA_DRIVER_FLAGS_SUPPORT_FILS		0x0000040000000000ULL
 	u64 flags;
 
 #define FULL_AP_CLIENT_STATE_SUPP(drv_flags) \
@@ -3322,14 +3295,6 @@ struct wpa_driver_ops {
 	int (*macsec_deinit)(void *priv);
 
 	/**
-	 * macsec_get_capability - Inform MKA of this driver's capability
-	 * @priv: Private driver interface data
-	 * @cap: Driver's capability
-	 * Returns: 0 on success, -1 on failure
-	 */
-	int (*macsec_get_capability)(void *priv, enum macsec_cap *cap);
-
-	/**
 	 * enable_protect_frames - Set protect frames status
 	 * @priv: Private driver interface data
 	 * @enabled: TRUE = protect frames enabled
@@ -3368,129 +3333,155 @@ struct wpa_driver_ops {
 	/**
 	 * get_receive_lowest_pn - Get receive lowest pn
 	 * @priv: Private driver interface data
-	 * @sa: secure association
+	 * @channel: secure channel
+	 * @an: association number
+	 * @lowest_pn: lowest accept pn
 	 * Returns: 0 on success, -1 on failure (or if not supported)
 	 */
-	int (*get_receive_lowest_pn)(void *priv, struct receive_sa *sa);
+	int (*get_receive_lowest_pn)(void *priv, u32 channel, u8 an,
+				     u32 *lowest_pn);
 
 	/**
 	 * get_transmit_next_pn - Get transmit next pn
 	 * @priv: Private driver interface data
-	 * @sa: secure association
+	 * @channel: secure channel
+	 * @an: association number
+	 * @next_pn: next pn
 	 * Returns: 0 on success, -1 on failure (or if not supported)
 	 */
-	int (*get_transmit_next_pn)(void *priv, struct transmit_sa *sa);
+	int (*get_transmit_next_pn)(void *priv, u32 channel, u8 an,
+				    u32 *next_pn);
 
 	/**
 	 * set_transmit_next_pn - Set transmit next pn
 	 * @priv: Private driver interface data
-	 * @sa: secure association
+	 * @channel: secure channel
+	 * @an: association number
+	 * @next_pn: next pn
 	 * Returns: 0 on success, -1 on failure (or if not supported)
 	 */
-	int (*set_transmit_next_pn)(void *priv, struct transmit_sa *sa);
+	int (*set_transmit_next_pn)(void *priv, u32 channel, u8 an,
+				    u32 next_pn);
+
+	/**
+	 * get_available_receive_sc - get available receive channel
+	 * @priv: Private driver interface data
+	 * @channel: secure channel
+	 * Returns: 0 on success, -1 on failure (or if not supported)
+	 */
+	int (*get_available_receive_sc)(void *priv, u32 *channel);
 
 	/**
 	 * create_receive_sc - create secure channel for receiving
 	 * @priv: Private driver interface data
-	 * @sc: secure channel
+	 * @channel: secure channel
+	 * @sci_addr: secure channel identifier - address
+	 * @sci_port: secure channel identifier - port
 	 * @conf_offset: confidentiality offset (0, 30, or 50)
 	 * @validation: frame validation policy (0 = Disabled, 1 = Checked,
 	 *	2 = Strict)
 	 * Returns: 0 on success, -1 on failure (or if not supported)
 	 */
-	int (*create_receive_sc)(void *priv, struct receive_sc *sc,
-				 unsigned int conf_offset,
+	int (*create_receive_sc)(void *priv, u32 channel, const u8 *sci_addr,
+				 u16 sci_port, unsigned int conf_offset,
 				 int validation);
 
 	/**
 	 * delete_receive_sc - delete secure connection for receiving
 	 * @priv: private driver interface data from init()
-	 * @sc: secure channel
+	 * @channel: secure channel
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*delete_receive_sc)(void *priv, struct receive_sc *sc);
+	int (*delete_receive_sc)(void *priv, u32 channel);
 
 	/**
 	 * create_receive_sa - create secure association for receive
 	 * @priv: private driver interface data from init()
-	 * @sa: secure association
+	 * @channel: secure channel
+	 * @an: association number
+	 * @lowest_pn: the lowest packet number can be received
+	 * @sak: the secure association key
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*create_receive_sa)(void *priv, struct receive_sa *sa);
-
-	/**
-	 * delete_receive_sa - Delete secure association for receive
-	 * @priv: Private driver interface data from init()
-	 * @sa: Secure association
-	 * Returns: 0 on success, -1 on failure
-	 */
-	int (*delete_receive_sa)(void *priv, struct receive_sa *sa);
+	int (*create_receive_sa)(void *priv, u32 channel, u8 an,
+				 u32 lowest_pn, const u8 *sak);
 
 	/**
 	 * enable_receive_sa - enable the SA for receive
 	 * @priv: private driver interface data from init()
-	 * @sa: secure association
+	 * @channel: secure channel
+	 * @an: association number
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*enable_receive_sa)(void *priv, struct receive_sa *sa);
+	int (*enable_receive_sa)(void *priv, u32 channel, u8 an);
 
 	/**
 	 * disable_receive_sa - disable SA for receive
 	 * @priv: private driver interface data from init()
-	 * @sa: secure association
+	 * @channel: secure channel index
+	 * @an: association number
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*disable_receive_sa)(void *priv, struct receive_sa *sa);
+	int (*disable_receive_sa)(void *priv, u32 channel, u8 an);
+
+	/**
+	 * get_available_transmit_sc - get available transmit channel
+	 * @priv: Private driver interface data
+	 * @channel: secure channel
+	 * Returns: 0 on success, -1 on failure (or if not supported)
+	 */
+	int (*get_available_transmit_sc)(void *priv, u32 *channel);
 
 	/**
 	 * create_transmit_sc - create secure connection for transmit
 	 * @priv: private driver interface data from init()
-	 * @sc: secure channel
-	 * @conf_offset: confidentiality offset (0, 30, or 50)
+	 * @channel: secure channel
+	 * @sci_addr: secure channel identifier - address
+	 * @sci_port: secure channel identifier - port
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*create_transmit_sc)(void *priv, struct transmit_sc *sc,
-				  unsigned int conf_offset);
+	int (*create_transmit_sc)(void *priv, u32 channel, const u8 *sci_addr,
+				  u16 sci_port, unsigned int conf_offset);
 
 	/**
 	 * delete_transmit_sc - delete secure connection for transmit
 	 * @priv: private driver interface data from init()
-	 * @sc: secure channel
+	 * @channel: secure channel
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*delete_transmit_sc)(void *priv, struct transmit_sc *sc);
+	int (*delete_transmit_sc)(void *priv, u32 channel);
 
 	/**
 	 * create_transmit_sa - create secure association for transmit
 	 * @priv: private driver interface data from init()
-	 * @sa: secure association
+	 * @channel: secure channel index
+	 * @an: association number
+	 * @next_pn: the packet number used as next transmit packet
+	 * @confidentiality: True if the SA is to provide confidentiality
+	 *                   as well as integrity
+	 * @sak: the secure association key
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*create_transmit_sa)(void *priv, struct transmit_sa *sa);
-
-	/**
-	 * delete_transmit_sa - Delete secure association for transmit
-	 * @priv: Private driver interface data from init()
-	 * @sa: Secure association
-	 * Returns: 0 on success, -1 on failure
-	 */
-	int (*delete_transmit_sa)(void *priv, struct transmit_sa *sa);
+	int (*create_transmit_sa)(void *priv, u32 channel, u8 an, u32 next_pn,
+				  Boolean confidentiality, const u8 *sak);
 
 	/**
 	 * enable_transmit_sa - enable SA for transmit
 	 * @priv: private driver interface data from init()
-	 * @sa: secure association
+	 * @channel: secure channel
+	 * @an: association number
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*enable_transmit_sa)(void *priv, struct transmit_sa *sa);
+	int (*enable_transmit_sa)(void *priv, u32 channel, u8 an);
 
 	/**
 	 * disable_transmit_sa - disable SA for transmit
 	 * @priv: private driver interface data from init()
-	 * @sa: secure association
+	 * @channel: secure channel
+	 * @an: association number
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*disable_transmit_sa)(void *priv, struct transmit_sa *sa);
+	int (*disable_transmit_sa)(void *priv, u32 channel, u8 an);
 #endif /* CONFIG_MACSEC */
 
 	/**
@@ -3632,16 +3623,6 @@ struct wpa_driver_ops {
 	 */
 	int (*set_default_scan_ies)(void *priv, const u8 *ies, size_t ies_len);
 
-	/**
-	 * set_tdls_mode - Set TDLS trigger mode to the host driver
-	 * @priv: Private driver interface data
-	 * @tdls_external_control: Represents if TDLS external trigger control
-	 *  mode is enabled/disabled.
-	 *
-	 * This optional callback can be used to configure the TDLS external
-	 * trigger control mode to the host driver.
-	 */
-	int (*set_tdls_mode)(void *priv, int tdls_external_control);
 };
 
 
@@ -4062,7 +4043,7 @@ enum wpa_event_type {
 	 * EVENT_DFS_CAC_ABORTED - Notify that channel availability check has been aborted
 	 *
 	 * The CAC was not successful, and the channel remains in the previous
-	 * state. This may happen due to a radar being detected or other
+	 * state. This may happen due to a radar beeing detected or other
 	 * external influences.
 	 */
 	EVENT_DFS_CAC_ABORTED,
@@ -4221,16 +4202,6 @@ union wpa_event_data {
 		 * resp_ies_len - Length of resp_ies in bytes
 		 */
 		size_t resp_ies_len;
-
-		/**
-		 * resp_frame - (Re)Association Response frame
-		 */
-		const u8 *resp_frame;
-
-		/**
-		 * resp_frame_len - (Re)Association Response frame length
-		 */
-		size_t resp_frame_len;
 
 		/**
 		 * beacon_ies - Beacon or Probe Response IEs

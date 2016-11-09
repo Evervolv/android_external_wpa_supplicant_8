@@ -411,8 +411,6 @@ ieee802_1x_kay_get_peer_sci(struct ieee802_1x_mka_participant *participant,
 }
 
 
-static void ieee802_1x_kay_use_data_key(struct data_key *pkey);
-
 /**
  * ieee802_1x_kay_init_receive_sa -
  */
@@ -431,7 +429,6 @@ ieee802_1x_kay_init_receive_sa(struct receive_sc *psc, u8 an, u32 lowest_pn,
 		return NULL;
 	}
 
-	ieee802_1x_kay_use_data_key(key);
 	psa->pkey = key;
 	psa->lowest_pn = lowest_pn;
 	psa->next_pn = lowest_pn;
@@ -443,21 +440,18 @@ ieee802_1x_kay_init_receive_sa(struct receive_sc *psc, u8 an, u32 lowest_pn,
 
 	dl_list_add(&psc->sa_list, &psa->list);
 	wpa_printf(MSG_DEBUG,
-		   "KaY: Create receive SA(AN: %hhu lowest_pn: %u of SC",
-		   an, lowest_pn);
+		   "KaY: Create receive SA(AN: %hhu lowest_pn: %u of SC(channel: %d)",
+		   an, lowest_pn, psc->channel);
 
 	return psa;
 }
 
-
-static void ieee802_1x_kay_deinit_data_key(struct data_key *pkey);
 
 /**
  * ieee802_1x_kay_deinit_receive_sa -
  */
 static void ieee802_1x_kay_deinit_receive_sa(struct receive_sa *psa)
 {
-	ieee802_1x_kay_deinit_data_key(psa->pkey);
 	psa->pkey = NULL;
 	wpa_printf(MSG_DEBUG,
 		   "KaY: Delete receive SA(an: %hhu) of SC",
@@ -471,7 +465,8 @@ static void ieee802_1x_kay_deinit_receive_sa(struct receive_sa *psa)
  * ieee802_1x_kay_init_receive_sc -
  */
 static struct receive_sc *
-ieee802_1x_kay_init_receive_sc(const struct ieee802_1x_mka_sci *psci)
+ieee802_1x_kay_init_receive_sc(const struct ieee802_1x_mka_sci *psci,
+			       int channel)
 {
 	struct receive_sc *psc;
 
@@ -485,24 +480,16 @@ ieee802_1x_kay_init_receive_sc(const struct ieee802_1x_mka_sci *psci)
 	}
 
 	os_memcpy(&psc->sci, psci, sizeof(psc->sci));
+	psc->channel = channel;
 
 	os_get_time(&psc->created_time);
 	psc->receiving = FALSE;
 
 	dl_list_init(&psc->sa_list);
-	wpa_printf(MSG_DEBUG, "KaY: Create receive SC");
+	wpa_printf(MSG_DEBUG, "KaY: Create receive SC(channel: %d)", channel);
 	wpa_hexdump(MSG_DEBUG, "SCI: ", (u8 *)psci, sizeof(*psci));
 
 	return psc;
-}
-
-
-static void ieee802_1x_delete_receive_sa(struct ieee802_1x_kay *kay,
-					 struct receive_sa *sa)
-{
-	secy_disable_receive_sa(kay, sa);
-	secy_delete_receive_sa(kay, sa);
-	ieee802_1x_kay_deinit_receive_sa(sa);
 }
 
 
@@ -515,11 +502,13 @@ ieee802_1x_kay_deinit_receive_sc(
 {
 	struct receive_sa *psa, *pre_sa;
 
-	wpa_printf(MSG_DEBUG, "KaY: Delete receive SC");
+	wpa_printf(MSG_DEBUG, "KaY: Delete receive SC(channel: %d)",
+		   psc->channel);
 	dl_list_for_each_safe(psa, pre_sa, &psc->sa_list, struct receive_sa,
-			      list)
-		ieee802_1x_delete_receive_sa(participant->kay, psa);
-
+			      list)  {
+		secy_disable_receive_sa(participant->kay, psa);
+		ieee802_1x_kay_deinit_receive_sa(psa);
+	}
 	dl_list_del(&psc->list);
 	os_free(psc);
 }
@@ -563,6 +552,7 @@ ieee802_1x_kay_create_live_peer(struct ieee802_1x_mka_participant *participant,
 {
 	struct ieee802_1x_kay_peer *peer;
 	struct receive_sc *rxsc;
+	u32 sc_ch = 0;
 
 	peer = ieee802_1x_kay_create_peer(mi, mn);
 	if (!peer)
@@ -571,7 +561,9 @@ ieee802_1x_kay_create_live_peer(struct ieee802_1x_mka_participant *participant,
 	os_memcpy(&peer->sci, &participant->current_peer_sci,
 		  sizeof(peer->sci));
 
-	rxsc = ieee802_1x_kay_init_receive_sc(&peer->sci);
+	secy_get_available_receive_sc(participant->kay, &sc_ch);
+
+	rxsc = ieee802_1x_kay_init_receive_sc(&peer->sci, sc_ch);
 	if (!rxsc) {
 		os_free(peer);
 		return NULL;
@@ -619,10 +611,12 @@ ieee802_1x_kay_move_live_peer(struct ieee802_1x_mka_participant *participant,
 {
 	struct ieee802_1x_kay_peer *peer;
 	struct receive_sc *rxsc;
+	u32 sc_ch = 0;
 
 	peer = ieee802_1x_kay_get_potential_peer(participant, mi);
 
-	rxsc = ieee802_1x_kay_init_receive_sc(&participant->current_peer_sci);
+	rxsc = ieee802_1x_kay_init_receive_sc(&participant->current_peer_sci,
+					      sc_ch);
 	if (!rxsc)
 		return NULL;
 
@@ -636,6 +630,8 @@ ieee802_1x_kay_move_live_peer(struct ieee802_1x_mka_participant *participant,
 
 	dl_list_del(&peer->list);
 	dl_list_add_tail(&participant->live_peers, &peer->list);
+
+	secy_get_available_receive_sc(participant->kay, &sc_ch);
 
 	dl_list_add(&participant->rxsc_list, &rxsc->list);
 	secy_create_receive_sc(participant->kay, rxsc);
@@ -1618,7 +1614,6 @@ ieee802_1x_mka_decode_dist_sak_body(
 	sa_key->an = body->dan;
 	ieee802_1x_kay_init_data_key(sa_key);
 
-	ieee802_1x_kay_use_data_key(sa_key);
 	dl_list_add(&participant->sak_list, &sa_key->list);
 
 	ieee802_1x_cp_set_ciphersuite(kay->cp, cs->id);
@@ -1880,17 +1875,7 @@ static struct mka_param_body_handler mka_body_handler[] = {
 
 
 /**
- * ieee802_1x_kay_use_data_key - Take reference on a key
- */
-static void ieee802_1x_kay_use_data_key(struct data_key *pkey)
-{
-	pkey->user++;
-}
-
-
-/**
- * ieee802_1x_kay_deinit_data_key - Release reference on a key and
- * free if there are no remaining users
+ * ieee802_1x_kay_deinit_data_key -
  */
 static void ieee802_1x_kay_deinit_data_key(struct data_key *pkey)
 {
@@ -1901,6 +1886,7 @@ static void ieee802_1x_kay_deinit_data_key(struct data_key *pkey)
 	if (pkey->user > 1)
 		return;
 
+	dl_list_del(&pkey->list);
 	os_free(pkey->key);
 	os_free(pkey);
 }
@@ -2010,9 +1996,7 @@ ieee802_1x_kay_generate_new_sak(struct ieee802_1x_mka_participant *participant)
 
 	participant->new_key = sa_key;
 
-	ieee802_1x_kay_use_data_key(sa_key);
 	dl_list_add(&participant->sak_list, &sa_key->list);
-
 	ieee802_1x_cp_set_ciphersuite(kay->cp, cs->id);
 	ieee802_1x_cp_sm_step(kay->cp);
 	ieee802_1x_cp_set_offset(kay->cp, kay->macsec_confidentiality);
@@ -2296,16 +2280,6 @@ ieee802_1x_participant_send_mkpdu(
 
 
 static void ieee802_1x_kay_deinit_transmit_sa(struct transmit_sa *psa);
-
-static void ieee802_1x_delete_transmit_sa(struct ieee802_1x_kay *kay,
-					  struct transmit_sa *sa)
-{
-	secy_disable_transmit_sa(kay, sa);
-	secy_delete_transmit_sa(kay, sa);
-	ieee802_1x_kay_deinit_transmit_sa(sa);
-}
-
-
 /**
  * ieee802_1x_participant_timer -
  */
@@ -2380,7 +2354,8 @@ static void ieee802_1x_participant_timer(void *eloop_ctx, void *timeout_ctx)
 			dl_list_for_each_safe(txsa, pre_txsa,
 					      &participant->txsc->sa_list,
 					      struct transmit_sa, list) {
-				ieee802_1x_delete_transmit_sa(kay, txsa);
+				secy_disable_transmit_sa(kay, txsa);
+				ieee802_1x_kay_deinit_transmit_sa(txsa);
 			}
 
 			ieee802_1x_cp_connect_authenticated(kay->cp);
@@ -2454,7 +2429,6 @@ ieee802_1x_kay_init_transmit_sa(struct transmit_sc *psc, u8 an, u32 next_PN,
 		psa->confidentiality = FALSE;
 
 	psa->an = an;
-	ieee802_1x_kay_use_data_key(key);
 	psa->pkey = key;
 	psa->next_pn = next_PN;
 	psa->sc = psc;
@@ -2464,8 +2438,8 @@ ieee802_1x_kay_init_transmit_sa(struct transmit_sc *psc, u8 an, u32 next_PN,
 
 	dl_list_add(&psc->sa_list, &psa->list);
 	wpa_printf(MSG_DEBUG,
-		   "KaY: Create transmit SA(an: %hhu, next_PN: %u) of SC",
-		   an, next_PN);
+		   "KaY: Create transmit SA(an: %hhu, next_PN: %u) of SC(channel: %d)",
+		   an, next_PN, psc->channel);
 
 	return psa;
 }
@@ -2476,7 +2450,6 @@ ieee802_1x_kay_init_transmit_sa(struct transmit_sc *psc, u8 an, u32 next_PN,
  */
 static void ieee802_1x_kay_deinit_transmit_sa(struct transmit_sa *psa)
 {
-	ieee802_1x_kay_deinit_data_key(psa->pkey);
 	psa->pkey = NULL;
 	wpa_printf(MSG_DEBUG,
 		   "KaY: Delete transmit SA(an: %hhu) of SC",
@@ -2490,7 +2463,8 @@ static void ieee802_1x_kay_deinit_transmit_sa(struct transmit_sa *psa)
  * init_transmit_sc -
  */
 static struct transmit_sc *
-ieee802_1x_kay_init_transmit_sc(const struct ieee802_1x_mka_sci *sci)
+ieee802_1x_kay_init_transmit_sc(const struct ieee802_1x_mka_sci *sci,
+				int channel)
 {
 	struct transmit_sc *psc;
 
@@ -2500,6 +2474,7 @@ ieee802_1x_kay_init_transmit_sc(const struct ieee802_1x_mka_sci *sci)
 		return NULL;
 	}
 	os_memcpy(&psc->sci, sci, sizeof(psc->sci));
+	psc->channel = channel;
 
 	os_get_time(&psc->created_time);
 	psc->transmitting = FALSE;
@@ -2507,7 +2482,7 @@ ieee802_1x_kay_init_transmit_sc(const struct ieee802_1x_mka_sci *sci)
 	psc->enciphering_sa = FALSE;
 
 	dl_list_init(&psc->sa_list);
-	wpa_printf(MSG_DEBUG, "KaY: Create transmit SC");
+	wpa_printf(MSG_DEBUG, "KaY: Create transmit SC(channel: %d)", channel);
 	wpa_hexdump(MSG_DEBUG, "SCI: ", (u8 *)sci , sizeof(*sci));
 
 	return psc;
@@ -2523,9 +2498,13 @@ ieee802_1x_kay_deinit_transmit_sc(
 {
 	struct transmit_sa *psa, *tmp;
 
-	wpa_printf(MSG_DEBUG, "KaY: Delete transmit SC");
-	dl_list_for_each_safe(psa, tmp, &psc->sa_list, struct transmit_sa, list)
-		ieee802_1x_delete_transmit_sa(participant->kay, psa);
+	wpa_printf(MSG_DEBUG, "KaY: Delete transmit SC(channel: %d)",
+		   psc->channel);
+	dl_list_for_each_safe(psa, tmp, &psc->sa_list, struct transmit_sa,
+			      list) {
+		secy_disable_transmit_sa(participant->kay, psa);
+		ieee802_1x_kay_deinit_transmit_sa(psa);
+	}
 
 	os_free(psc);
 }
@@ -2603,32 +2582,6 @@ int ieee802_1x_kay_set_old_sa_attr(struct ieee802_1x_kay *kay,
 }
 
 
-static struct transmit_sa * lookup_txsa_by_an(struct transmit_sc *txsc, u8 an)
-{
-	struct transmit_sa *txsa;
-
-	dl_list_for_each(txsa, &txsc->sa_list, struct transmit_sa, list) {
-		if (txsa->an == an)
-			return txsa;
-	}
-
-	return NULL;
-}
-
-
-static struct receive_sa * lookup_rxsa_by_an(struct receive_sc *rxsc, u8 an)
-{
-	struct receive_sa *rxsa;
-
-	dl_list_for_each(rxsa, &rxsc->sa_list, struct receive_sa, list) {
-		if (rxsa->an == an)
-			return rxsa;
-	}
-
-	return NULL;
-}
-
-
 /**
  * ieee802_1x_kay_create_sas -
  */
@@ -2663,9 +2616,6 @@ int ieee802_1x_kay_create_sas(struct ieee802_1x_kay *kay,
 	}
 
 	dl_list_for_each(rxsc, &principal->rxsc_list, struct receive_sc, list) {
-		while ((rxsa = lookup_rxsa_by_an(rxsc, latest_sak->an)) != NULL)
-			ieee802_1x_delete_receive_sa(kay, rxsa);
-
 		rxsa = ieee802_1x_kay_init_receive_sa(rxsc, latest_sak->an, 1,
 						      latest_sak);
 		if (!rxsa)
@@ -2673,10 +2623,6 @@ int ieee802_1x_kay_create_sas(struct ieee802_1x_kay *kay,
 
 		secy_create_receive_sa(kay, rxsa);
 	}
-
-	while ((txsa = lookup_txsa_by_an(principal->txsc, latest_sak->an)) !=
-	       NULL)
-		ieee802_1x_delete_transmit_sa(kay, txsa);
 
 	txsa = ieee802_1x_kay_init_transmit_sa(principal->txsc, latest_sak->an,
 					       1, latest_sak);
@@ -2711,16 +2657,20 @@ int ieee802_1x_kay_delete_sas(struct ieee802_1x_kay *kay,
 	/* remove the transmit sa */
 	dl_list_for_each_safe(txsa, pre_txsa, &principal->txsc->sa_list,
 			      struct transmit_sa, list) {
-		if (is_ki_equal(&txsa->pkey->key_identifier, ki))
-			ieee802_1x_delete_transmit_sa(kay, txsa);
+		if (is_ki_equal(&txsa->pkey->key_identifier, ki)) {
+			secy_disable_transmit_sa(kay, txsa);
+			ieee802_1x_kay_deinit_transmit_sa(txsa);
+		}
 	}
 
 	/* remove the receive sa */
 	dl_list_for_each(rxsc, &principal->rxsc_list, struct receive_sc, list) {
 		dl_list_for_each_safe(rxsa, pre_rxsa, &rxsc->sa_list,
 				      struct receive_sa, list) {
-			if (is_ki_equal(&rxsa->pkey->key_identifier, ki))
-				ieee802_1x_delete_receive_sa(kay, rxsa);
+			if (is_ki_equal(&rxsa->pkey->key_identifier, ki)) {
+				secy_disable_receive_sa(kay, rxsa);
+				ieee802_1x_kay_deinit_receive_sa(rxsa);
+			}
 		}
 	}
 
@@ -2728,7 +2678,6 @@ int ieee802_1x_kay_delete_sas(struct ieee802_1x_kay *kay,
 	dl_list_for_each_safe(sa_key, pre_key, &principal->sak_list,
 			      struct data_key, list) {
 		if (is_ki_equal(&sa_key->key_identifier, ki)) {
-			dl_list_del(&sa_key->list);
 			ieee802_1x_kay_deinit_data_key(sa_key);
 			break;
 		}
@@ -3120,26 +3069,20 @@ ieee802_1x_kay_init(struct ieee802_1x_kay_ctx *ctx, enum macsec_policy policy,
 		kay->macsec_replay_window = 0;
 		kay->macsec_confidentiality = CONFIDENTIALITY_NONE;
 	} else {
-		if (secy_get_capability(kay, &kay->macsec_capable) < 0) {
-			os_free(kay);
-			return NULL;
-		}
-
+		kay->macsec_capable = MACSEC_CAP_INTEG_AND_CONF_0_30_50;
 		kay->macsec_desired = TRUE;
 		kay->macsec_protect = TRUE;
 		kay->macsec_validate = Strict;
 		kay->macsec_replay_protect = FALSE;
 		kay->macsec_replay_window = 0;
-		if (kay->macsec_capable >= MACSEC_CAP_INTEG_AND_CONF)
-			kay->macsec_confidentiality = CONFIDENTIALITY_OFFSET_0;
-		else
-			kay->macsec_confidentiality = MACSEC_CAP_INTEGRITY;
+		kay->macsec_confidentiality = CONFIDENTIALITY_OFFSET_0;
 	}
 
 	wpa_printf(MSG_DEBUG, "KaY: state machine created");
 
 	/* Initialize the SecY must be prio to CP, as CP will control SecY */
 	secy_init_macsec(kay);
+	secy_get_available_transmit_sc(kay, &kay->sc_ch);
 
 	wpa_printf(MSG_DEBUG, "KaY: secy init macsec done");
 
@@ -3300,7 +3243,8 @@ ieee802_1x_kay_create_mka(struct ieee802_1x_kay *kay, struct mka_key_name *ckn,
 	dl_list_init(&participant->sak_list);
 	participant->new_key = NULL;
 	dl_list_init(&participant->rxsc_list);
-	participant->txsc = ieee802_1x_kay_init_transmit_sc(&kay->actor_sci);
+	participant->txsc = ieee802_1x_kay_init_transmit_sc(&kay->actor_sci,
+							    kay->sc_ch);
 	secy_cp_control_protect_frames(kay, kay->macsec_protect);
 	secy_cp_control_replay(kay, kay->macsec_replay_protect,
 			       kay->macsec_replay_window);
@@ -3396,7 +3340,8 @@ ieee802_1x_kay_delete_mka(struct ieee802_1x_kay *kay, struct mka_key_name *ckn)
 		sak = dl_list_entry(participant->sak_list.next,
 				    struct data_key, list);
 		dl_list_del(&sak->list);
-		ieee802_1x_kay_deinit_data_key(sak);
+		os_free(sak->key);
+		os_free(sak);
 	}
 	while (!dl_list_empty(&participant->rxsc_list)) {
 		rxsc = dl_list_entry(participant->rxsc_list.next,
@@ -3464,7 +3409,6 @@ ieee802_1x_kay_change_cipher_suite(struct ieee802_1x_kay *kay,
 				   unsigned int cs_index)
 {
 	struct ieee802_1x_mka_participant *participant;
-	enum macsec_cap secy_cap;
 
 	if (!kay)
 		return -1;
@@ -3482,12 +3426,6 @@ ieee802_1x_kay_change_cipher_suite(struct ieee802_1x_kay *kay,
 
 	kay->macsec_csindex = cs_index;
 	kay->macsec_capable = cipher_suite_tbl[kay->macsec_csindex].capable;
-
-	if (secy_get_capability(kay, &secy_cap) < 0)
-		return -3;
-
-	if (kay->macsec_capable > secy_cap)
-		kay->macsec_capable = secy_cap;
 
 	participant = ieee802_1x_kay_get_principal_participant(kay);
 	if (participant) {
