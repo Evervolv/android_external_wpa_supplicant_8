@@ -491,11 +491,6 @@ static u8 * hostapd_gen_probe_resp(struct hostapd_data *hapd,
 		pos = hostapd_eid_txpower_envelope(hapd, pos);
 		pos = hostapd_eid_wb_chsw_wrapper(hapd, pos);
 	}
-#endif /* CONFIG_IEEE80211AC */
-
-	pos = hostapd_eid_fils_indic(hapd, pos, 0);
-
-#ifdef CONFIG_IEEE80211AC
 	if (hapd->conf->vendor_vht)
 		pos = hostapd_eid_vendor_vht(hapd, pos);
 #endif /* CONFIG_IEEE80211AC */
@@ -623,7 +618,7 @@ static struct hostapd_sta_info * sta_track_get(struct hostapd_iface *iface,
 }
 
 
-void sta_track_add(struct hostapd_iface *iface, const u8 *addr, int ssi_signal)
+void sta_track_add(struct hostapd_iface *iface, const u8 *addr)
 {
 	struct hostapd_sta_info *info;
 
@@ -633,7 +628,6 @@ void sta_track_add(struct hostapd_iface *iface, const u8 *addr, int ssi_signal)
 		dl_list_del(&info->list);
 		dl_list_add_tail(&iface->sta_seen, &info->list);
 		os_get_reltime(&info->last_seen);
-		info->ssi_signal = ssi_signal;
 		return;
 	}
 
@@ -643,7 +637,6 @@ void sta_track_add(struct hostapd_iface *iface, const u8 *addr, int ssi_signal)
 		return;
 	os_memcpy(info->addr, addr, ETH_ALEN);
 	os_get_reltime(&info->last_seen);
-	info->ssi_signal = ssi_signal;
 
 	if (iface->num_sta_seen >= iface->conf->track_sta_max_num) {
 		/* Expire oldest entry to make room for a new one */
@@ -719,7 +712,7 @@ void handle_probe_req(struct hostapd_data *hapd,
 		return;
 	ie = ((const u8 *) mgmt) + IEEE80211_HDRLEN;
 	if (hapd->iconf->track_sta_max_num)
-		sta_track_add(hapd->iface, mgmt->sa, ssi_signal);
+		sta_track_add(hapd->iface, mgmt->sa);
 	ie_len = len - IEEE80211_HDRLEN;
 
 	for (i = 0; hapd->probereq_cb && i < hapd->num_probereq_cb; i++)
@@ -1162,11 +1155,6 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 		tailpos = hostapd_eid_txpower_envelope(hapd, tailpos);
 		tailpos = hostapd_eid_wb_chsw_wrapper(hapd, tailpos);
 	}
-#endif /* CONFIG_IEEE80211AC */
-
-	tailpos = hostapd_eid_fils_indic(hapd, tailpos, 0);
-
-#ifdef CONFIG_IEEE80211AC
 	if (hapd->conf->vendor_vht)
 		tailpos = hostapd_eid_vendor_vht(hapd, tailpos);
 #endif /* CONFIG_IEEE80211AC */
