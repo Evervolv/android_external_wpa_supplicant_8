@@ -956,10 +956,10 @@ static int hostapd_setup_bss(struct hostapd_data *hapd, int first)
 	if (conf->wmm_enabled < 0)
 		conf->wmm_enabled = hapd->iconf->ieee80211n;
 
-#ifdef CONFIG_IEEE80211R_AP
+#ifdef CONFIG_IEEE80211R
 	if (is_zero_ether_addr(conf->r1_key_holder))
 		os_memcpy(conf->r1_key_holder, hapd->own_addr, ETH_ALEN);
-#endif /* CONFIG_IEEE80211R_AP */
+#endif /* CONFIG_IEEE80211R */
 
 #ifdef CONFIG_MESH
 	if (hapd->iface->mconf == NULL)
@@ -1561,7 +1561,7 @@ static void hostapd_set_own_neighbor_report(struct hostapd_data *hapd)
 	int vht = hapd->iconf->ieee80211ac && !hapd->conf->disable_11ac;
 	struct wpa_ssid_value ssid;
 	u8 channel, op_class;
-	u8 center_freq1_idx = 0, center_freq2_idx = 0;
+	int center_freq1 = 0, center_freq2 = 0;
 	enum nr_chan_width width;
 	u32 bssid_info;
 	struct wpabuf *nr;
@@ -1604,14 +1604,16 @@ static void hostapd_set_own_neighbor_report(struct hostapd_data *hapd)
 				      &op_class, &channel);
 	width = hostapd_get_nr_chan_width(hapd, ht, vht);
 	if (vht) {
-		center_freq1_idx = hapd->iconf->vht_oper_centr_freq_seg0_idx;
+		center_freq1 = ieee80211_chan_to_freq(
+			NULL, op_class,
+			hapd->iconf->vht_oper_centr_freq_seg0_idx);
 		if (width == NR_CHAN_WIDTH_80P80)
-			center_freq2_idx =
-				hapd->iconf->vht_oper_centr_freq_seg1_idx;
+			center_freq2 = ieee80211_chan_to_freq(
+				NULL, op_class,
+				hapd->iconf->vht_oper_centr_freq_seg1_idx);
 	} else if (ht) {
-		ieee80211_freq_to_chan(hapd->iface->freq +
-				       10 * hapd->iconf->secondary_channel,
-				       &center_freq1_idx);
+		center_freq1 = hapd->iface->freq +
+			10 * hapd->iconf->secondary_channel;
 	}
 
 	ssid.ssid_len = hapd->conf->ssid.ssid_len;
@@ -1639,11 +1641,11 @@ static void hostapd_set_own_neighbor_report(struct hostapd_data *hapd)
 	wpabuf_put_u8(nr, WNM_NEIGHBOR_WIDE_BW_CHAN);
 	wpabuf_put_u8(nr, 3);
 	wpabuf_put_u8(nr, width);
-	wpabuf_put_u8(nr, center_freq1_idx);
-	wpabuf_put_u8(nr, center_freq2_idx);
+	wpabuf_put_u8(nr, center_freq1);
+	wpabuf_put_u8(nr, center_freq2);
 
 	hostapd_neighbor_set(hapd, hapd->own_addr, &ssid, nr, hapd->iconf->lci,
-			     hapd->iconf->civic, hapd->iconf->stationary_ap);
+			     hapd->iconf->civic);
 
 	wpabuf_free(nr);
 #endif /* NEED_AP_MLME */

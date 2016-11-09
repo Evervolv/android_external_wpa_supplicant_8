@@ -38,9 +38,6 @@ endif
 L_CFLAGS += -DCONFIG_CTRL_IFACE_CLIENT_DIR=\"/data/misc/wifi/sockets\"
 L_CFLAGS += -DCONFIG_CTRL_IFACE_DIR=\"/data/system/hostapd\"
 
-# Use Android specific directory for hostapd_cli command completion history
-L_CFLAGS += -DCONFIG_HOSTAPD_CLI_HISTORY_DIR=\"/data/misc/wifi\"
-
 # To force sizeof(enum) = 4
 ifeq ($(TARGET_ARCH),arm)
 L_CFLAGS += -mabi=aapcs-linux
@@ -247,7 +244,7 @@ NEED_AES_OMAC1=y
 endif
 
 ifdef CONFIG_IEEE80211R
-L_CFLAGS += -DCONFIG_IEEE80211R -DCONFIG_IEEE80211R_AP
+L_CFLAGS += -DCONFIG_IEEE80211R
 OBJS += src/ap/wpa_auth_ft.c
 NEED_SHA256=y
 NEED_AES_OMAC1=y
@@ -259,13 +256,6 @@ L_CFLAGS += -DCONFIG_SAE
 OBJS += src/common/sae.c
 NEED_ECC=y
 NEED_DH_GROUPS=y
-endif
-
-ifdef CONFIG_FILS
-L_CFLAGS += -DCONFIG_FILS
-NEED_CRC32=y
-NEED_SHA384=y
-NEED_AES_SIV=y
 endif
 
 ifdef CONFIG_WNM
@@ -747,9 +737,6 @@ ifneq ($(CONFIG_TLS), openssl)
 AESOBJS += src/crypto/aes-cbc.c
 endif
 endif
-ifdef NEED_AES_SIV
-AESOBJS += src/crypto/aes-siv.c
-endif
 ifdef NEED_AES_DEC
 ifdef CONFIG_INTERNAL_AES
 AESOBJS += src/crypto/aes-internal-dec.c
@@ -863,10 +850,6 @@ endif
 
 ifdef NEED_ECC
 L_CFLAGS += -DCONFIG_ECC
-endif
-
-ifdef NEED_CRC32
-OBJS += src/utils/crc32.c
 endif
 
 ifdef CONFIG_NO_RANDOM_POOL
