@@ -1233,22 +1233,6 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 		wpa_dbg(wpa_s, MSG_DEBUG,
 			"WPA: using KEY_MGMT 802.1X with Suite B");
 #endif /* CONFIG_SUITEB */
-#ifdef CONFIG_FILS
-#ifdef CONFIG_IEEE80211R
-	} else if (sel & WPA_KEY_MGMT_FT_FILS_SHA384) {
-		wpa_s->key_mgmt = WPA_KEY_MGMT_FT_FILS_SHA384;
-		wpa_dbg(wpa_s, MSG_DEBUG, "WPA: using KEY_MGMT FT-FILS-SHA384");
-	} else if (sel & WPA_KEY_MGMT_FT_FILS_SHA256) {
-		wpa_s->key_mgmt = WPA_KEY_MGMT_FT_FILS_SHA256;
-		wpa_dbg(wpa_s, MSG_DEBUG, "WPA: using KEY_MGMT FT-FILS-SHA256");
-#endif /* CONFIG_IEEE80211R */
-	} else if (sel & WPA_KEY_MGMT_FILS_SHA384) {
-		wpa_s->key_mgmt = WPA_KEY_MGMT_FILS_SHA384;
-		wpa_dbg(wpa_s, MSG_DEBUG, "WPA: using KEY_MGMT FILS-SHA384");
-	} else if (sel & WPA_KEY_MGMT_FILS_SHA256) {
-		wpa_s->key_mgmt = WPA_KEY_MGMT_FILS_SHA256;
-		wpa_dbg(wpa_s, MSG_DEBUG, "WPA: using KEY_MGMT FILS-SHA256");
-#endif /* CONFIG_FILS */
 #ifdef CONFIG_IEEE80211R
 	} else if (sel & WPA_KEY_MGMT_FT_IEEE8021X) {
 		wpa_s->key_mgmt = WPA_KEY_MGMT_FT_IEEE8021X;
@@ -1482,11 +1466,6 @@ static void wpas_ext_capab_byte(struct wpa_supplicant *wpa_s, u8 *pos, int idx)
 		if (wpa_s->conf->ftm_initiator)
 			*pos |= 0x80; /* Bit 71 - FTM initiator */
 		break;
-	case 9: /* Bits 72-79 */
-#ifdef CONFIG_FILS
-		*pos |= 0x01;
-#endif /* CONFIG_FILS */
-		break;
 	}
 }
 
@@ -1494,8 +1473,11 @@ static void wpas_ext_capab_byte(struct wpa_supplicant *wpa_s, u8 *pos, int idx)
 int wpas_build_ext_capab(struct wpa_supplicant *wpa_s, u8 *buf, size_t buflen)
 {
 	u8 *pos = buf;
-	u8 len = 10, i;
+	u8 len = 6, i;
 
+	if (len < 9 &&
+	    (wpa_s->conf->ftm_initiator || wpa_s->conf->ftm_responder))
+		len = 9;
 	if (len < wpa_s->extended_capa_len)
 		len = wpa_s->extended_capa_len;
 	if (buflen < (size_t) len + 2) {
@@ -1691,13 +1673,11 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 			wmm_ac_save_tspecs(wpa_s);
 			wpa_s->reassoc_same_bss = 1;
 		}
-	}
-
-	if (rand_style > 0 && !wpa_s->reassoc_same_ess) {
+	} else if (rand_style > 0) {
 		if (wpas_update_random_addr(wpa_s, rand_style) < 0)
 			return;
 		wpa_sm_pmksa_cache_flush(wpa_s->wpa, ssid);
-	} else if (rand_style == 0 && wpa_s->mac_addr_changed) {
+	} else if (wpa_s->mac_addr_changed) {
 		if (wpa_drv_set_mac_addr(wpa_s, NULL) < 0) {
 			wpa_msg(wpa_s, MSG_INFO,
 				"Could not restore permanent MAC address");
@@ -1716,13 +1696,6 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 #ifdef CONFIG_IBSS_RSN
 	ibss_rsn_deinit(wpa_s->ibss_rsn);
 	wpa_s->ibss_rsn = NULL;
-#else /* CONFIG_IBSS_RSN */
-	if (ssid->mode == WPAS_MODE_IBSS &&
-	    !(ssid->key_mgmt & (WPA_KEY_MGMT_NONE | WPA_KEY_MGMT_WPA_NONE))) {
-		wpa_msg(wpa_s, MSG_INFO,
-			"IBSS RSN not supported in the build");
-		return;
-	}
 #endif /* CONFIG_IBSS_RSN */
 
 	if (ssid->mode == WPAS_MODE_AP || ssid->mode == WPAS_MODE_P2P_GO ||
@@ -2470,14 +2443,12 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 	if (bss) {
 		params.ssid = bss->ssid;
 		params.ssid_len = bss->ssid_len;
-		if (!wpas_driver_bss_selection(wpa_s) || ssid->bssid_set ||
-		    wpa_s->key_mgmt == WPA_KEY_MGMT_WPS) {
+		if (!wpas_driver_bss_selection(wpa_s) || ssid->bssid_set) {
 			wpa_printf(MSG_DEBUG, "Limit connection to BSSID "
 				   MACSTR " freq=%u MHz based on scan results "
-				   "(bssid_set=%d wps=%d)",
+				   "(bssid_set=%d)",
 				   MAC2STR(bss->bssid), bss->freq,
-				   ssid->bssid_set,
-				   wpa_s->key_mgmt == WPA_KEY_MGMT_WPS);
+				   ssid->bssid_set);
 			params.bssid = bss->bssid;
 			params.freq.freq = bss->freq;
 		}

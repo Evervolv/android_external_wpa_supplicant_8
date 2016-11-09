@@ -138,16 +138,6 @@ struct wpa_sm {
 #ifdef CONFIG_TESTING_OPTIONS
 	struct wpabuf *test_assoc_ie;
 #endif /* CONFIG_TESTING_OPTIONS */
-
-#ifdef CONFIG_FILS
-	u8 fils_nonce[FILS_NONCE_LEN];
-	u8 fils_session[FILS_SESSION_LEN];
-	u8 fils_anonce[FILS_NONCE_LEN];
-	u8 fils_key_auth_ap[FILS_MAX_KEY_AUTH_LEN];
-	u8 fils_key_auth_sta[FILS_MAX_KEY_AUTH_LEN];
-	size_t fils_key_auth_len;
-	unsigned int fils_completed:1;
-#endif /* CONFIG_FILS */
 };
 
 
@@ -363,7 +353,7 @@ static inline int wpa_sm_key_mgmt_set_pmk(struct wpa_sm *sm,
 	return sm->ctx->key_mgmt_set_pmk(sm->ctx->ctx, pmk, pmk_len);
 }
 
-int wpa_eapol_key_send(struct wpa_sm *sm, struct wpa_ptk *ptk,
+int wpa_eapol_key_send(struct wpa_sm *sm, const u8 *kck, size_t kck_len,
 		       int ver, const u8 *dest, u16 proto,
 		       u8 *msg, size_t msg_len, u8 *key_mic);
 int wpa_supplicant_send_2_of_4(struct wpa_sm *sm, const unsigned char *dst,

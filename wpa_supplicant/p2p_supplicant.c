@@ -807,7 +807,7 @@ grp_owner:
 					      wpa_s->own_addr);
 		} else if (!s && !go_wpa_s) {
 			if (wpas_p2p_add_group_interface(wpa_s,
-							 WPA_IF_P2P_GROUP) < 0) {
+							 WPA_IF_P2P_GO) < 0) {
 				wpa_printf(MSG_ERROR,
 					   "P2P: Failed to allocate a new interface for the group");
 				return P2PS_SETUP_NONE;
@@ -5236,10 +5236,8 @@ static int wpas_p2p_setup_freqs(struct wpa_supplicant *wpa_s, int freq,
 		if (!res && max_pref_freq > 0) {
 			*num_pref_freq = max_pref_freq;
 			i = 0;
-			while ((!p2p_supported_freq(wpa_s->global->p2p,
-						    pref_freq_list[i]) ||
-				wpas_p2p_disallowed_freq(wpa_s->global,
-							pref_freq_list[i])) &&
+			while (wpas_p2p_disallowed_freq(wpa_s->global,
+							pref_freq_list[i]) &&
 			       i < *num_pref_freq) {
 				wpa_printf(MSG_DEBUG,
 					   "P2P: preferred_freq_list[%d]=%d is disallowed",
