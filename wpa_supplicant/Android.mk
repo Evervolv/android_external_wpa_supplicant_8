@@ -210,10 +210,6 @@ NEED_SHA256=y
 NEED_AES_OMAC1=y
 endif
 
-ifdef CONFIG_IEEE80211R_AP
-CONFIG_IEEE80211R=y
-endif
-
 ifdef CONFIG_IEEE80211R
 L_CFLAGS += -DCONFIG_IEEE80211R
 OBJS += src/rsn_supp/wpa_ft.c
@@ -240,13 +236,6 @@ L_CFLAGS += -DCONFIG_SAE
 OBJS += src/common/sae.c
 NEED_ECC=y
 NEED_DH_GROUPS=y
-endif
-
-ifdef CONFIG_FILS
-L_CFLAGS += -DCONFIG_FILS
-NEED_CRC32=y
-NEED_SHA384=y
-NEED_AES_SIV=y
 endif
 
 ifdef CONFIG_WNM
@@ -845,6 +834,11 @@ L_CFLAGS += -DCONFIG_IEEE80211AC
 endif
 endif
 
+ifdef CONFIG_MBO
+OBJS += mbo.c
+L_CFLAGS += -DCONFIG_MBO
+endif
+
 ifdef NEED_AP_MLME
 OBJS += src/ap/wmm.c
 OBJS += src/ap/ap_list.c
@@ -866,19 +860,13 @@ OBJS += src/ap/hs20.c
 endif
 endif
 
-ifdef CONFIG_MBO
-OBJS += mbo.c
-L_CFLAGS += -DCONFIG_MBO
-endif
-
 ifdef NEED_RSN_AUTHENTICATOR
 L_CFLAGS += -DCONFIG_NO_RADIUS
 NEED_AES_WRAP=y
 OBJS += src/ap/wpa_auth.c
 OBJS += src/ap/wpa_auth_ie.c
 OBJS += src/ap/pmksa_cache_auth.c
-ifdef CONFIG_IEEE80211R_AP
-L_CFLAGS += -DCONFIG_IEEE80211R_AP
+ifdef CONFIG_IEEE80211R
 OBJS += src/ap/wpa_auth_ft.c
 endif
 ifdef CONFIG_PEERKEY
@@ -1294,10 +1282,6 @@ endif
 
 ifdef NEED_ECC
 L_CFLAGS += -DCONFIG_ECC
-endif
-
-ifdef NEED_CRC32
-OBJS += src/utils/crc32.c
 endif
 
 ifdef CONFIG_NO_RANDOM_POOL

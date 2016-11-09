@@ -333,7 +333,7 @@ int mesh_rsn_auth_sae_sta(struct wpa_supplicant *wpa_s,
 			return -1;
 	}
 
-	pmksa = wpa_auth_pmksa_get(hapd->wpa_auth, sta->addr, NULL);
+	pmksa = wpa_auth_pmksa_get(hapd->wpa_auth, sta->addr);
 	if (pmksa) {
 		if (!sta->wpa_sm)
 			sta->wpa_sm = wpa_auth_sta_init(hapd->wpa_auth,
@@ -579,7 +579,7 @@ skip_keys:
 	/* encrypt after MIC */
 	mic_payload = wpabuf_put(buf, 2 + len + AES_BLOCK_SIZE);
 
-	if (aes_siv_encrypt(sta->aek, sizeof(sta->aek), ampe_ie, 2 + len, 3,
+	if (aes_siv_encrypt(sta->aek, ampe_ie, 2 + len, 3,
 			    aad, aad_len, mic_payload)) {
 		wpa_printf(MSG_ERROR, "protect frame: failed to encrypt");
 		ret = -ENOMEM;
@@ -611,7 +611,7 @@ int mesh_rsn_process_ampe(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 	if (!sta->sae) {
 		struct hostapd_data *hapd = wpa_s->ifmsh->bss[0];
 
-		if (!wpa_auth_pmksa_get(hapd->wpa_auth, sta->addr, NULL)) {
+		if (!wpa_auth_pmksa_get(hapd->wpa_auth, sta->addr)) {
 			wpa_printf(MSG_INFO,
 				   "Mesh RSN: SAE is not prepared yet");
 			return -1;
@@ -650,7 +650,7 @@ int mesh_rsn_process_ampe(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 
 	os_memcpy(crypt, elems->mic, crypt_len);
 
-	if (aes_siv_decrypt(sta->aek, sizeof(sta->aek), crypt, crypt_len, 3,
+	if (aes_siv_decrypt(sta->aek, crypt, crypt_len, 3,
 			    aad, aad_len, ampe_buf)) {
 		wpa_printf(MSG_ERROR, "Mesh RSN: frame verification failed!");
 		ret = -2;

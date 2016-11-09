@@ -532,8 +532,6 @@ static int wpa_supplicant_ctrl_iface_set(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_MBO */
 	} else if (os_strcasecmp(cmd, "lci") == 0) {
 		ret = wpas_ctrl_iface_set_lci(wpa_s, value);
-	} else if (os_strcasecmp(cmd, "tdls_trigger_control") == 0) {
-		ret = wpa_drv_set_tdls_mode(wpa_s, atoi(value));
 	} else {
 		value[-1] = '=';
 		ret = wpa_config_process_global(wpa_s->conf, cmd, -1);
@@ -2439,39 +2437,6 @@ static char * wpa_supplicant_ie_txt(char *pos, char *end, const char *proto,
 	}
 #endif /* CONFIG_SUITEB192 */
 
-#ifdef CONFIG_FILS
-	if (data.key_mgmt & WPA_KEY_MGMT_FILS_SHA256) {
-		ret = os_snprintf(pos, end - pos, "%sFILS-SHA256",
-				  pos == start ? "" : "+");
-		if (os_snprintf_error(end - pos, ret))
-			return pos;
-		pos += ret;
-	}
-	if (data.key_mgmt & WPA_KEY_MGMT_FILS_SHA384) {
-		ret = os_snprintf(pos, end - pos, "%sFILS-SHA384",
-				  pos == start ? "" : "+");
-		if (os_snprintf_error(end - pos, ret))
-			return pos;
-		pos += ret;
-	}
-#ifdef CONFIG_IEEE80211R
-	if (data.key_mgmt & WPA_KEY_MGMT_FT_FILS_SHA256) {
-		ret = os_snprintf(pos, end - pos, "%sFT-FILS-SHA256",
-				  pos == start ? "" : "+");
-		if (os_snprintf_error(end - pos, ret))
-			return pos;
-		pos += ret;
-	}
-	if (data.key_mgmt & WPA_KEY_MGMT_FT_FILS_SHA384) {
-		ret = os_snprintf(pos, end - pos, "%sFT-FILS-SHA384",
-				  pos == start ? "" : "+");
-		if (os_snprintf_error(end - pos, ret))
-			return pos;
-		pos += ret;
-	}
-#endif /* CONFIG_IEEE80211R */
-#endif /* CONFIG_FILS */
-
 	if (data.key_mgmt & WPA_KEY_MGMT_OSEN) {
 		ret = os_snprintf(pos, end - pos, "%sOSEN",
 				  pos == start ? "" : "+");
@@ -2643,14 +2608,6 @@ static int wpa_supplicant_ctrl_iface_scan_result(
 		pos += ret;
 	}
 #endif /* CONFIG_HS20 */
-#ifdef CONFIG_FILS
-	if (wpa_bss_get_ie(bss, WLAN_EID_FILS_INDICATION)) {
-		ret = os_snprintf(pos, end - pos, "[FILS]");
-		if (os_snprintf_error(end - pos, ret))
-			return -1;
-		pos += ret;
-	}
-#endif /* CONFIG_FILS */
 #ifdef CONFIG_FST
 	if (wpa_bss_get_ie(bss, WLAN_EID_MULTI_BAND)) {
 		ret = os_snprintf(pos, end - pos, "[FST]");
@@ -4049,16 +4006,6 @@ static int wpa_supplicant_ctrl_iface_get_capability(
 	}
 #endif /* CONFIG_ACS */
 
-#ifdef CONFIG_FILS
-	if (os_strcmp(field, "fils") == 0 &&
-	    (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SUPPORT_FILS)) {
-		res = os_snprintf(buf, buflen, "FILS");
-		if (os_snprintf_error(buflen, res))
-			return -1;
-		return res;
-	}
-#endif /* CONFIG_FILS */
-
 	wpa_printf(MSG_DEBUG, "CTRL_IFACE: Unknown GET_CAPABILITY field '%s'",
 		   field);
 
@@ -4289,14 +4236,6 @@ static int print_bss_info(struct wpa_supplicant *wpa_s, struct wpa_bss *bss,
 			pos += ret;
 		}
 #endif /* CONFIG_HS20 */
-#ifdef CONFIG_FILS
-		if (wpa_bss_get_ie(bss, WLAN_EID_FILS_INDICATION)) {
-			ret = os_snprintf(pos, end - pos, "[FILS]");
-			if (os_snprintf_error(end - pos, ret))
-				return 0;
-			pos += ret;
-		}
-#endif /* CONFIG_FILS */
 
 		ret = os_snprintf(pos, end - pos, "\n");
 		if (os_snprintf_error(end - pos, ret))
@@ -6444,7 +6383,6 @@ static int get_anqp(struct wpa_supplicant *wpa_s, char *dst)
 	u16 id[MAX_ANQP_INFO_ID];
 	size_t num_id = 0;
 	u32 subtypes = 0;
-	int get_cell_pref = 0;
 
 	used = hwaddr_aton2(dst, dst_addr);
 	if (used < 0)
@@ -6462,15 +6400,6 @@ static int get_anqp(struct wpa_supplicant *wpa_s, char *dst)
 #else /* CONFIG_HS20 */
 			return -1;
 #endif /* CONFIG_HS20 */
-		} else if (os_strncmp(pos, "mbo:", 4) == 0) {
-#ifdef CONFIG_MBO
-			int num = atoi(pos + 4);
-			if (num != MBO_ANQP_SUBTYPE_CELL_CONN_PREF)
-				return -1;
-			get_cell_pref = 1;
-#else /* CONFIG_MBO */
-			return -1;
-#endif /* CONFIG_MBO */
 		} else {
 			id[num_id] = atoi(pos);
 			if (id[num_id])
@@ -6485,8 +6414,7 @@ static int get_anqp(struct wpa_supplicant *wpa_s, char *dst)
 	if (num_id == 0)
 		return -1;
 
-	return anqp_send_req(wpa_s, dst_addr, id, num_id, subtypes,
-			     get_cell_pref);
+	return anqp_send_req(wpa_s, dst_addr, id, num_id, subtypes);
 }
 
 
@@ -6823,9 +6751,6 @@ static int wpa_supplicant_ctrl_iface_autoscan(struct wpa_supplicant *wpa_s,
 		autoscan_init(wpa_s, 1);
 	else if (state == WPA_SCANNING)
 		wpa_supplicant_reinit_autoscan(wpa_s);
-	else
-		wpa_printf(MSG_DEBUG, "No autoscan update in state %s",
-			   wpa_supplicant_state_txt(state));
 
 	return 0;
 }

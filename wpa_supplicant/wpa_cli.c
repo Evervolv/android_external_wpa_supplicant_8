@@ -60,9 +60,6 @@ static DEFINE_DL_LIST(p2p_peers); /* struct cli_txt_entry */
 static DEFINE_DL_LIST(p2p_groups); /* struct cli_txt_entry */
 static DEFINE_DL_LIST(ifnames); /* struct cli_txt_entry */
 static DEFINE_DL_LIST(networks); /* struct cli_txt_entry */
-#ifdef CONFIG_AP
-static DEFINE_DL_LIST(stations); /* struct cli_txt_entry */
-#endif /* CONFIG_AP */
 
 
 static void print_help(const char *cmd);
@@ -71,7 +68,6 @@ static void wpa_cli_close_connection(void);
 static char * wpa_cli_get_default_ifname(void);
 static char ** wpa_list_cmd_list(void);
 static void update_networks(struct wpa_ctrl *ctrl);
-static void update_stations(struct wpa_ctrl *ctrl);
 
 
 static void usage(void)
@@ -218,7 +214,7 @@ static void wpa_cli_msg_cb(char *msg, size_t len)
 }
 
 
-static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print)
+static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, char *cmd, int print)
 {
 	char buf[4096];
 	size_t len;
@@ -254,7 +250,7 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print)
 }
 
 
-static int wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd)
+static int wpa_ctrl_command(struct wpa_ctrl *ctrl, char *cmd)
 {
 	return _wpa_ctrl_command(ctrl, cmd, 1);
 }
@@ -1740,23 +1736,8 @@ static int wpa_cli_cmd_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
 }
 
 
-static char ** wpa_cli_complete_sta(const char *str, int pos)
-{
-	int arg = get_cmd_arg_num(str, pos);
-	char **res = NULL;
-
-	switch (arg) {
-	case 1:
-		res = cli_txt_list_array(&stations);
-		break;
-	}
-
-	return res;
-}
-
-
-static int wpa_ctrl_command_sta(struct wpa_ctrl *ctrl, const char *cmd,
-				char *addr, size_t addr_len, int print)
+static int wpa_ctrl_command_sta(struct wpa_ctrl *ctrl, char *cmd,
+				char *addr, size_t addr_len)
 {
 	char buf[4096], *pos;
 	size_t len;
@@ -1786,8 +1767,7 @@ static int wpa_ctrl_command_sta(struct wpa_ctrl *ctrl, const char *cmd,
 	buf[len] = '\0';
 	if (os_memcmp(buf, "FAIL", 4) == 0)
 		return -1;
-	if (print)
-		printf("%s", buf);
+	printf("%s", buf);
 
 	pos = buf;
 	while (*pos != '\0' && *pos != '\n')
@@ -1802,30 +1782,13 @@ static int wpa_cli_cmd_all_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	char addr[32], cmd[64];
 
-	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 1))
+	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr)))
 		return 0;
 	do {
 		os_snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
-	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 1) == 0);
+	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr)) == 0);
 
 	return -1;
-}
-
-
-static int wpa_cli_cmd_list_sta(struct wpa_ctrl *ctrl, int argc,
-				char *argv[])
-{
-	char addr[32], cmd[64];
-
-	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 0))
-		return 0;
-	do {
-		if (os_strcmp(addr, "") != 0)
-			printf("%s\n", addr);
-		os_snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
-	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 0) == 0);
-
-	return 0;
 }
 
 
@@ -1836,42 +1799,11 @@ static int wpa_cli_cmd_deauthenticate(struct wpa_ctrl *ctrl, int argc,
 }
 
 
-static char ** wpa_cli_complete_deauthenticate(const char *str, int pos)
-{
-	int arg = get_cmd_arg_num(str, pos);
-	char **res = NULL;
-
-	switch (arg) {
-	case 1:
-		res = cli_txt_list_array(&stations);
-		break;
-	}
-
-	return res;
-}
-
-
 static int wpa_cli_cmd_disassociate(struct wpa_ctrl *ctrl, int argc,
 				    char *argv[])
 {
 	return wpa_cli_cmd(ctrl, "DISASSOCIATE", 1, argc, argv);
 }
-
-
-static char ** wpa_cli_complete_disassociate(const char *str, int pos)
-{
-	int arg = get_cmd_arg_num(str, pos);
-	char **res = NULL;
-
-	switch (arg) {
-	case 1:
-		res = cli_txt_list_array(&stations);
-		break;
-	}
-
-	return res;
-}
-
 
 static int wpa_cli_cmd_chanswitch(struct wpa_ctrl *ctrl, int argc,
 				    char *argv[])
@@ -2244,7 +2176,7 @@ static char ** wpa_cli_complete_p2p_peer(const char *str, int pos)
 }
 
 
-static int wpa_ctrl_command_p2p_peer(struct wpa_ctrl *ctrl, const char *cmd,
+static int wpa_ctrl_command_p2p_peer(struct wpa_ctrl *ctrl, char *cmd,
 				     char *addr, size_t addr_len,
 				     int discovered)
 {
@@ -2875,30 +2807,30 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "preauthenticate", wpa_cli_cmd_preauthenticate, wpa_cli_complete_bss,
 	  cli_cmd_flag_none,
 	  "<BSSID> = force preauthentication" },
-	{ "identity", wpa_cli_cmd_identity, wpa_cli_complete_network_id,
+	{ "identity", wpa_cli_cmd_identity, NULL,
 	  cli_cmd_flag_none,
 	  "<network id> <identity> = configure identity for an SSID" },
-	{ "password", wpa_cli_cmd_password, wpa_cli_complete_network_id,
+	{ "password", wpa_cli_cmd_password, NULL,
 	  cli_cmd_flag_sensitive,
 	  "<network id> <password> = configure password for an SSID" },
-	{ "new_password", wpa_cli_cmd_new_password,
-	  wpa_cli_complete_network_id, cli_cmd_flag_sensitive,
+	{ "new_password", wpa_cli_cmd_new_password, NULL,
+	  cli_cmd_flag_sensitive,
 	  "<network id> <password> = change password for an SSID" },
-	{ "pin", wpa_cli_cmd_pin, wpa_cli_complete_network_id,
+	{ "pin", wpa_cli_cmd_pin, NULL,
 	  cli_cmd_flag_sensitive,
 	  "<network id> <pin> = configure pin for an SSID" },
-	{ "otp", wpa_cli_cmd_otp, wpa_cli_complete_network_id,
+	{ "otp", wpa_cli_cmd_otp, NULL,
 	  cli_cmd_flag_sensitive,
 	  "<network id> <password> = configure one-time-password for an SSID"
 	},
-	{ "passphrase", wpa_cli_cmd_passphrase, wpa_cli_complete_network_id,
+	{ "passphrase", wpa_cli_cmd_passphrase, NULL,
 	  cli_cmd_flag_sensitive,
 	  "<network id> <passphrase> = configure private key passphrase\n"
 	  "  for an SSID" },
-	{ "sim", wpa_cli_cmd_sim, wpa_cli_complete_network_id,
+	{ "sim", wpa_cli_cmd_sim, NULL,
 	  cli_cmd_flag_sensitive,
 	  "<network id> <pin> = report SIM operation result" },
-	{ "bssid", wpa_cli_cmd_bssid, wpa_cli_complete_network_id,
+	{ "bssid", wpa_cli_cmd_bssid, NULL,
 	  cli_cmd_flag_none,
 	  "<network id> <BSSID> = set preferred BSSID for an SSID" },
 	{ "blacklist", wpa_cli_cmd_blacklist, wpa_cli_complete_bss,
@@ -3097,20 +3029,17 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	  cli_cmd_flag_none,
 	  "<addr> = request RSN authentication with <addr> in IBSS" },
 #ifdef CONFIG_AP
-	{ "sta", wpa_cli_cmd_sta, wpa_cli_complete_sta,
+	{ "sta", wpa_cli_cmd_sta, NULL,
 	  cli_cmd_flag_none,
 	  "<addr> = get information about an associated station (AP)" },
 	{ "all_sta", wpa_cli_cmd_all_sta, NULL,
 	  cli_cmd_flag_none,
 	  "= get information about all associated stations (AP)" },
-	{ "list_sta", wpa_cli_cmd_list_sta, NULL,
+	{ "deauthenticate", wpa_cli_cmd_deauthenticate, NULL,
 	  cli_cmd_flag_none,
-	  "= list all stations (AP)" },
-	{ "deauthenticate", wpa_cli_cmd_deauthenticate,
-	  wpa_cli_complete_deauthenticate, cli_cmd_flag_none,
 	  "<addr> = deauthenticate a station" },
-	{ "disassociate", wpa_cli_cmd_disassociate,
-	  wpa_cli_complete_disassociate, cli_cmd_flag_none,
+	{ "disassociate", wpa_cli_cmd_disassociate, NULL,
+	  cli_cmd_flag_none,
 	  "<addr> = disassociate a station" },
 	{ "chan_switch", wpa_cli_cmd_chanswitch, NULL,
 	  cli_cmd_flag_none,
@@ -3746,7 +3675,6 @@ static void wpa_cli_reconnect(void)
 		edit_clear_line();
 		printf("\rConnection to wpa_supplicant re-established\n");
 		edit_redraw();
-		update_stations(ctrl_conn);
 	}
 }
 
@@ -3969,7 +3897,7 @@ static void update_bssid_list(struct wpa_ctrl *ctrl)
 	char buf[4096];
 	size_t len = sizeof(buf);
 	int ret;
-	const char *cmd = "BSS RANGE=ALL MASK=0x2";
+	char *cmd = "BSS RANGE=ALL MASK=0x2";
 	char *pos, *end;
 
 	if (ctrl == NULL)
@@ -4000,7 +3928,7 @@ static void update_ifnames(struct wpa_ctrl *ctrl)
 	char buf[4096];
 	size_t len = sizeof(buf);
 	int ret;
-	const char *cmd = "INTERFACES";
+	char *cmd = "INTERFACES";
 	char *pos, *end;
 	char txt[200];
 
@@ -4032,7 +3960,7 @@ static void update_networks(struct wpa_ctrl *ctrl)
 	char buf[4096];
 	size_t len = sizeof(buf);
 	int ret;
-	const char *cmd = "LIST_NETWORKS";
+	char *cmd = "LIST_NETWORKS";
 	char *pos, *end;
 	int header = 1;
 
@@ -4059,27 +3987,6 @@ static void update_networks(struct wpa_ctrl *ctrl)
 }
 
 
-static void update_stations(struct wpa_ctrl *ctrl)
-{
-#ifdef CONFIG_AP
-	char addr[32], cmd[64];
-
-	if (!ctrl || !interactive)
-		return;
-
-	cli_txt_list_flush(&stations);
-
-	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 0))
-		return;
-	do {
-		if (os_strcmp(addr, "") != 0)
-			cli_txt_list_add(&stations, addr);
-		os_snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
-	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 0) == 0);
-#endif /* CONFIG_AP */
-}
-
-
 static void try_connection(void *eloop_ctx, void *timeout_ctx)
 {
 	if (ctrl_conn)
@@ -4101,7 +4008,6 @@ static void try_connection(void *eloop_ctx, void *timeout_ctx)
 
 	update_bssid_list(ctrl_conn);
 	update_networks(ctrl_conn);
-	update_stations(ctrl_conn);
 
 	if (warning_displayed)
 		printf("Connection established.\n");
@@ -4348,7 +4254,6 @@ int main(int argc, char *argv[])
 					       "control interface\n");
 				}
 			}
-			update_stations(ctrl_conn);
 		}
 	}
 
