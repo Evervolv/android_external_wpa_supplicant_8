@@ -3095,11 +3095,11 @@ retry:
 	if (params->ie &&
 	    nla_put(msg, NL80211_ATTR_IE, params->ie_len, params->ie))
 		goto fail;
-	if (params->sae_data) {
-		wpa_hexdump(MSG_DEBUG, "  * SAE data", params->sae_data,
-			    params->sae_data_len);
-		if (nla_put(msg, NL80211_ATTR_SAE_DATA, params->sae_data_len,
-			    params->sae_data))
+	if (params->auth_data) {
+		wpa_hexdump(MSG_DEBUG, "  * auth_data", params->auth_data,
+			    params->auth_data_len);
+		if (nla_put(msg, NL80211_ATTR_SAE_DATA, params->auth_data_len,
+			    params->auth_data))
 			goto fail;
 	}
 	if (params->auth_alg & WPA_AUTH_ALG_OPEN)
@@ -3112,6 +3112,8 @@ retry:
 		type = NL80211_AUTHTYPE_FT;
 	else if (params->auth_alg & WPA_AUTH_ALG_SAE)
 		type = NL80211_AUTHTYPE_SAE;
+	else if (params->auth_alg & WPA_AUTH_ALG_FILS)
+		type = NL80211_AUTHTYPE_FILS_SK;
 	else
 		goto fail;
 	wpa_printf(MSG_DEBUG, "  * Auth Type %d", type);
@@ -5151,6 +5153,22 @@ static int wpa_driver_nl80211_associate(
 	ret = nl80211_connect_common(drv, params, msg);
 	if (ret)
 		goto fail;
+
+	if (params->fils_kek) {
+		wpa_printf(MSG_DEBUG, "  * FILS KEK (len=%u)",
+			   (unsigned int) params->fils_kek_len);
+		if (nla_put(msg, NL80211_ATTR_FILS_KEK, params->fils_kek_len,
+			    params->fils_kek))
+			goto fail;
+	}
+	if (params->fils_nonces) {
+		wpa_hexdump(MSG_DEBUG, "  * FILS nonces (for AAD)",
+			    params->fils_nonces,
+			    params->fils_nonces_len);
+		if (nla_put(msg, NL80211_ATTR_FILS_NONCES,
+			    params->fils_nonces_len, params->fils_nonces))
+			goto fail;
+	}
 
 	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
 	msg = NULL;
@@ -9307,6 +9325,56 @@ static int nl80211_p2p_lo_stop(void *priv)
 	return send_and_recv_msgs(drv, msg, NULL, NULL);
 }
 
+
+static int nl80211_set_tdls_mode(void *priv, int tdls_external_control)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+	struct nlattr *params;
+	int ret;
+	u32 tdls_mode;
+
+	wpa_printf(MSG_DEBUG,
+		   "nl80211: Set TDKS mode: tdls_external_control=%d",
+		   tdls_external_control);
+
+	if (tdls_external_control == 1)
+		tdls_mode = QCA_WLAN_VENDOR_TDLS_TRIGGER_MODE_IMPLICIT |
+			QCA_WLAN_VENDOR_TDLS_TRIGGER_MODE_EXTERNAL;
+	else
+		tdls_mode = QCA_WLAN_VENDOR_TDLS_TRIGGER_MODE_EXPLICIT;
+
+	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_VENDOR)) ||
+	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_QCA) ||
+	    nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD,
+			QCA_NL80211_VENDOR_SUBCMD_CONFIGURE_TDLS))
+		goto fail;
+
+	params = nla_nest_start(msg, NL80211_ATTR_VENDOR_DATA);
+	if (!params)
+		goto fail;
+
+	if (nla_put_u32(msg, QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TRIGGER_MODE,
+			tdls_mode))
+		goto fail;
+
+	nla_nest_end(msg, params);
+
+	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
+	msg = NULL;
+	if (ret) {
+		wpa_printf(MSG_ERROR,
+			   "nl80211: Set TDLS mode failed: ret=%d (%s)",
+			   ret, strerror(-ret));
+		goto fail;
+	}
+	return 0;
+fail:
+	nlmsg_free(msg);
+	return -1;
+}
+
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 
 
@@ -9550,6 +9618,7 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.p2p_lo_start = nl80211_p2p_lo_start,
 	.p2p_lo_stop = nl80211_p2p_lo_stop,
 	.set_default_scan_ies = nl80211_set_default_scan_ies,
+	.set_tdls_mode = nl80211_set_tdls_mode,
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 	.configure_data_frame_filters = nl80211_configure_data_frame_filters,
 	.get_ext_capab = nl80211_get_ext_capab,
