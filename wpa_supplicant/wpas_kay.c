@@ -38,6 +38,12 @@ static int wpas_macsec_deinit(void *priv)
 }
 
 
+static int wpas_macsec_get_capability(void *priv, enum macsec_cap *cap)
+{
+	return wpa_drv_macsec_get_capability(priv, cap);
+}
+
+
 static int wpas_enable_protect_frames(void *wpa_s, Boolean enabled)
 {
 	return wpa_drv_enable_protect_frames(wpa_s, enabled);
@@ -62,30 +68,21 @@ static int wpas_enable_controlled_port(void *wpa_s, Boolean enabled)
 }
 
 
-static int wpas_get_receive_lowest_pn(void *wpa_s, u32 channel,
-				      u8 an, u32 *lowest_pn)
+static int wpas_get_receive_lowest_pn(void *wpa_s, struct receive_sa *sa)
 {
-	return wpa_drv_get_receive_lowest_pn(wpa_s, channel, an, lowest_pn);
+	return wpa_drv_get_receive_lowest_pn(wpa_s, sa);
 }
 
 
-static int wpas_get_transmit_next_pn(void *wpa_s, u32 channel,
-				      u8 an, u32 *next_pn)
+static int wpas_get_transmit_next_pn(void *wpa_s, struct transmit_sa *sa)
 {
-	return wpa_drv_get_transmit_next_pn(wpa_s, channel, an, next_pn);
+	return wpa_drv_get_transmit_next_pn(wpa_s, sa);
 }
 
 
-static int wpas_set_transmit_next_pn(void *wpa_s, u32 channel,
-				      u8 an, u32 next_pn)
+static int wpas_set_transmit_next_pn(void *wpa_s, struct transmit_sa *sa)
 {
-	return wpa_drv_set_transmit_next_pn(wpa_s, channel, an, next_pn);
-}
-
-
-static int wpas_get_available_receive_sc(void *wpa_s, u32 *channel)
-{
-	return wpa_drv_get_available_receive_sc(wpa_s, channel);
+	return wpa_drv_set_transmit_next_pn(wpa_s, sa);
 }
 
 
@@ -103,83 +100,79 @@ static unsigned int conf_offset_val(enum confidentiality_offset co)
 }
 
 
-static int wpas_create_receive_sc(void *wpa_s, u32 channel,
-				  struct ieee802_1x_mka_sci *sci,
+static int wpas_create_receive_sc(void *wpa_s, struct receive_sc *sc,
 				  enum validate_frames vf,
 				  enum confidentiality_offset co)
 {
-	return wpa_drv_create_receive_sc(wpa_s, channel, sci->addr,
-					 be_to_host16(sci->port),
-					 conf_offset_val(co), vf);
+	return wpa_drv_create_receive_sc(wpa_s, sc, conf_offset_val(co), vf);
 }
 
 
-static int wpas_delete_receive_sc(void *wpa_s, u32 channel)
+static int wpas_delete_receive_sc(void *wpa_s, struct receive_sc *sc)
 {
-	return wpa_drv_delete_receive_sc(wpa_s, channel);
+	return wpa_drv_delete_receive_sc(wpa_s, sc);
 }
 
 
-static int wpas_create_receive_sa(void *wpa_s, u32 channel, u8 an,
-				  u32 lowest_pn, const u8 *sak)
+static int wpas_create_receive_sa(void *wpa_s, struct receive_sa *sa)
 {
-	return wpa_drv_create_receive_sa(wpa_s, channel, an, lowest_pn, sak);
+	return wpa_drv_create_receive_sa(wpa_s, sa);
 }
 
 
-static int wpas_enable_receive_sa(void *wpa_s, u32 channel, u8 an)
+static int wpas_delete_receive_sa(void *wpa_s, struct receive_sa *sa)
 {
-	return wpa_drv_enable_receive_sa(wpa_s, channel, an);
+	return wpa_drv_delete_receive_sa(wpa_s, sa);
 }
 
 
-static int wpas_disable_receive_sa(void *wpa_s, u32 channel, u8 an)
+static int wpas_enable_receive_sa(void *wpa_s, struct receive_sa *sa)
 {
-	return wpa_drv_disable_receive_sa(wpa_s, channel, an);
+	return wpa_drv_enable_receive_sa(wpa_s, sa);
 }
 
 
-static int wpas_get_available_transmit_sc(void *wpa_s, u32 *channel)
+static int wpas_disable_receive_sa(void *wpa_s, struct receive_sa *sa)
 {
-	return wpa_drv_get_available_transmit_sc(wpa_s, channel);
+	return wpa_drv_disable_receive_sa(wpa_s, sa);
 }
 
 
 static int
-wpas_create_transmit_sc(void *wpa_s, u32 channel,
-			const struct ieee802_1x_mka_sci *sci,
+wpas_create_transmit_sc(void *wpa_s, struct transmit_sc *sc,
 			enum confidentiality_offset co)
 {
-	return wpa_drv_create_transmit_sc(wpa_s, channel, sci->addr,
-					  be_to_host16(sci->port),
-					  conf_offset_val(co));
+	return wpa_drv_create_transmit_sc(wpa_s, sc, conf_offset_val(co));
 }
 
 
-static int wpas_delete_transmit_sc(void *wpa_s, u32 channel)
+static int wpas_delete_transmit_sc(void *wpa_s, struct transmit_sc *sc)
 {
-	return wpa_drv_delete_transmit_sc(wpa_s, channel);
+	return wpa_drv_delete_transmit_sc(wpa_s, sc);
 }
 
 
-static int wpas_create_transmit_sa(void *wpa_s, u32 channel, u8 an,
-				   u32 next_pn, Boolean confidentiality,
-				   const u8 *sak)
+static int wpas_create_transmit_sa(void *wpa_s, struct transmit_sa *sa)
 {
-	return wpa_drv_create_transmit_sa(wpa_s, channel, an, next_pn,
-					  confidentiality, sak);
+	return wpa_drv_create_transmit_sa(wpa_s, sa);
 }
 
 
-static int wpas_enable_transmit_sa(void *wpa_s, u32 channel, u8 an)
+static int wpas_delete_transmit_sa(void *wpa_s, struct transmit_sa *sa)
 {
-	return wpa_drv_enable_transmit_sa(wpa_s, channel, an);
+	return wpa_drv_delete_transmit_sa(wpa_s, sa);
 }
 
 
-static int wpas_disable_transmit_sa(void *wpa_s, u32 channel, u8 an)
+static int wpas_enable_transmit_sa(void *wpa_s, struct transmit_sa *sa)
 {
-	return wpa_drv_disable_transmit_sa(wpa_s, channel, an);
+	return wpa_drv_enable_transmit_sa(wpa_s, sa);
+}
+
+
+static int wpas_disable_transmit_sa(void *wpa_s, struct transmit_sa *sa)
+{
+	return wpa_drv_disable_transmit_sa(wpa_s, sa);
 }
 
 
@@ -204,6 +197,7 @@ int ieee802_1x_alloc_kay_sm(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
 
 	kay_ctx->macsec_init = wpas_macsec_init;
 	kay_ctx->macsec_deinit = wpas_macsec_deinit;
+	kay_ctx->macsec_get_capability = wpas_macsec_get_capability;
 	kay_ctx->enable_protect_frames = wpas_enable_protect_frames;
 	kay_ctx->set_replay_protect = wpas_set_replay_protect;
 	kay_ctx->set_current_cipher_suite = wpas_set_current_cipher_suite;
@@ -211,16 +205,16 @@ int ieee802_1x_alloc_kay_sm(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid)
 	kay_ctx->get_receive_lowest_pn = wpas_get_receive_lowest_pn;
 	kay_ctx->get_transmit_next_pn = wpas_get_transmit_next_pn;
 	kay_ctx->set_transmit_next_pn = wpas_set_transmit_next_pn;
-	kay_ctx->get_available_receive_sc = wpas_get_available_receive_sc;
 	kay_ctx->create_receive_sc = wpas_create_receive_sc;
 	kay_ctx->delete_receive_sc = wpas_delete_receive_sc;
 	kay_ctx->create_receive_sa = wpas_create_receive_sa;
+	kay_ctx->delete_receive_sa = wpas_delete_receive_sa;
 	kay_ctx->enable_receive_sa = wpas_enable_receive_sa;
 	kay_ctx->disable_receive_sa = wpas_disable_receive_sa;
-	kay_ctx->get_available_transmit_sc = wpas_get_available_transmit_sc;
 	kay_ctx->create_transmit_sc = wpas_create_transmit_sc;
 	kay_ctx->delete_transmit_sc = wpas_delete_transmit_sc;
 	kay_ctx->create_transmit_sa = wpas_create_transmit_sa;
+	kay_ctx->delete_transmit_sa = wpas_delete_transmit_sa;
 	kay_ctx->enable_transmit_sa = wpas_enable_transmit_sa;
 	kay_ctx->disable_transmit_sa = wpas_disable_transmit_sa;
 
