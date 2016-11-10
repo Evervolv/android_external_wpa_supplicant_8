@@ -247,6 +247,8 @@ static void mlme_event_assoc(struct wpa_driver_nl80211_data *drv,
 	os_memcpy(drv->prev_bssid, mgmt->sa, ETH_ALEN);
 
 	os_memset(&event, 0, sizeof(event));
+	event.assoc_info.resp_frame = frame;
+	event.assoc_info.resp_frame_len = len;
 	if (len > 24 + sizeof(mgmt->u.assoc_resp)) {
 		event.assoc_info.resp_ies = (u8 *) mgmt->u.assoc_resp.variable;
 		event.assoc_info.resp_ies_len =
@@ -516,6 +518,7 @@ static void mlme_event_ch_switch(struct wpa_driver_nl80211_data *drv,
 		data.ch_switch.cf2 = nla_get_u32(cf2);
 
 	bss->freq = data.ch_switch.freq;
+	drv->assoc_freq = data.ch_switch.freq;
 
 	wpa_supplicant_event(bss->ctx, EVENT_CH_SWITCH, &data);
 }
