@@ -164,8 +164,11 @@ enum qca_radiotap_vendor_ids {
  *
  * @QCA_NL80211_VENDOR_SUBCMD_AOA_MEAS: Perform a standalone AOA (angle of
  *	arrival) measurement with a single peer. Specify peer MAC address in
- *	QCA_WLAN_VENDOR_ATTR_MAC_ADDR and measurement type in
- *	QCA_WLAN_VENDOR_ATTR_AOA_TYPE. Measurement result is reported in
+ *	QCA_WLAN_VENDOR_ATTR_MAC_ADDR and optionally frequency (MHz) in
+ *	QCA_WLAN_VENDOR_ATTR_FREQ (if not specified, locate peer in kernel
+ *	scan results cache and use the frequency from there).
+ *	Also specify measurement type in QCA_WLAN_VENDOR_ATTR_AOA_TYPE.
+ *	Measurement result is reported in
  *	QCA_NL80211_VENDOR_SUBCMD_AOA_MEAS_RESULT event.
  *
  * @QCA_NL80211_VENDOR_SUBCMD_AOA_ABORT_MEAS: Abort an AOA measurement. Specify
@@ -185,6 +188,50 @@ enum qca_radiotap_vendor_ids {
  *
  * @QCA_NL80211_VENDOR_SUBCMD_GET_CHAIN_RSSI: Get antenna RSSI value for a
  *	specific chain.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_DMG_RF_GET_SECTOR_CFG: Get low level
+ *	configuration for a DMG RF sector. Specify sector index in
+ *	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_INDEX, sector type in
+ *	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE and RF modules
+ *	to return sector information for in
+ *	QCA_WLAN_VENDOR_ATTR_DMG_RF_MODULE_MASK. Returns sector configuration
+ *	in QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG. Also return the
+ *	exact time where information was captured in
+ *	QCA_WLAN_VENDOR_ATTR_TSF.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_DMG_RF_SET_SECTOR_CFG: Set low level
+ *	configuration for a DMG RF sector. Specify sector index in
+ *	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_INDEX, sector type in
+ *	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE and sector configuration
+ *	for one or more DMG RF modules in
+ *	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_DMG_RF_GET_SELECTED_SECTOR: Get selected
+ *	DMG RF sector for a station. This is the sector that the HW
+ *	will use to communicate with the station. Specify the MAC address
+ *	of associated station/AP/PCP in QCA_WLAN_VENDOR_ATTR_MAC_ADDR (not
+ *	needed for unassociated	station). Specify sector type to return in
+ *	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE. Returns the selected
+ *	sector index in QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_INDEX.
+ *	Also return the exact time where the information was captured
+ *	in QCA_WLAN_VENDOR_ATTR_TSF.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_DMG_RF_SET_SELECTED_SECTOR: Set the
+ *	selected DMG RF sector for a station. This is the sector that
+ *	the HW will use to communicate with the station.
+ *	Specify the MAC address of associated station/AP/PCP in
+ *	QCA_WLAN_VENDOR_ATTR_MAC_ADDR, the sector type to select in
+ *	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE and the sector index
+ *	in QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_INDEX.
+ *	The selected sector will be locked such that it will not be
+ *	modified like it normally does (for example when station
+ *	moves around). To unlock the selected sector for a station
+ *	pass the special value 0xFFFF in the sector index. To unlock
+ *	all connected stations also pass a broadcast MAC address.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_CONFIGURE_TDLS: Configure the TDLS behavior
+ *	in the host driver. The different TDLS configurations are defined
+ *	by the attributes in enum qca_wlan_vendor_attr_tdls_configuration.
  */
 enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_UNSPEC = 0,
@@ -194,7 +241,7 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY = 10,
 	QCA_NL80211_VENDOR_SUBCMD_DFS_CAPABILITY =  11,
 	QCA_NL80211_VENDOR_SUBCMD_NAN =  12,
-	QCA_NL80211_VENDOR_SUBMCD_STATS_EXT = 13,
+	QCA_NL80211_VENDOR_SUBCMD_STATS_EXT = 13,
 	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_SET = 14,
 	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_GET = 15,
 	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_CLR = 16,
@@ -285,6 +332,12 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_AOA_MEAS_RESULT = 136,
 	QCA_NL80211_VENDOR_SUBCMD_ENCRYPTION_TEST = 137,
 	QCA_NL80211_VENDOR_SUBCMD_GET_CHAIN_RSSI = 138,
+	/* DMG low level RF sector operations */
+	QCA_NL80211_VENDOR_SUBCMD_DMG_RF_GET_SECTOR_CFG = 139,
+	QCA_NL80211_VENDOR_SUBCMD_DMG_RF_SET_SECTOR_CFG = 140,
+	QCA_NL80211_VENDOR_SUBCMD_DMG_RF_GET_SELECTED_SECTOR = 141,
+	QCA_NL80211_VENDOR_SUBCMD_DMG_RF_SET_SELECTED_SECTOR = 142,
+	QCA_NL80211_VENDOR_SUBCMD_CONFIGURE_TDLS = 143,
 };
 
 
@@ -392,6 +445,42 @@ enum qca_wlan_vendor_attr {
 	/* Used in QCA_NL80211_VENDOR_SUBCMD_GET_CHAIN_RSSI command
 	 * to report the specific antenna RSSI value (unsigned 32 bit value) */
 	QCA_WLAN_VENDOR_ATTR_CHAIN_RSSI = 27,
+	/* Frequency in MHz, various uses. Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_FREQ = 28,
+	/* TSF timer value, unsigned 64 bit value.
+	 * May be returned by various commands.
+	 */
+	QCA_WLAN_VENDOR_ATTR_TSF = 29,
+	/* DMG RF sector index, unsigned 16 bit number. Valid values are
+	 * 0..127 for sector indices or 65535 as special value used to
+	 * unlock sector selection in
+	 * QCA_NL80211_VENDOR_SUBCMD_DMG_RF_SET_SELECTED_SECTOR.
+	 */
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_INDEX = 30,
+	/* DMG RF sector type, unsigned 8 bit value. One of the values
+	 * in enum qca_wlan_vendor_attr_dmg_rf_sector_type.
+	 */
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE = 31,
+	/* Bitmask of DMG RF modules for which information is requested. Each
+	 * bit corresponds to an RF module with the same index as the bit
+	 * number. Unsigned 32 bit number but only low 8 bits can be set since
+	 * all DMG chips currently have up to 8 RF modules.
+	 */
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_MODULE_MASK = 32,
+	/* Array of nested attributes where each entry is DMG RF sector
+	 * configuration for a single RF module.
+	 * Attributes for each entry are taken from enum
+	 * qca_wlan_vendor_attr_dmg_rf_sector_cfg.
+	 * Specified in QCA_NL80211_VENDOR_SUBCMD_DMG_RF_SET_SECTOR_CFG
+	 * and returned by QCA_NL80211_VENDOR_SUBCMD_DMG_RF_GET_SECTOR_CFG.
+	 */
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG = 33,
+	/* Used in QCA_NL80211_VENDOR_SUBCMD_STATS_EXT command
+	 * to report frame aggregation statistics to userspace.
+	 */
+	QCA_WLAN_VENDOR_ATTR_RX_AGGREGATION_STATS_HOLES_NUM = 34,
+	QCA_WLAN_VENDOR_ATTR_RX_AGGREGATION_STATS_HOLES_INFO = 35,
+
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_MAX	= QCA_WLAN_VENDOR_ATTR_AFTER_LAST - 1,
@@ -789,13 +878,13 @@ enum qca_vendor_attr_txpower_decr_db {
  * QCA_NL80211_VENDOR_SUBCMD_GET_WIFI_CONFIGURATION subcommands.
  */
 enum qca_wlan_vendor_attr_config {
-	QCA_WLAN_VENDOR_ATTR_CONFIG_INVALID,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_INVALID = 0,
 	/* Unsigned 32-bit value to set the DTIM period.
 	 * Whether the wifi chipset wakes at every dtim beacon or a multiple of
 	 * the DTIM period. If DTIM is set to 3, the STA shall wake up every 3
 	 * DTIM beacons.
 	 */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_DYNAMIC_DTIM,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_DYNAMIC_DTIM = 1,
 	/* Unsigned 32-bit value to set the wifi_iface stats averaging factor
 	 * used to calculate statistics like average the TSF offset or average
 	 * number of frame leaked.
@@ -804,52 +893,52 @@ enum qca_wlan_vendor_attr_config {
 	 * For instance, when evaluating leaky APs:
 	 * current_avg = ((num frame received within guard time) * factor + previous_avg * (0x10000 - factor)) / 0x10000
 	 */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_STATS_AVG_FACTOR,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_STATS_AVG_FACTOR = 2,
 	/* Unsigned 32-bit value to configure guard time, i.e., when
 	 * implementing IEEE power management based on frame control PM bit, how
 	 * long the driver waits before shutting down the radio and after
 	 * receiving an ACK frame for a Data frame with PM bit set.
 	 */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_GUARD_TIME,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_GUARD_TIME = 3,
 	/* Unsigned 32-bit value to change the FTM capability dynamically */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_FINE_TIME_MEASUREMENT,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_FINE_TIME_MEASUREMENT = 4,
 	/* Unsigned 16-bit value to configure maximum TX rate dynamically */
-	QCA_WLAN_VENDOR_ATTR_CONF_TX_RATE,
+	QCA_WLAN_VENDOR_ATTR_CONF_TX_RATE = 5,
 	/* Unsigned 32-bit value to configure the number of continuous
 	 * Beacon Miss which shall be used by the firmware to penalize
 	 * the RSSI.
 	 */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_PENALIZE_AFTER_NCONS_BEACON_MISS,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_PENALIZE_AFTER_NCONS_BEACON_MISS = 6,
 	/* Unsigned 8-bit value to configure the channel avoidance indication
 	 * behavior. Firmware to send only one indication and ignore duplicate
 	 * indications when set to avoid multiple Apps wakeups.
 	 */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_AVOIDANCE_IND,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_AVOIDANCE_IND = 7,
 	/* 8-bit unsigned value to configure the maximum TX MPDU for
 	 * aggregation. */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_TX_MPDU_AGGREGATION,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_TX_MPDU_AGGREGATION = 8,
 	/* 8-bit unsigned value to configure the maximum RX MPDU for
 	 * aggregation. */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MPDU_AGGREGATION,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MPDU_AGGREGATION = 9,
 	/* 8-bit unsigned value to configure the Non aggregrate/11g sw
 	 * retry threshold (0 disable, 31 max). */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_NON_AGG_RETRY,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_NON_AGG_RETRY = 10,
 	/* 8-bit unsigned value to configure the aggregrate sw
 	 * retry threshold (0 disable, 31 max). */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_AGG_RETRY,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_AGG_RETRY = 11,
 	/* 8-bit unsigned value to configure the MGMT frame
 	 * retry threshold (0 disable, 31 max). */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_MGMT_RETRY,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_MGMT_RETRY = 12,
 	/* 8-bit unsigned value to configure the CTRL frame
 	 * retry threshold (0 disable, 31 max). */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_CTRL_RETRY,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_CTRL_RETRY = 13,
 	/* 8-bit unsigned value to configure the propagation delay for
 	 * 2G/5G band (0~63, units in us) */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_PROPAGATION_DELAY,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_PROPAGATION_DELAY = 14,
 	/* Unsigned 32-bit value to configure the number of unicast TX fail
 	 * packet count. The peer is disconnected once this threshold is
 	 * reached. */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_TX_FAIL_COUNT,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_TX_FAIL_COUNT = 15,
 	/* Attribute used to set scan default IEs to the driver.
 	 *
 	 * These IEs can be used by scan operations that will be initiated by
@@ -860,50 +949,62 @@ enum qca_wlan_vendor_attr_config {
 	 * driver. If a particular IE is present in the scan default IEs but not
 	 * present in the scan request, then that IE should be added to the IEs
 	 * sent in the Probe Request frames for that scan request. */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_DEFAULT_IES,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_DEFAULT_IES = 16,
 	/* Unsigned 32-bit attribute for generic commands */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND = 17,
 	/* Unsigned 32-bit value attribute for generic commands */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_VALUE,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_VALUE = 18,
 	/* Unsigned 32-bit data attribute for generic command response */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA = 19,
 	/* Unsigned 32-bit length attribute for
 	 * QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_LENGTH,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_LENGTH = 20,
 	/* Unsigned 32-bit flags attribute for
 	 * QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_FLAGS,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_FLAGS = 21,
 	/* Unsigned 32-bit, defining the access policy.
 	 * See enum qca_access_policy. Used with
 	 * QCA_WLAN_VENDOR_ATTR_CONFIG_ACCESS_POLICY_IE_LIST. */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_ACCESS_POLICY,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ACCESS_POLICY = 22,
 	/* Sets the list of full set of IEs for which a specific access policy
 	 * has to be applied. Used along with
 	 * QCA_WLAN_VENDOR_ATTR_CONFIG_ACCESS_POLICY to control the access.
 	 * Zero length payload can be used to clear this access constraint. */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_ACCESS_POLICY_IE_LIST,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ACCESS_POLICY_IE_LIST = 23,
 	/* Unsigned 32-bit, specifies the interface index (netdev) for which the
 	 * corresponding configurations are applied. If the interface index is
 	 * not specified, the configurations are attributed to the respective
 	 * wiphy. */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_IFINDEX,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_IFINDEX = 24,
 	/* 8-bit unsigned value to trigger QPower: 1-Enable, 0-Disable */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER = 25,
 	/* 8-bit unsigned value to configure the driver and below layers to
 	 * ignore the assoc disallowed set by APs while connecting
 	 * 1-Ignore, 0-Don't ignore */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_IGNORE_ASSOC_DISALLOWED,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_IGNORE_ASSOC_DISALLOWED = 26,
 	/* 32-bit unsigned value to trigger antenna diversity features:
 	 * 1-Enable, 0-Disable */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_ENA,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_ENA = 27,
 	/* 32-bit unsigned value to configure specific chain antenna */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_CHAIN,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_CHAIN = 28,
 	/* 32-bit unsigned value to trigger cycle selftest
 	 * 1-Enable, 0-Disable */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SELFTEST,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SELFTEST = 29,
 	/* 32-bit unsigned to configure the cycle time of selftest
 	 * the unit is micro-second */
-	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SELFTEST_INTVL,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SELFTEST_INTVL = 30,
+	/* 32-bit unsigned value to set reorder timeout for AC_VO */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_REORDER_TIMEOUT_VOICE = 31,
+	/* 32-bit unsigned value to set reorder timeout for AC_VI */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_REORDER_TIMEOUT_VIDEO = 32,
+	/* 32-bit unsigned value to set reorder timeout for AC_BE */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_REORDER_TIMEOUT_BESTEFFORT = 33,
+	/* 32-bit unsigned value to set reorder timeout for AC_BK */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_REORDER_TIMEOUT_BACKGROUND = 34,
+	/* 6-byte MAC address to point out the specific peer */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_BLOCKSIZE_PEER_MAC = 35,
+	/* 32-bit unsigned value to set window size for specific peer */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_BLOCKSIZE_WINLIMIT = 36,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_AFTER_LAST,
@@ -1320,6 +1421,10 @@ enum qca_wlan_vendor_attr_loc_capa_flags {
  * @QCA_WLAN_VENDOR_ATTR_FTM_PEER_AOA_BURST_PERIOD: Request AOA
  *	measurement every <value> bursts. If 0 or not specified,
  *	AOA measurements will be disabled for this peer.
+ * @QCA_WLAN_VENDOR_ATTR_FTM_PEER_FREQ: Frequency in MHz where
+ *	the measurement frames are exchanged. Optional; if not
+ *	specified, try to locate the peer in the kernel scan
+ *	results cache and use frequency from there.
  */
 enum qca_wlan_vendor_attr_ftm_peer_info {
 	QCA_WLAN_VENDOR_ATTR_FTM_PEER_INVALID,
@@ -1328,6 +1433,7 @@ enum qca_wlan_vendor_attr_ftm_peer_info {
 	QCA_WLAN_VENDOR_ATTR_FTM_PEER_MEAS_PARAMS,
 	QCA_WLAN_VENDOR_ATTR_FTM_PEER_SECURE_TOKEN_ID,
 	QCA_WLAN_VENDOR_ATTR_FTM_PEER_AOA_BURST_PERIOD,
+	QCA_WLAN_VENDOR_ATTR_FTM_PEER_FREQ,
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_FTM_PEER_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_FTM_PEER_MAX =
@@ -1585,6 +1691,520 @@ enum qca_wlan_vendor_attr_encryption_test {
 	QCA_WLAN_VENDOR_ATTR_ENCRYPTION_TEST_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_ENCRYPTION_TEST_MAX =
 	QCA_WLAN_VENDOR_ATTR_ENCRYPTION_TEST_AFTER_LAST - 1
+};
+
+/**
+ * enum qca_wlan_vendor_attr_dmg_rf_sector_type - Type of
+ * sector for DMG RF sector operations.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE_RX: RX sector
+ * @QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE_TX: TX sector
+ */
+enum qca_wlan_vendor_attr_dmg_rf_sector_type {
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE_RX,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE_TX,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_TYPE_MAX
+};
+
+/**
+ * enum qca_wlan_vendor_attr_dmg_rf_sector_cfg - Attributes for
+ * DMG RF sector configuration for a single RF module.
+ * The values are defined in a compact way which closely matches
+ * the way it is stored in HW registers.
+ * The configuration provides values for 32 antennas and 8 distribution
+ * amplifiers, and together describes the characteristics of the RF
+ * sector - such as a beam in some direction with some gain.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_MODULE_INDEX: Index
+ *	of RF module for this configuration.
+ * @QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_ETYPE0: Bit 0 of edge
+ *	amplifier gain index. Unsigned 32 bit number containing
+ *	bits for all 32 antennas.
+ * @QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_ETYPE1: Bit 1 of edge
+ *	amplifier gain index. Unsigned 32 bit number containing
+ *	bits for all 32 antennas.
+ * @QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_ETYPE2: Bit 2 of edge
+ *	amplifier gain index. Unsigned 32 bit number containing
+ *	bits for all 32 antennas.
+ * @QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_PSH_HI: Phase values
+ *	for first 16 antennas, 2 bits per antenna.
+ * @QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_PSH_LO: Phase values
+ *	for last 16 antennas, 2 bits per antenna.
+ * @QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_DTYPE_X16: Contains
+ *	DTYPE values (3 bits) for each distribution amplifier, followed
+ *	by X16 switch bits for each distribution amplifier. There are
+ *	total of 8 distribution amplifiers.
+ */
+enum qca_wlan_vendor_attr_dmg_rf_sector_cfg {
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_MODULE_INDEX = 1,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_ETYPE0 = 2,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_ETYPE1 = 3,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_ETYPE2 = 4,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_PSH_HI = 5,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_PSH_LO = 6,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_DTYPE_X16 = 7,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_MAX =
+	QCA_WLAN_VENDOR_ATTR_DMG_RF_SECTOR_CFG_AFTER_LAST - 1
+};
+
+enum qca_wlan_vendor_attr_ll_stats_set {
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_INVALID = 0,
+	/* Unsigned 32-bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_MPDU_SIZE_THRESHOLD = 1,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_AGGRESSIVE_STATS_GATHERING = 2,
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_MAX =
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_AFTER_LAST - 1,
+};
+
+enum qca_wlan_vendor_attr_ll_stats_clr {
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_INVALID = 0,
+	/* Unsigned 32bit bitmap for clearing statistics
+	 * All radio statistics                     0x00000001
+	 * cca_busy_time (within radio statistics)  0x00000002
+	 * All channel stats (within radio statistics) 0x00000004
+	 * All scan statistics (within radio statistics) 0x00000008
+	 * All interface statistics                     0x00000010
+	 * All tx rate statistics (within interface statistics) 0x00000020
+	 * All ac statistics (with in interface statistics) 0x00000040
+	 * All contention (min, max, avg) statistics (within ac statisctics)
+	 * 0x00000080.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_REQ_MASK = 1,
+	/* Unsigned 8 bit value: Request to stop statistics collection */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_STOP_REQ = 2,
+
+	/* Unsigned 32 bit bitmap: Response from the driver
+	 * for the cleared statistics
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_RSP_MASK = 3,
+	/* Unsigned 8 bit value: Response from driver/firmware
+	 * for the stop request
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_STOP_RSP = 4,
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_MAX =
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_AFTER_LAST - 1,
+};
+
+enum qca_wlan_vendor_attr_ll_stats_get {
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_INVALID = 0,
+	/* Unsigned 32 bit value provided by the caller issuing the GET stats
+	 * command. When reporting the stats results, the driver uses the same
+	 * value to indicate which GET request the results correspond to.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_ID = 1,
+	/* Unsigned 32 bit value - bit mask to identify what statistics are
+	 * requested for retrieval.
+	 * Radio Statistics 0x00000001
+	 * Interface Statistics 0x00000020
+	 * All Peer Statistics 0x00000040
+	 * Peer Statistics     0x00000080
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_MASK = 2,
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_MAX =
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_AFTER_LAST - 1,
+};
+
+enum qca_wlan_vendor_attr_ll_stats_results {
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_INVALID = 0,
+	/* Unsigned 32bit value. Used by the driver; must match the request id
+	 * provided with the QCA_NL80211_VENDOR_SUBCMD_LL_STATS_GET command.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RESULTS_REQ_ID = 1,
+
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_BEACON_RX = 2,
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_MGMT_RX = 3,
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_MGMT_ACTION_RX = 4,
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_MGMT_ACTION_TX = 5,
+	/* Signed 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RSSI_MGMT = 6,
+	/* Signed 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RSSI_DATA = 7,
+	/* Signed 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RSSI_ACK = 8,
+
+	/* Attributes of type QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_* are
+	 * nested within the interface stats.
+	 */
+
+	/* Interface mode, e.g., STA, SOFTAP, IBSS, etc.
+	 * Type = enum wifi_interface_mode.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_MODE = 9,
+	/* Interface MAC address. An array of 6 Unsigned int8 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_MAC_ADDR = 10,
+	/* Type = enum wifi_connection_state, e.g., DISCONNECTED,
+	 * AUTHENTICATING, etc. valid for STA, CLI only.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_STATE = 11,
+	/* Type = enum wifi_roam_state. Roaming state, e.g., IDLE or ACTIVE
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_ROAMING = 12,
+	/* Unsigned 32 bit value. WIFI_CAPABILITY_XXX */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_CAPABILITIES = 13,
+	/* NULL terminated SSID. An array of 33 Unsigned 8bit values */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_SSID = 14,
+	/* BSSID. An array of 6 unsigned 8 bit values */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_BSSID = 15,
+	/* Country string advertised by AP. An array of 3 unsigned 8 bit
+	 * values.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_AP_COUNTRY_STR = 16,
+	/* Country string for this association. An array of 3 unsigned 8 bit
+	 * values.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_COUNTRY_STR = 17,
+
+	/* Attributes of type QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_* could
+	 * be nested within the interface stats.
+	 */
+
+	/* Type = enum wifi_traffic_ac, e.g., V0, VI, BE and BK */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_AC = 18,
+	/* Unsigned int 32 value corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_TX_MPDU = 19,
+	/* Unsigned int 32 value corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_RX_MPDU = 20,
+	/* Unsigned int 32 value corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_TX_MCAST = 21,
+	/* Unsigned int 32 value corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_RX_MCAST = 22,
+	/* Unsigned int 32 value corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_RX_AMPDU = 23,
+	/* Unsigned int 32 value corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_TX_AMPDU = 24,
+	/* Unsigned int 32 value corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_MPDU_LOST = 25,
+	/* Unsigned int 32 value corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_RETRIES = 26,
+	/* Unsigned int 32 value corresponding to respective AC  */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_RETRIES_SHORT = 27,
+	/* Unsigned int 32 values corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_RETRIES_LONG = 28,
+	/* Unsigned int 32 values corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_CONTENTION_TIME_MIN = 29,
+	/* Unsigned int 32 values corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_CONTENTION_TIME_MAX = 30,
+	/* Unsigned int 32 values corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_CONTENTION_TIME_AVG = 31,
+	/* Unsigned int 32 values corresponding to respective AC */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_CONTENTION_NUM_SAMPLES = 32,
+	/* Unsigned 32 bit value. Number of peers */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_NUM_PEERS = 33,
+
+	/* Attributes of type QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO_* are
+	 * nested within the interface stats.
+	 */
+
+	/* Type = enum wifi_peer_type. Peer type, e.g., STA, AP, P2P GO etc. */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO_TYPE = 34,
+	/* MAC addr corresponding to respective peer. An array of 6 unsigned
+	 * 8 bit values.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO_MAC_ADDRESS = 35,
+	/* Unsigned int 32 bit value representing capabilities corresponding
+	 * to respective peer.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO_CAPABILITIES = 36,
+	/* Unsigned 32 bit value. Number of rates */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO_NUM_RATES = 37,
+
+	/* Attributes of type QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_*
+	 * are nested within the rate stat.
+	 */
+
+	/* Wi-Fi Rate - separate attributes defined for individual fields */
+
+	/* Unsigned int 8 bit value; 0: OFDM, 1:CCK, 2:HT 3:VHT 4..7 reserved */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_PREAMBLE = 38,
+	/* Unsigned int 8 bit value; 0:1x1, 1:2x2, 3:3x3, 4:4x4 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_NSS = 39,
+	/* Unsigned int 8 bit value; 0:20 MHz, 1:40 MHz, 2:80 MHz, 3:160 MHz */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_BW = 40,
+	/* Unsigned int 8 bit value; OFDM/CCK rate code would be as per IEEE Std
+	 * in the units of 0.5 Mbps HT/VHT it would be MCS index */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_MCS_INDEX = 41,
+
+	/* Unsigned 32 bit value. Bit rate in units of 100 kbps */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_BIT_RATE = 42,
+
+
+	/* Attributes of type QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_STAT_* could be
+	 * nested within the peer info stats.
+	 */
+
+	/* Unsigned int 32 bit value. Number of successfully transmitted data
+	 * packets, i.e., with ACK received corresponding to the respective
+	 * rate.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_TX_MPDU = 43,
+	/* Unsigned int 32 bit value. Number of received data packets
+	 * corresponding to the respective rate.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_RX_MPDU = 44,
+	/* Unsigned int 32 bit value. Number of data packet losses, i.e., no ACK
+	 * received corresponding to the respective rate.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_MPDU_LOST = 45,
+	/* Unsigned int 32 bit value. Total number of data packet retries for
+	 * the respective rate.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_RETRIES = 46,
+	/* Unsigned int 32 bit value. Total number of short data packet retries
+	 * for the respective rate.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_RETRIES_SHORT = 47,
+	/* Unsigned int 32 bit value. Total number of long data packet retries
+	 * for the respective rate.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_RETRIES_LONG = 48,
+
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_ID = 49,
+	/* Unsigned 32 bit value. Total number of msecs the radio is awake
+	 * accruing over time.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_ON_TIME = 50,
+	/* Unsigned 32 bit value. Total number of msecs the radio is
+	 * transmitting accruing over time.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_TX_TIME = 51,
+	/* Unsigned 32 bit value. Total number of msecs the radio is in active
+	 * receive accruing over time.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_RX_TIME = 52,
+	/* Unsigned 32 bit value. Total number of msecs the radio is awake due
+	 * to all scan accruing over time.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_ON_TIME_SCAN = 53,
+	/* Unsigned 32 bit value. Total number of msecs the radio is awake due
+	 * to NAN accruing over time.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_ON_TIME_NBD = 54,
+	/* Unsigned 32 bit value. Total number of msecs the radio is awake due
+	 * to GSCAN accruing over time.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_ON_TIME_GSCAN = 55,
+	/* Unsigned 32 bit value. Total number of msecs the radio is awake due
+	 * to roam scan accruing over time.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_ON_TIME_ROAM_SCAN = 56,
+	/* Unsigned 32 bit value. Total number of msecs the radio is awake due
+	 * to PNO scan accruing over time.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_ON_TIME_PNO_SCAN = 57,
+	/* Unsigned 32 bit value. Total number of msecs the radio is awake due
+	 * to Hotspot 2.0 scans and GAS exchange accruing over time.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_ON_TIME_HS20 = 58,
+	/* Unsigned 32 bit value. Number of channels. */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_NUM_CHANNELS = 59,
+
+	/* Attributes of type QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_INFO_* could
+	 * be nested within the channel stats.
+	 */
+
+	/* Type = enum wifi_channel_width. Channel width, e.g., 20, 40, 80 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_INFO_WIDTH = 60,
+	/* Unsigned 32 bit value. Primary 20 MHz channel. */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_INFO_CENTER_FREQ = 61,
+	/* Unsigned 32 bit value. Center frequency (MHz) first segment. */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_INFO_CENTER_FREQ0 = 62,
+	/* Unsigned 32 bit value. Center frequency (MHz) second segment. */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_INFO_CENTER_FREQ1 = 63,
+
+	/* Attributes of type QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_* could be
+	 * nested within the radio stats.
+	 */
+
+	/* Unsigned int 32 bit value representing total number of msecs the
+	 * radio is awake on that channel accruing over time, corresponding to
+	 * the respective channel.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_ON_TIME = 64,
+	/* Unsigned int 32 bit value representing total number of msecs the CCA
+	 * register is busy accruing over time corresponding to the respective
+	 * channel.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_CCA_BUSY_TIME = 65,
+
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_NUM_RADIOS = 66,
+
+	/* Signifies the nested list of channel attributes
+	 * QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_INFO_*
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CH_INFO = 67,
+
+	/* Signifies the nested list of peer info attributes
+	 * QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO_*
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO = 68,
+
+	/* Signifies the nested list of rate info attributes
+	 * QCA_WLAN_VENDOR_ATTR_LL_STATS_RATE_*
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO_RATE_INFO = 69,
+
+	/* Signifies the nested list of wmm info attributes
+	 * QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_AC_*
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_WMM_INFO = 70,
+
+	/* Unsigned 8 bit value. Used by the driver; if set to 1, it indicates
+	 * that more stats, e.g., peers or radio, are to follow in the next
+	 * QCA_NL80211_VENDOR_SUBCMD_LL_STATS_*_RESULTS event.
+	 * Otherwise, it is set to 0.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RESULTS_MORE_DATA = 71,
+
+	/* Unsigned 64 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_AVERAGE_TSF_OFFSET = 72,
+
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_LEAKY_AP_DETECTED = 73,
+
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_LEAKY_AP_AVG_NUM_FRAMES_LEAKED = 74,
+
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_LEAKY_AP_GUARD_TIME = 75,
+
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE = 76,
+
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_NUM_TX_LEVELS = 77,
+
+	/* Number of msecs the radio spent in transmitting for each power level
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_TX_TIME_PER_LEVEL = 78,
+
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RTS_SUCC_CNT = 79,
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RTS_FAIL_CNT = 80,
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_PPDU_SUCC_CNT = 81,
+	/* Unsigned 32 bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_PPDU_FAIL_CNT = 82,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_MAX =
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_AFTER_LAST - 1,
+};
+
+enum qca_wlan_vendor_attr_ll_stats_type
+{
+	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_INVALID = 0,
+	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_RADIO = 1,
+	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_IFACE = 2,
+	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_PEERS = 3,
+
+	/* keep last */
+	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_AFTER_LAST,
+	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_MAX =
+	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_tdls_configuration - Attributes for
+ * TDLS configuration to the host driver.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TRIGGER_MODE: Configure the TDLS trigger
+ *	mode in the host driver. enum qca_wlan_vendor_tdls_trigger_mode
+ *	represents the different TDLS trigger modes.
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TX_STATS_PERIOD: Duration (u32) within
+ *      which QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TX_THRESHOLD number
+ *      of packets shall meet the criteria for implicit TDLS setup.
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TX_THRESHOLD: Number (u32) of Tx/Rx packets
+ *      within a duration QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TX_STATS_PERIOD
+ *      to initiate a TDLS setup.
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_DISCOVERY_PERIOD: Time (u32) to initiate
+ *      a TDLS Discovery to the peer.
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_MAX_DISCOVERY_ATTEMPT: Max number (u32) of
+ *      discovery attempts to know the TDLS capability of the peer. A peer is
+ *      marked as TDLS not capable if there is no response for all the attempts.
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_IDLE_TIMEOUT: Represents a duration (u32)
+ *      within which QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_IDLE_PACKET_THRESHOLD
+ *      number of TX / RX frames meet the criteria for TDLS teardown.
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_IDLE_PACKET_THRESHOLD: Minimum number (u32)
+ *      of Tx/Rx packets within a duration
+ *      QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_IDLE_TIMEOUT to tear down a TDLS link.
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_SETUP_RSSI_THRESHOLD: Threshold
+ *	corresponding to the RSSI of the peer below which a TDLS setup is
+ *	triggered.
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TEARDOWN_RSSI_THRESHOLD: Threshold
+ *	corresponding to the RSSI of the peer above which a TDLS teardown is
+ *	triggered.
+ */
+enum qca_wlan_vendor_attr_tdls_configuration {
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TRIGGER_MODE = 1,
+
+	/* Attributes configuring the TDLS Implicit Trigger */
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TX_STATS_PERIOD = 2,
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TX_THRESHOLD = 3,
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_DISCOVERY_PERIOD = 4,
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_MAX_DISCOVERY_ATTEMPT = 5,
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_IDLE_TIMEOUT = 6,
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_IDLE_PACKET_THRESHOLD = 7,
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_SETUP_RSSI_THRESHOLD = 8,
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TEARDOWN_RSSI_THRESHOLD = 9,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_MAX =
+	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_AFTER_LAST - 1
+};
+
+/**
+ * enum qca_wlan_vendor_tdls_trigger_mode: Represents the TDLS trigger mode in
+ *	the driver
+ *
+ * The following are the different values for
+ *	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TRIGGER_MODE.
+ *
+ * @QCA_WLAN_VENDOR_TDLS_TRIGGER_MODE_EXPLICIT: The trigger to initiate/teardown
+ *	the TDLS connection to a respective peer comes from the user space.
+ *	wpa_supplicant provides the commands TDLS_SETUP, TDLS_TEARDOWN,
+ *	TDLS_DISCOVER to do this.
+ * @QCA_WLAN_VENDOR_TDLS_TRIGGER_MODE_IMPLICIT: Host driver triggers this TDLS
+ *	setup/teardown to the eligible peer once the configured criteria
+ *	(such as TX/RX threshold, RSSI) is met. The attributes
+ *	in QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_IMPLICIT_PARAMS correspond to
+ *	the different configuration criteria for the TDLS trigger from the
+ *	host driver.
+ * @QCA_WLAN_VENDOR_TDLS_TRIGGER_MODE_EXTERNAL: Enables the driver to trigger
+ *	the TDLS setup / teardown through the implicit mode only to the
+ *	configured MAC addresses (wpa_supplicant, with tdls_external_control=1,
+ *	configures the MAC address through TDLS_SETUP / TDLS_TEARDOWN commands).
+ *	External mode works on top of the implicit mode. Thus the host driver
+ *	is expected to configure in TDLS Implicit mode too to operate in
+ *	External mode.
+ *	Configuring External mode alone without	Implicit mode is invalid.
+ *
+ * All the above implementations work as expected only when the host driver
+ * advertises the capability WPA_DRIVER_FLAGS_TDLS_EXTERNAL_SETUP - representing
+ * that the TDLS message exchange is not internal to the host driver, but
+ * depends on wpa_supplicant to do the message exchange.
+ */
+enum qca_wlan_vendor_tdls_trigger_mode {
+	QCA_WLAN_VENDOR_TDLS_TRIGGER_MODE_EXPLICIT = 1 << 0,
+	QCA_WLAN_VENDOR_TDLS_TRIGGER_MODE_IMPLICIT = 1 << 1,
+	QCA_WLAN_VENDOR_TDLS_TRIGGER_MODE_EXTERNAL = 1 << 2,
 };
 
 #endif /* QCA_VENDOR_H */

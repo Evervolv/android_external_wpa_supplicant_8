@@ -109,6 +109,7 @@ struct hostapd_neighbor_entry {
 	struct wpabuf *civic;
 	/* LCI update time */
 	struct os_time lci_date;
+	int stationary;
 };
 
 /**
@@ -311,6 +312,7 @@ struct hostapd_sta_info {
 	struct dl_list list;
 	u8 addr[ETH_ALEN];
 	struct os_reltime last_seen;
+	int ssi_signal;
 #ifdef CONFIG_TAXONOMY
 	struct wpabuf *probe_ie_taxonomy;
 #endif /* CONFIG_TAXONOMY */

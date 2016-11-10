@@ -1256,6 +1256,8 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 	if (max_sched_scan_ssids < 1 || wpa_s->conf->disable_scan_offload)
 		return -1;
 
+	wpa_s->sched_scan_stop_req = 0;
+
 	if (wpa_s->sched_scanning) {
 		wpa_dbg(wpa_s, MSG_DEBUG, "Already sched scanning");
 		return 0;
@@ -1554,6 +1556,9 @@ void wpa_supplicant_cancel_sched_scan(struct wpa_supplicant *wpa_s)
 	if (!wpa_s->sched_scanning)
 		return;
 
+	if (wpa_s->sched_scanning)
+		wpa_s->sched_scan_stop_req = 1;
+
 	wpa_dbg(wpa_s, MSG_DEBUG, "Cancelling sched scan");
 	eloop_cancel_timeout(wpa_supplicant_sched_scan_timeout, wpa_s, NULL);
 	wpa_supplicant_stop_sched_scan(wpa_s);
@@ -1613,7 +1618,13 @@ static int wpa_scan_get_max_rate(const struct wpa_scan_res *res)
  */
 const u8 * wpa_scan_get_ie(const struct wpa_scan_res *res, u8 ie)
 {
-	return get_ie((const u8 *) (res + 1), res->ie_len, ie);
+	size_t ie_len = res->ie_len;
+
+	/* Use the Beacon frame IEs if res->ie_len is not available */
+	if (!ie_len)
+		ie_len = res->beacon_ie_len;
+
+	return get_ie((const u8 *) (res + 1), ie_len, ie);
 }
 
 
@@ -2172,8 +2183,10 @@ wpa_supplicant_get_scan_results(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_WPS */
 
-	qsort(scan_res->res, scan_res->num, sizeof(struct wpa_scan_res *),
-	      compar);
+	if (scan_res->res) {
+		qsort(scan_res->res, scan_res->num,
+		      sizeof(struct wpa_scan_res *), compar);
+	}
 	dump_scan_res(scan_res);
 
 	wpa_bss_update_start(wpa_s);
@@ -2415,6 +2428,13 @@ int wpas_start_pno(struct wpa_supplicant *wpa_s)
 		}
 	}
 
+	if (wpa_s->sched_scan_stop_req) {
+		wpa_printf(MSG_DEBUG,
+			   "Schedule PNO after previous sched scan has stopped");
+		wpa_s->pno_sched_pending = 1;
+		return 0;
+	}
+
 	os_memset(&params, 0, sizeof(params));
 
 	num_ssid = num_match_ssid = 0;
@@ -2530,6 +2550,7 @@ int wpas_stop_pno(struct wpa_supplicant *wpa_s)
 		return 0;
 
 	ret = wpa_supplicant_stop_sched_scan(wpa_s);
+	wpa_s->sched_scan_stop_req = 1;
 
 	wpa_s->pno = 0;
 	wpa_s->pno_sched_pending = 0;

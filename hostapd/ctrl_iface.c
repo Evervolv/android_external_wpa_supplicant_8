@@ -1117,6 +1117,20 @@ static int hostapd_ctrl_iface_get_key_mgmt(struct hostapd_data *hapd,
 		pos += ret;
 	}
 #endif /* CONFIG_SAE */
+#ifdef CONFIG_FILS
+	if (hapd->conf->wpa_key_mgmt & WPA_KEY_MGMT_FT_FILS_SHA256) {
+		ret = os_snprintf(pos, end - pos, "FT-FILS-SHA256 ");
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+	if (hapd->conf->wpa_key_mgmt & WPA_KEY_MGMT_FT_FILS_SHA384) {
+		ret = os_snprintf(pos, end - pos, "FT-FILS-SHA384 ");
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+#endif /* CONFIG_FILS */
 #endif /* CONFIG_IEEE80211R */
 #ifdef CONFIG_IEEE80211W
 	if (hapd->conf->wpa_key_mgmt & WPA_KEY_MGMT_PSK_SHA256) {
@@ -1154,6 +1168,20 @@ static int hostapd_ctrl_iface_get_key_mgmt(struct hostapd_data *hapd,
 			return pos - buf;
 		pos += ret;
 	}
+#ifdef CONFIG_FILS
+	if (hapd->conf->wpa_key_mgmt & WPA_KEY_MGMT_FILS_SHA256) {
+		ret = os_snprintf(pos, end - pos, "FILS-SHA256 ");
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+	if (hapd->conf->wpa_key_mgmt & WPA_KEY_MGMT_FILS_SHA384) {
+		ret = os_snprintf(pos, end - pos, "FILS-SHA384 ");
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+#endif /* CONFIG_FILS */
 
 	if (pos > buf && *(pos - 1) == ' ') {
 		*(pos - 1) = '\0';
@@ -2055,8 +2083,9 @@ static int hostapd_ctrl_iface_track_sta_list(struct hostapd_data *hapd,
 		int ret;
 
 		os_reltime_sub(&now, &info->last_seen, &age);
-		ret = os_snprintf(pos, end - pos, MACSTR " %u\n",
-				  MAC2STR(info->addr), (unsigned int) age.sec);
+		ret = os_snprintf(pos, end - pos, MACSTR " %u %d\n",
+				  MAC2STR(info->addr), (unsigned int) age.sec,
+				  info->ssi_signal);
 		if (os_snprintf_error(end - pos, ret))
 			break;
 		pos += ret;
@@ -2145,6 +2174,7 @@ static int hostapd_ctrl_iface_set_neighbor(struct hostapd_data *hapd, char *buf)
 	struct wpa_ssid_value ssid;
 	u8 bssid[ETH_ALEN];
 	struct wpabuf *nr, *lci = NULL, *civic = NULL;
+	int stationary = 0;
 	char *tmp;
 	int ret;
 
@@ -2223,8 +2253,15 @@ static int hostapd_ctrl_iface_set_neighbor(struct hostapd_data *hapd, char *buf)
 		}
 	}
 
+	if (!buf)
+		goto set;
+
+	if (os_strstr(buf, "stat"))
+		stationary = 1;
+
 set:
-	ret = hostapd_neighbor_set(hapd, bssid, &ssid, nr, lci, civic);
+	ret = hostapd_neighbor_set(hapd, bssid, &ssid, nr, lci, civic,
+				   stationary);
 
 	wpabuf_free(nr);
 	wpabuf_free(lci);
@@ -3478,8 +3515,6 @@ int hostapd_global_ctrl_iface_init(struct hapd_interfaces *interface)
 		}
 	}
 
-	dl_list_init(&interface->global_ctrl_dst);
-	interface->global_ctrl_sock = -1;
 	os_get_random(gcookie, COOKIE_LEN);
 
 #ifdef CONFIG_CTRL_IFACE_UDP_REMOTE
