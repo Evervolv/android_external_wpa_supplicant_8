@@ -42,27 +42,45 @@ class P2pIface
 public:
 	P2pIface(struct wpa_global* wpa_global, const char ifname[]);
 	~P2pIface() override = default;
+	// Refer to |StaIface::invalidate()|.
+	void invalidate();
+	bool isValid();
 
 	// Hidl methods exposed.
 	Return<void> getName(getName_cb _hidl_cb) override;
 	Return<void> getType(getType_cb _hidl_cb) override;
 	Return<void> addNetwork(addNetwork_cb _hidl_cb) override;
 	Return<void> removeNetwork(
-	    uint32_t id, removeNetwork_cb _hidl_cb) override;
-	Return<void> getNetwork(uint32_t id, getNetwork_cb _hidl_cb) override;
+	    SupplicantNetworkId id, removeNetwork_cb _hidl_cb) override;
+	Return<void> getNetwork(
+	    SupplicantNetworkId id, getNetwork_cb _hidl_cb) override;
 	Return<void> listNetworks(listNetworks_cb _hidl_cb) override;
 	Return<void> registerCallback(
 	    const sp<ISupplicantP2pIfaceCallback>& callback,
 	    registerCallback_cb _hidl_cb) override;
 
 private:
-	struct wpa_supplicant* retrieveP2pIfacePtr();
+	// Corresponding worker functions for the HIDL methods.
+	std::pair<SupplicantStatus, std::string> getNameInternal();
+	std::pair<SupplicantStatus, IfaceType> getTypeInternal();
+	std::pair<SupplicantStatus, sp<ISupplicantP2pNetwork>>
+	addNetworkInternal();
+	SupplicantStatus removeNetworkInternal(SupplicantNetworkId id);
+	std::pair<SupplicantStatus, sp<ISupplicantP2pNetwork>>
+	getNetworkInternal(SupplicantNetworkId id);
+	std::pair<SupplicantStatus, std::vector<SupplicantNetworkId>>
+	listNetworksInternal();
+	SupplicantStatus registerCallbackInternal(
+	    const sp<ISupplicantP2pIfaceCallback>& callback);
+
+	struct wpa_supplicant* retrieveIfacePtr();
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
 	// the lifetime of the process.
 	const struct wpa_global* wpa_global_;
 	// Name of the iface this hidl object controls
 	const std::string ifname_;
+	bool is_valid_;
 
 	DISALLOW_COPY_AND_ASSIGN(P2pIface);
 };
