@@ -91,9 +91,11 @@ int removeHidlObjectFromMap(
     std::map<const std::string, android::sp<ObjectType>> &object_map)
 {
 	// Return failure if we dont have an object for that |key|.
-	if (object_map.find(key) == object_map.end())
+	const auto &object_iter = object_map.find(key);
+	if (object_iter == object_map.end())
 		return 1;
-	object_map.erase(key);
+	object_iter->second->invalidate();
+	object_map.erase(object_iter);
 	return 0;
 }
 
