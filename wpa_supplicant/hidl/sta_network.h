@@ -10,6 +10,9 @@
 #ifndef WPA_SUPPLICANT_HIDL_STA_NETWORK_H
 #define WPA_SUPPLICANT_HIDL_STA_NETWORK_H
 
+#include <array>
+#include <vector>
+
 #include <android-base/macros.h>
 
 #include <android/hardware/wifi/supplicant/1.0/ISupplicantStaNetwork.h>
@@ -44,6 +47,9 @@ public:
 	StaNetwork(
 	    struct wpa_global* wpa_global, const char ifname[], int network_id);
 	~StaNetwork() override = default;
+	// Refer to |StaIface::invalidate()|.
+	void invalidate();
+	bool isValid();
 
 	// Hidl methods exposed.
 	Return<void> getId(getId_cb _hidl_cb) override;
@@ -55,8 +61,7 @@ public:
 	Return<void> setSsid(
 	    const hidl_vec<uint8_t>& ssid, setSsid_cb _hidl_cb) override;
 	Return<void> setBssid(
-	    const hidl_array<uint8_t, 6 /* 6 */>& bssid,
-	    setBssid_cb _hidl_cb) override;
+	    const hidl_array<uint8_t, 6>& bssid, setBssid_cb _hidl_cb) override;
 	Return<void> setScanSsid(bool enable, setScanSsid_cb _hidl_cb) override;
 	Return<void> setKeyMgmt(
 	    uint32_t key_mgmt_mask, setKeyMgmt_cb _hidl_cb) override;
@@ -142,9 +147,75 @@ public:
 	    sendNetworkEapIdentityResponse_cb _hidl_cb) override;
 
 private:
+	// Corresponding worker functions for the HIDL methods.
+	std::pair<SupplicantStatus, uint32_t> getIdInternal();
+	std::pair<SupplicantStatus, std::string> getInterfaceNameInternal();
+	std::pair<SupplicantStatus, IfaceType> getTypeInternal();
+	SupplicantStatus registerCallbackInternal(
+	    const sp<ISupplicantStaNetworkCallback>& callback);
+	SupplicantStatus setSsidInternal(const std::vector<uint8_t>& ssid);
+	SupplicantStatus setBssidInternal(const std::array<uint8_t, 6>& bssid);
+	SupplicantStatus setScanSsidInternal(bool enable);
+	SupplicantStatus setKeyMgmtInternal(uint32_t key_mgmt_mask);
+	SupplicantStatus setProtoInternal(uint32_t proto_mask);
+	SupplicantStatus setAuthAlgInternal(uint32_t auth_alg_mask);
+	SupplicantStatus setGroupCipherInternal(uint32_t group_cipher_mask);
+	SupplicantStatus setPairwiseCipherInternal(
+	    uint32_t pairwise_cipher_mask);
+	SupplicantStatus setPskPassphraseInternal(const std::string& psk);
+	SupplicantStatus setWepKeyInternal(
+	    uint32_t key_idx, const std::vector<uint8_t>& wep_key);
+	SupplicantStatus setWepTxKeyIdxInternal(uint32_t key_idx);
+	SupplicantStatus setRequirePmfInternal(bool enable);
+	SupplicantStatus setEapMethodInternal(
+	    ISupplicantStaNetwork::EapMethod method);
+	SupplicantStatus setEapPhase2MethodInternal(
+	    ISupplicantStaNetwork::EapPhase2Method method);
+	SupplicantStatus setEapIdentityInternal(
+	    const std::vector<uint8_t>& identity);
+	SupplicantStatus setEapAnonymousIdentityInternal(
+	    const std::vector<uint8_t>& identity);
+	SupplicantStatus setEapPasswordInternal(
+	    const std::vector<uint8_t>& password);
+	SupplicantStatus setEapCACertInternal(const std::string& path);
+	SupplicantStatus setEapCAPathInternal(const std::string& path);
+	SupplicantStatus setEapClientCertInternal(const std::string& path);
+	SupplicantStatus setEapPrivateKeyInternal(const std::string& path);
+	SupplicantStatus setEapSubjectMatchInternal(const std::string& match);
+	SupplicantStatus setEapAltSubjectMatchInternal(
+	    const std::string& match);
+	SupplicantStatus setEapEngineInternal(bool enable);
+	SupplicantStatus setEapEngineIDInternal(const std::string& id);
+	SupplicantStatus setEapDomainSuffixMatchInternal(
+	    const std::string& match);
+	std::pair<SupplicantStatus, std::vector<uint8_t>> getSsidInternal();
+	std::pair<SupplicantStatus, std::array<uint8_t, 6>> getBssidInternal();
+	std::pair<SupplicantStatus, bool> getScanSsidInternal();
+	std::pair<SupplicantStatus, uint32_t> getKeyMgmtInternal();
+	std::pair<SupplicantStatus, uint32_t> getProtoInternal();
+	std::pair<SupplicantStatus, uint32_t> getAuthAlgInternal();
+	std::pair<SupplicantStatus, uint32_t> getGroupCipherInternal();
+	std::pair<SupplicantStatus, uint32_t> getPairwiseCipherInternal();
+	std::pair<SupplicantStatus, std::string> getPskPassphraseInternal();
+	std::pair<SupplicantStatus, std::vector<uint8_t>> getWepKeyInternal(
+	    uint32_t key_idx);
+	std::pair<SupplicantStatus, uint32_t> getWepTxKeyIdxInternal();
+	std::pair<SupplicantStatus, bool> getRequirePmfInternal();
+	SupplicantStatus enableInternal(bool no_connect);
+	SupplicantStatus disableInternal();
+	SupplicantStatus selectInternal();
+	SupplicantStatus sendNetworkEapSimGsmAuthResponseInternal(
+	    const ISupplicantStaNetwork::NetworkResponseEapSimGsmAuthParams&
+		params);
+	SupplicantStatus sendNetworkEapSimUmtsAuthResponseInternal(
+	    const ISupplicantStaNetwork::NetworkResponseEapSimUmtsAuthParams&
+		params);
+	SupplicantStatus sendNetworkEapIdentityResponseInternal(
+	    const std::vector<uint8_t>& identity);
+
 	struct wpa_ssid* retrieveNetworkPtr();
 	struct wpa_supplicant* retrieveIfacePtr();
-	int isPskPassphraseValid(const android::hardware::hidl_string& psk);
+	int isPskPassphraseValid(const std::string& psk);
 	void resetInternalStateAfterParamsUpdate();
 	int setStringFieldAndResetState(
 	    const char* value, uint8_t** to_update_field,
@@ -171,6 +242,7 @@ private:
 	const std::string ifname_;
 	// Id of the network this hidl object controls.
 	const int network_id_;
+	bool is_valid_;
 
 	DISALLOW_COPY_AND_ASSIGN(StaNetwork);
 };
