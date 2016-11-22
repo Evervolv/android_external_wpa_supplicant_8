@@ -10,6 +10,9 @@
 #ifndef WPA_SUPPLICANT_HIDL_STA_IFACE_H
 #define WPA_SUPPLICANT_HIDL_STA_IFACE_H
 
+#include <array>
+#include <vector>
+
 #include <android-base/macros.h>
 
 #include <android/hardware/wifi/supplicant/1.0/ISupplicantStaIface.h>
@@ -43,14 +46,29 @@ class StaIface
 public:
 	StaIface(struct wpa_global* wpa_global, const char ifname[]);
 	~StaIface() override = default;
+	// HIDL does not provide a built-in mechanism to let the server
+	// invalidate a HIDL interface object after creation. If any client
+	// process holds onto a reference to the object in their context,
+	// any method calls on that reference will continue to be directed to
+	// the server.
+	// However Supplicant HAL needs to control the lifetime of these
+	// objects. So, add a public |invalidate| method to all |Iface| and
+	// |Network| objects.
+	// This will be used to mark an object invalid when the corresponding
+	// iface or network is removed.
+	// All HIDL method implementations should check if the object is still
+	// marked valid before processing them.
+	void invalidate();
+	bool isValid();
 
 	// Hidl methods exposed.
 	Return<void> getName(getName_cb _hidl_cb) override;
 	Return<void> getType(getType_cb _hidl_cb) override;
 	Return<void> addNetwork(addNetwork_cb _hidl_cb) override;
 	Return<void> removeNetwork(
-	    uint32_t id, removeNetwork_cb _hidl_cb) override;
-	Return<void> getNetwork(uint32_t id, getNetwork_cb _hidl_cb) override;
+	    SupplicantNetworkId id, removeNetwork_cb _hidl_cb) override;
+	Return<void> getNetwork(
+	    SupplicantNetworkId id, getNetwork_cb _hidl_cb) override;
 	Return<void> listNetworks(listNetworks_cb _hidl_cb) override;
 	Return<void> registerCallback(
 	    const sp<ISupplicantStaIfaceCallback>& callback,
@@ -61,16 +79,39 @@ public:
 	Return<void> setPowerSave(
 	    bool enable, setPowerSave_cb _hidl_cb) override;
 	Return<void> initiateTdlsDiscover(
-	    const hidl_array<uint8_t, 6 /* 6 */>& mac_address,
+	    const hidl_array<uint8_t, 6>& mac_address,
 	    initiateTdlsDiscover_cb _hidl_cb) override;
 	Return<void> initiateTdlsSetup(
-	    const hidl_array<uint8_t, 6 /* 6 */>& mac_address,
+	    const hidl_array<uint8_t, 6>& mac_address,
 	    initiateTdlsSetup_cb _hidl_cb) override;
 	Return<void> initiateTdlsTeardown(
-	    const hidl_array<uint8_t, 6 /* 6 */>& mac_address,
+	    const hidl_array<uint8_t, 6>& mac_address,
 	    initiateTdlsTeardown_cb _hidl_cb) override;
 
 private:
+	// Corresponding worker functions for the HIDL methods.
+	std::pair<SupplicantStatus, std::string> getNameInternal();
+	std::pair<SupplicantStatus, IfaceType> getTypeInternal();
+	std::pair<SupplicantStatus, sp<ISupplicantNetwork>>
+	addNetworkInternal();
+	SupplicantStatus removeNetworkInternal(SupplicantNetworkId id);
+	std::pair<SupplicantStatus, sp<ISupplicantNetwork>> getNetworkInternal(
+	    SupplicantNetworkId id);
+	std::pair<SupplicantStatus, std::vector<SupplicantNetworkId>>
+	listNetworksInternal();
+	SupplicantStatus registerCallbackInternal(
+	    const sp<ISupplicantStaIfaceCallback>& callback);
+	SupplicantStatus reassociateInternal();
+	SupplicantStatus reconnectInternal();
+	SupplicantStatus disconnectInternal();
+	SupplicantStatus setPowerSaveInternal(bool enable);
+	SupplicantStatus initiateTdlsDiscoverInternal(
+	    const std::array<uint8_t, 6>& mac_address);
+	SupplicantStatus initiateTdlsSetupInternal(
+	    const std::array<uint8_t, 6>& mac_address);
+	SupplicantStatus initiateTdlsTeardownInternal(
+	    const std::array<uint8_t, 6>& mac_address);
+
 	struct wpa_supplicant* retrieveIfacePtr();
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
@@ -78,6 +119,7 @@ private:
 	const struct wpa_global* wpa_global_;
 	// Name of the iface this hidl object controls
 	const std::string ifname_;
+	bool is_valid_;
 
 	DISALLOW_COPY_AND_ASSIGN(StaIface);
 };
