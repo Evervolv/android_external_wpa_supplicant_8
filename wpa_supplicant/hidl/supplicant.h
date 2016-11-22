@@ -54,6 +54,8 @@ public:
 	Return<ISupplicant::DebugLevel> getDebugLevel() override;
 	Return<bool> isDebugShowTimestampEnabled() override;
 	Return<bool> isDebugShowKeysEnabled() override;
+	Return<void> setConcurrencyPriority(
+	    IfaceType type, setConcurrencyPriority_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -65,6 +67,7 @@ private:
 	    const sp<ISupplicantCallback>& callback);
 	SupplicantStatus setDebugParamsInternal(
 	    ISupplicant::DebugLevel level, bool show_timestamp, bool show_keys);
+	SupplicantStatus setConcurrencyPriorityInternal(IfaceType type);
 
 	// Raw pointer to the global structure maintained by the core.
 	struct wpa_global* wpa_global_;
