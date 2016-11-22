@@ -9,7 +9,7 @@
 
 #include "hidl_manager.h"
 #include "hidl_return_macros.h"
-#include "iface.h"
+#include "sta_iface.h"
 
 namespace android {
 namespace hardware {
@@ -18,12 +18,12 @@ namespace supplicant {
 namespace V1_0 {
 namespace implementation {
 
-Iface::Iface(struct wpa_global *wpa_global, const char ifname[])
+StaIface::StaIface(struct wpa_global *wpa_global, const char ifname[])
     : wpa_global_(wpa_global), ifname_(ifname)
 {
 }
 
-Return<void> Iface::getName(getName_cb _hidl_cb)
+Return<void> StaIface::getName(getName_cb _hidl_cb)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
@@ -34,9 +34,21 @@ Return<void> Iface::getName(getName_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, ifname_);
 }
 
-Return<void> Iface::addNetwork(addNetwork_cb _hidl_cb)
+Return<void> StaIface::getType(getType_cb _hidl_cb)
 {
-	android::sp<ISupplicantNetwork> network;
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (!wpa_s) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_IFACE_INVALID,
+		    IfaceType::STA);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, IfaceType::STA);
+}
+
+Return<void> StaIface::addNetwork(addNetwork_cb _hidl_cb)
+{
+	android::sp<ISupplicantStaNetwork> network;
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
 		HIDL_RETURN(
@@ -50,7 +62,7 @@ Return<void> Iface::addNetwork(addNetwork_cb _hidl_cb)
 
 	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager ||
-	    hidl_manager->getNetworkHidlObjectByIfnameAndNetworkId(
+	    hidl_manager->getStaNetworkHidlObjectByIfnameAndNetworkId(
 		wpa_s->ifname, ssid->id, &network)) {
 		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN, network);
 	}
@@ -58,7 +70,7 @@ Return<void> Iface::addNetwork(addNetwork_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, network);
 }
 
-Return<void> Iface::removeNetwork(uint32_t id, removeNetwork_cb _hidl_cb)
+Return<void> StaIface::removeNetwork(uint32_t id, removeNetwork_cb _hidl_cb)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
@@ -77,9 +89,9 @@ Return<void> Iface::removeNetwork(uint32_t id, removeNetwork_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Iface::getNetwork(uint32_t id, getNetwork_cb _hidl_cb)
+Return<void> StaIface::getNetwork(uint32_t id, getNetwork_cb _hidl_cb)
 {
-	android::sp<ISupplicantNetwork> network;
+	android::sp<ISupplicantStaNetwork> network;
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
 		HIDL_RETURN(
@@ -94,7 +106,7 @@ Return<void> Iface::getNetwork(uint32_t id, getNetwork_cb _hidl_cb)
 
 	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager ||
-	    hidl_manager->getNetworkHidlObjectByIfnameAndNetworkId(
+	    hidl_manager->getStaNetworkHidlObjectByIfnameAndNetworkId(
 		wpa_s->ifname, ssid->id, &network)) {
 		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN, network);
 	}
@@ -102,7 +114,7 @@ Return<void> Iface::getNetwork(uint32_t id, getNetwork_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, network);
 }
 
-Return<void> Iface::listNetworks(listNetworks_cb _hidl_cb)
+Return<void> StaIface::listNetworks(listNetworks_cb _hidl_cb)
 {
 	std::vector<uint32_t> network_ids;
 
@@ -120,8 +132,9 @@ Return<void> Iface::listNetworks(listNetworks_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, network_ids);
 }
 
-Return<void> Iface::registerCallback(
-    const sp<ISupplicantIfaceCallback> &callback, registerCallback_cb _hidl_cb)
+Return<void> StaIface::registerCallback(
+    const sp<ISupplicantStaIfaceCallback> &callback,
+    registerCallback_cb _hidl_cb)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
@@ -130,14 +143,14 @@ Return<void> Iface::registerCallback(
 
 	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager ||
-	    hidl_manager->addIfaceCallbackHidlObject(ifname_, callback)) {
+	    hidl_manager->addStaIfaceCallbackHidlObject(ifname_, callback)) {
 		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Iface::reassociate(reassociate_cb _hidl_cb)
+Return<void> StaIface::reassociate(reassociate_cb _hidl_cb)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
@@ -151,7 +164,7 @@ Return<void> Iface::reassociate(reassociate_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Iface::reconnect(reconnect_cb _hidl_cb)
+Return<void> StaIface::reconnect(reconnect_cb _hidl_cb)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
@@ -171,7 +184,7 @@ Return<void> Iface::reconnect(reconnect_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Iface::disconnect(disconnect_cb _hidl_cb)
+Return<void> StaIface::disconnect(disconnect_cb _hidl_cb)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
@@ -187,7 +200,7 @@ Return<void> Iface::disconnect(disconnect_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Iface::setPowerSave(bool enable, setPowerSave_cb _hidl_cb)
+Return<void> StaIface::setPowerSave(bool enable, setPowerSave_cb _hidl_cb)
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s) {
@@ -201,7 +214,7 @@ Return<void> Iface::setPowerSave(bool enable, setPowerSave_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Iface::initiateTdlsDiscover(
+Return<void> StaIface::initiateTdlsDiscover(
     const hidl_array<uint8_t, 6 /* 6 */> &mac_address,
     initiateTdlsDiscover_cb _hidl_cb)
 {
@@ -228,7 +241,7 @@ Return<void> Iface::initiateTdlsDiscover(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Iface::initiateTdlsSetup(
+Return<void> StaIface::initiateTdlsSetup(
     const hidl_array<uint8_t, 6 /* 6 */> &mac_address,
     initiateTdlsSetup_cb _hidl_cb)
 {
@@ -257,7 +270,7 @@ Return<void> Iface::initiateTdlsSetup(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Iface::initiateTdlsTeardown(
+Return<void> StaIface::initiateTdlsTeardown(
     const hidl_array<uint8_t, 6 /* 6 */> &mac_address,
     initiateTdlsTeardown_cb _hidl_cb)
 {
@@ -293,7 +306,7 @@ Return<void> Iface::initiateTdlsTeardown(
  * If the underlying iface is removed, then all RPC method calls on this object
  * will return failure.
  */
-wpa_supplicant *Iface::retrieveIfacePtr()
+wpa_supplicant *StaIface::retrieveIfacePtr()
 {
 	return wpa_supplicant_get_iface(
 	    (struct wpa_global *)wpa_global_, ifname_.c_str());
