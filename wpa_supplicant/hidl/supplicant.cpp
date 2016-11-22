@@ -24,88 +24,53 @@ const char Supplicant::kConfigFilePath[] =
     "/data/misc/wifi/wpa_supplicant.conf";
 
 Supplicant::Supplicant(struct wpa_global* global) : wpa_global_(global) {}
-Return<void> Supplicant::createInterface(
-    const hidl_string& ifname, createInterface_cb _hidl_cb)
-{
-	android::sp<ISupplicantIface> iface;
-
-	// Check if required |ifname| argument is empty.
-	if (ifname.size() == 0) {
-		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID, iface);
-	}
-	// Try to get the wpa_supplicant record for this iface, return
-	// an error if we already control it.
-	if (wpa_supplicant_get_iface(wpa_global_, ifname.c_str()) != NULL) {
-		HIDL_RETURN(SupplicantStatusCode::FAILURE_IFACE_EXISTS, iface);
-	}
-
-	// Otherwise, have wpa_supplicant attach to it.
-	struct wpa_supplicant* wpa_s = NULL;
-	struct wpa_interface iface_params;
-	os_memset(&iface_params, 0, sizeof(iface));
-	iface_params.ifname = ifname.c_str();
-	iface_params.confname = kConfigFilePath;
-	iface_params.driver = kDriverName;
-	wpa_s = wpa_supplicant_add_iface(wpa_global_, &iface_params, NULL);
-	if (!wpa_s) {
-		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN, iface);
-	}
-	// The supplicant core creates a corresponding hidl object via
-	// HidlManager when |wpa_supplicant_add_iface| is called.
-	HidlManager* hidl_manager = HidlManager::getInstance();
-	if (!hidl_manager ||
-	    hidl_manager->getIfaceHidlObjectByIfname(wpa_s->ifname, &iface)) {
-		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN, iface);
-	}
-
-	HIDL_RETURN(SupplicantStatusCode::SUCCESS, iface);
-}
-
-Return<void> Supplicant::removeInterface(
-    const hidl_string& ifname, removeInterface_cb _hidl_cb)
-{
-	struct wpa_supplicant* wpa_s;
-
-	wpa_s = wpa_supplicant_get_iface(wpa_global_, ifname.c_str());
-	if (!wpa_s) {
-		HIDL_RETURN(SupplicantStatusCode::FAILURE_IFACE_UNKNOWN);
-	}
-	if (wpa_supplicant_remove_iface(wpa_global_, wpa_s, 0)) {
-		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
-	}
-
-	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
-}
-
 Return<void> Supplicant::getInterface(
-    const hidl_string& ifname, getInterface_cb _hidl_cb)
+    const IfaceInfo& iface_info, getInterface_cb _hidl_cb)
 {
-	android::sp<ISupplicantIface> iface;
-
 	struct wpa_supplicant* wpa_s =
-	    wpa_supplicant_get_iface(wpa_global_, ifname.c_str());
+	    wpa_supplicant_get_iface(wpa_global_, iface_info.name.c_str());
 	if (!wpa_s) {
-		HIDL_RETURN(SupplicantStatusCode::FAILURE_IFACE_UNKNOWN, iface);
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_IFACE_UNKNOWN, nullptr);
 	}
 
 	HidlManager* hidl_manager = HidlManager::getInstance();
-	if (!hidl_manager ||
-	    hidl_manager->getIfaceHidlObjectByIfname(wpa_s->ifname, &iface)) {
-		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN, iface);
-	}
+	if (iface_info.type == IfaceType::P2P) {
+		android::sp<ISupplicantP2pIface> iface;
+		if (!hidl_manager ||
+		    hidl_manager->getP2pIfaceHidlObjectByIfname(
+			wpa_s->ifname, &iface)) {
+			HIDL_RETURN(
+			    SupplicantStatusCode::FAILURE_UNKNOWN, iface);
+		}
 
-	HIDL_RETURN(SupplicantStatusCode::SUCCESS, iface);
+		HIDL_RETURN(SupplicantStatusCode::SUCCESS, iface);
+	} else {
+		android::sp<ISupplicantStaIface> iface;
+		if (!hidl_manager ||
+		    hidl_manager->getStaIfaceHidlObjectByIfname(
+			wpa_s->ifname, &iface)) {
+			HIDL_RETURN(
+			    SupplicantStatusCode::FAILURE_UNKNOWN, iface);
+		}
+
+		HIDL_RETURN(SupplicantStatusCode::SUCCESS, iface);
+	}
 }
 
 Return<void> Supplicant::listInterfaces(listInterfaces_cb _hidl_cb)
 {
-	std::vector<hidl_string> ifnames;
+	std::vector<ISupplicant::IfaceInfo> ifaces;
 	for (struct wpa_supplicant* wpa_s = wpa_global_->ifaces; wpa_s;
 	     wpa_s = wpa_s->next) {
-		ifnames.emplace_back(wpa_s->ifname);
+		if (wpa_s->global->p2p_init_wpa_s == wpa_s) {
+			ifaces.emplace_back({IfaceType::P2P, wpa_s->ifname});
+		} else {
+			ifaces.emplace_back({IfaceType::STA, wpa_s->ifname});
+		}
 	}
 
-	HIDL_RETURN(SupplicantStatusCode::SUCCESS, ifnames);
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, ifaces);
 }
 
 Return<void> Supplicant::registerCallback(

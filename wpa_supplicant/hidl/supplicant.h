@@ -41,12 +41,8 @@ public:
 	~Supplicant() override = default;
 
 	// Hidl methods exposed.
-	Return<void> createInterface(
-	    const hidl_string& ifname, createInterface_cb _hidl_cb) override;
-	Return<void> removeInterface(
-	    const hidl_string& ifname, removeInterface_cb _hidl_cb) override;
 	Return<void> getInterface(
-	    const hidl_string& ifname, getInterface_cb _hidl_cb) override;
+	    const IfaceInfo& iface_info, getInterface_cb _hidl_cb) override;
 	Return<void> listInterfaces(listInterfaces_cb _hidl_cb) override;
 	Return<void> registerCallback(
 	    const sp<ISupplicantCallback>& callback,

@@ -7,19 +7,20 @@
  * See README for more details.
  */
 
-#ifndef WPA_SUPPLICANT_HIDL_IFACE_H
-#define WPA_SUPPLICANT_HIDL_IFACE_H
+#ifndef WPA_SUPPLICANT_HIDL_P2P_IFACE_H
+#define WPA_SUPPLICANT_HIDL_P2P_IFACE_H
 
 #include <android-base/macros.h>
 
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantIface.h>
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantIfaceCallback.h>
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantNetwork.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantP2pIface.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantP2pIfaceCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantP2pNetwork.h>
 
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
 #include "wpa_supplicant_i.h"
+#include "config.h"
 #include "driver_i.h"
 }
 
@@ -31,43 +32,31 @@ namespace V1_0 {
 namespace implementation {
 
 /**
- * Implementation of Iface hidl object. Each unique hidl
+ * Implementation of P2pIface hidl object. Each unique hidl
  * object is used for control operations on a specific interface
  * controlled by wpa_supplicant.
  */
-class Iface : public android::hardware::wifi::supplicant::V1_0::ISupplicantIface
+class P2pIface
+    : public android::hardware::wifi::supplicant::V1_0::ISupplicantP2pIface
 {
 public:
-	Iface(struct wpa_global* wpa_global, const char ifname[]);
-	~Iface() override = default;
+	P2pIface(struct wpa_global* wpa_global, const char ifname[]);
+	~P2pIface() override = default;
 
 	// Hidl methods exposed.
 	Return<void> getName(getName_cb _hidl_cb) override;
+	Return<void> getType(getType_cb _hidl_cb) override;
 	Return<void> addNetwork(addNetwork_cb _hidl_cb) override;
 	Return<void> removeNetwork(
 	    uint32_t id, removeNetwork_cb _hidl_cb) override;
 	Return<void> getNetwork(uint32_t id, getNetwork_cb _hidl_cb) override;
 	Return<void> listNetworks(listNetworks_cb _hidl_cb) override;
 	Return<void> registerCallback(
-	    const sp<ISupplicantIfaceCallback>& callback,
+	    const sp<ISupplicantP2pIfaceCallback>& callback,
 	    registerCallback_cb _hidl_cb) override;
-	Return<void> reassociate(reassociate_cb _hidl_cb) override;
-	Return<void> reconnect(reconnect_cb _hidl_cb) override;
-	Return<void> disconnect(disconnect_cb _hidl_cb) override;
-	Return<void> setPowerSave(
-	    bool enable, setPowerSave_cb _hidl_cb) override;
-	Return<void> initiateTdlsDiscover(
-	    const hidl_array<uint8_t, 6 /* 6 */>& mac_address,
-	    initiateTdlsDiscover_cb _hidl_cb) override;
-	Return<void> initiateTdlsSetup(
-	    const hidl_array<uint8_t, 6 /* 6 */>& mac_address,
-	    initiateTdlsSetup_cb _hidl_cb) override;
-	Return<void> initiateTdlsTeardown(
-	    const hidl_array<uint8_t, 6 /* 6 */>& mac_address,
-	    initiateTdlsTeardown_cb _hidl_cb) override;
 
 private:
-	struct wpa_supplicant* retrieveIfacePtr();
+	struct wpa_supplicant* retrieveP2pIfacePtr();
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
 	// the lifetime of the process.
@@ -75,7 +64,7 @@ private:
 	// Name of the iface this hidl object controls
 	const std::string ifname_;
 
-	DISALLOW_COPY_AND_ASSIGN(Iface);
+	DISALLOW_COPY_AND_ASSIGN(P2pIface);
 };
 
 }  // namespace implementation
@@ -85,4 +74,4 @@ private:
 }  // namespace hardware
 }  // namespace android
 
-#endif  // WPA_SUPPLICANT_HIDL_IFACE_H
+#endif  // WPA_SUPPLICANT_HIDL_P2P_IFACE_H
