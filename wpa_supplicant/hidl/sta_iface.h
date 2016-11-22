@@ -7,20 +7,22 @@
  * See README for more details.
  */
 
-#ifndef WPA_SUPPLICANT_HIDL_IFACE_H
-#define WPA_SUPPLICANT_HIDL_IFACE_H
+#ifndef WPA_SUPPLICANT_HIDL_STA_IFACE_H
+#define WPA_SUPPLICANT_HIDL_STA_IFACE_H
 
 #include <android-base/macros.h>
 
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantIface.h>
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantIfaceCallback.h>
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantNetwork.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantStaIface.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantStaIfaceCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantStaNetwork.h>
 
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
 #include "wpa_supplicant_i.h"
+#include "config.h"
 #include "driver_i.h"
+#include "wpa.h"
 }
 
 namespace android {
@@ -31,25 +33,27 @@ namespace V1_0 {
 namespace implementation {
 
 /**
- * Implementation of Iface hidl object. Each unique hidl
+ * Implementation of StaIface hidl object. Each unique hidl
  * object is used for control operations on a specific interface
  * controlled by wpa_supplicant.
  */
-class Iface : public android::hardware::wifi::supplicant::V1_0::ISupplicantIface
+class StaIface
+    : public android::hardware::wifi::supplicant::V1_0::ISupplicantStaIface
 {
 public:
-	Iface(struct wpa_global* wpa_global, const char ifname[]);
-	~Iface() override = default;
+	StaIface(struct wpa_global* wpa_global, const char ifname[]);
+	~StaIface() override = default;
 
 	// Hidl methods exposed.
 	Return<void> getName(getName_cb _hidl_cb) override;
+	Return<void> getType(getType_cb _hidl_cb) override;
 	Return<void> addNetwork(addNetwork_cb _hidl_cb) override;
 	Return<void> removeNetwork(
 	    uint32_t id, removeNetwork_cb _hidl_cb) override;
 	Return<void> getNetwork(uint32_t id, getNetwork_cb _hidl_cb) override;
 	Return<void> listNetworks(listNetworks_cb _hidl_cb) override;
 	Return<void> registerCallback(
-	    const sp<ISupplicantIfaceCallback>& callback,
+	    const sp<ISupplicantStaIfaceCallback>& callback,
 	    registerCallback_cb _hidl_cb) override;
 	Return<void> reassociate(reassociate_cb _hidl_cb) override;
 	Return<void> reconnect(reconnect_cb _hidl_cb) override;
@@ -75,7 +79,7 @@ private:
 	// Name of the iface this hidl object controls
 	const std::string ifname_;
 
-	DISALLOW_COPY_AND_ASSIGN(Iface);
+	DISALLOW_COPY_AND_ASSIGN(StaIface);
 };
 
 }  // namespace implementation
@@ -85,4 +89,4 @@ private:
 }  // namespace hardware
 }  // namespace android
 
-#endif  // WPA_SUPPLICANT_HIDL_IFACE_H
+#endif  // WPA_SUPPLICANT_HIDL_STA_IFACE_H

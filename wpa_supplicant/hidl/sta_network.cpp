@@ -9,43 +9,43 @@
 
 #include "hidl_manager.h"
 #include "hidl_return_macros.h"
-#include "network.h"
+#include "sta_network.h"
 
 namespace {
-using android::hardware::wifi::supplicant::V1_0::ISupplicantNetwork;
+using android::hardware::wifi::supplicant::V1_0::ISupplicantStaNetwork;
 using android::hardware::wifi::supplicant::V1_0::SupplicantStatus;
 
 constexpr uint8_t kZeroBssid[6] = {0, 0, 0, 0, 0, 0};
 
 constexpr uint32_t kAllowedKeyMgmtMask =
-    (static_cast<uint32_t>(ISupplicantNetwork::KeyMgmtMask::NONE) |
-     static_cast<uint32_t>(ISupplicantNetwork::KeyMgmtMask::WPA_PSK) |
-     static_cast<uint32_t>(ISupplicantNetwork::KeyMgmtMask::WPA_EAP) |
-     static_cast<uint32_t>(ISupplicantNetwork::KeyMgmtMask::IEEE8021X));
+    (static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::NONE) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::WPA_PSK) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::WPA_EAP) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::IEEE8021X));
 constexpr uint32_t kAllowedproto_mask =
-    (static_cast<uint32_t>(ISupplicantNetwork::ProtoMask::WPA) |
-     static_cast<uint32_t>(ISupplicantNetwork::ProtoMask::RSN) |
-     static_cast<uint32_t>(ISupplicantNetwork::ProtoMask::OSEN));
+    (static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::WPA) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::RSN) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::OSEN));
 constexpr uint32_t kAllowedauth_alg_mask =
-    (static_cast<uint32_t>(ISupplicantNetwork::AuthAlgMask::OPEN) |
-     static_cast<uint32_t>(ISupplicantNetwork::AuthAlgMask::SHARED) |
-     static_cast<uint32_t>(ISupplicantNetwork::AuthAlgMask::LEAP));
+    (static_cast<uint32_t>(ISupplicantStaNetwork::AuthAlgMask::OPEN) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::AuthAlgMask::SHARED) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::AuthAlgMask::LEAP));
 constexpr uint32_t kAllowedgroup_cipher_mask =
-    (static_cast<uint32_t>(ISupplicantNetwork::GroupCipherMask::WEP40) |
-     static_cast<uint32_t>(ISupplicantNetwork::GroupCipherMask::WEP104) |
-     static_cast<uint32_t>(ISupplicantNetwork::GroupCipherMask::TKIP) |
-     static_cast<uint32_t>(ISupplicantNetwork::GroupCipherMask::CCMP));
+    (static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::WEP40) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::WEP104) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::TKIP) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::CCMP));
 constexpr uint32_t kAllowedpairwise_cipher_mask =
-    (static_cast<uint32_t>(ISupplicantNetwork::PairwiseCipherMask::NONE) |
-     static_cast<uint32_t>(ISupplicantNetwork::PairwiseCipherMask::TKIP) |
-     static_cast<uint32_t>(ISupplicantNetwork::PairwiseCipherMask::CCMP));
+    (static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::NONE) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::TKIP) |
+     static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::CCMP));
 
 constexpr uint32_t kEapMethodMax =
-    static_cast<uint32_t>(ISupplicantNetwork::EapMethod::WFA_UNAUTH_TLS) + 1;
+    static_cast<uint32_t>(ISupplicantStaNetwork::EapMethod::WFA_UNAUTH_TLS) + 1;
 constexpr char const *kEapMethodStrings[kEapMethodMax] = {
     "PEAP", "TLS", "TTLS", "PWD", "SIM", "AKA", "AKA'", "WFA-UNAUTH-TLS"};
 constexpr uint32_t kEapPhase2MethodMax =
-    static_cast<uint32_t>(ISupplicantNetwork::EapPhase2Method::GTC) + 1;
+    static_cast<uint32_t>(ISupplicantStaNetwork::EapPhase2Method::GTC) + 1;
 constexpr char const *kEapPhase2MethodStrings[kEapPhase2MethodMax] = {
     "NULL", "PAP", "MSCHAP", "MSCHAPV2", "GTC"};
 }  // namespace
@@ -57,13 +57,13 @@ namespace supplicant {
 namespace V1_0 {
 namespace implementation {
 
-Network::Network(
+StaNetwork::StaNetwork(
     struct wpa_global *wpa_global, const char ifname[], int network_id)
     : wpa_global_(wpa_global), ifname_(ifname), network_id_(network_id)
 {
 }
 
-Return<void> Network::getId(getId_cb _hidl_cb)
+Return<void> StaNetwork::getId(getId_cb _hidl_cb)
 {
 	uint32_t id = UINT32_MAX;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -75,7 +75,7 @@ Return<void> Network::getId(getId_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, id);
 }
 
-Return<void> Network::getInterfaceName(getInterfaceName_cb _hidl_cb)
+Return<void> StaNetwork::getInterfaceName(getInterfaceName_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -86,8 +86,20 @@ Return<void> Network::getInterfaceName(getInterfaceName_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, ifname_);
 }
 
-Return<void> Network::registerCallback(
-    const sp<ISupplicantNetworkCallback> &callback,
+Return<void> StaNetwork::getType(getType_cb _hidl_cb)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid) {
+		HIDL_RETURN(
+		    SupplicantStatusCode::FAILURE_IFACE_INVALID,
+		    IfaceType::STA);
+	}
+
+	HIDL_RETURN(SupplicantStatusCode::SUCCESS, IfaceType::STA);
+}
+
+Return<void> StaNetwork::registerCallback(
+    const sp<ISupplicantStaNetworkCallback> &callback,
     registerCallback_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -97,7 +109,7 @@ Return<void> Network::registerCallback(
 
 	HidlManager *hidl_manager = HidlManager::getInstance();
 	if (!hidl_manager ||
-	    hidl_manager->addNetworkCallbackHidlObject(
+	    hidl_manager->addStaNetworkCallbackHidlObject(
 		ifname_, network_id_, callback)) {
 		HIDL_RETURN(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
@@ -105,7 +117,7 @@ Return<void> Network::registerCallback(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setSsid(
+Return<void> StaNetwork::setSsid(
     const hidl_vec<uint8_t> &ssid, setSsid_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -115,7 +127,7 @@ Return<void> Network::setSsid(
 
 	if (ssid.size() == 0 ||
 	    ssid.size() >
-		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+		static_cast<uint32_t>(ISupplicantStaNetwork::ParamSizeLimits::
 					  SSID_MAX_LEN_IN_BYTES)) {
 		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
@@ -132,7 +144,7 @@ Return<void> Network::setSsid(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setBssid(
+Return<void> StaNetwork::setBssid(
     const hidl_array<uint8_t, 6 /* 6 */> &bssid, setBssid_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -165,7 +177,7 @@ Return<void> Network::setBssid(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setScanSsid(bool enable, setScanSsid_cb _hidl_cb)
+Return<void> StaNetwork::setScanSsid(bool enable, setScanSsid_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -178,7 +190,8 @@ Return<void> Network::setScanSsid(bool enable, setScanSsid_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setKeyMgmt(uint32_t key_mgmt_mask, setKeyMgmt_cb _hidl_cb)
+Return<void> StaNetwork::setKeyMgmt(
+    uint32_t key_mgmt_mask, setKeyMgmt_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -195,7 +208,7 @@ Return<void> Network::setKeyMgmt(uint32_t key_mgmt_mask, setKeyMgmt_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setProto(uint32_t proto_mask, setProto_cb _hidl_cb)
+Return<void> StaNetwork::setProto(uint32_t proto_mask, setProto_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -212,7 +225,7 @@ Return<void> Network::setProto(uint32_t proto_mask, setProto_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setAuthAlg(
+Return<void> StaNetwork::setAuthAlg(
     uint32_t auth_alg_mask,
     std::function<void(const SupplicantStatus &status)> _hidl_cb)
 {
@@ -231,7 +244,7 @@ Return<void> Network::setAuthAlg(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setGroupCipher(
+Return<void> StaNetwork::setGroupCipher(
     uint32_t group_cipher_mask, setGroupCipher_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -249,7 +262,7 @@ Return<void> Network::setGroupCipher(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setPairwiseCipher(
+Return<void> StaNetwork::setPairwiseCipher(
     uint32_t pairwise_cipher_mask, setPairwiseCipher_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -268,7 +281,7 @@ Return<void> Network::setPairwiseCipher(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setPskPassphrase(
+Return<void> StaNetwork::setPskPassphrase(
     const hidl_string &psk, setPskPassphrase_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -298,7 +311,7 @@ Return<void> Network::setPskPassphrase(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setWepKey(
+Return<void> StaNetwork::setWepKey(
     uint32_t key_idx, const hidl_vec<uint8_t> &wep_key, setWepKey_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -308,14 +321,14 @@ Return<void> Network::setWepKey(
 
 	if (key_idx >=
 	    static_cast<uint32_t>(
-		ISupplicantNetwork::ParamSizeLimits::WEP_KEYS_MAX_NUM)) {
+		ISupplicantStaNetwork::ParamSizeLimits::WEP_KEYS_MAX_NUM)) {
 		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
 	if (wep_key.size() !=
-		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+		static_cast<uint32_t>(ISupplicantStaNetwork::ParamSizeLimits::
 					  WEP40_KEY_LEN_IN_BYTES) &&
 	    wep_key.size() !=
-		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+		static_cast<uint32_t>(ISupplicantStaNetwork::ParamSizeLimits::
 					  WEP104_KEY_LEN_IN_BYTES)) {
 		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
@@ -330,7 +343,7 @@ Return<void> Network::setWepKey(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setWepTxKeyIdx(
+Return<void> StaNetwork::setWepTxKeyIdx(
     uint32_t key_idx, setWepTxKeyIdx_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -340,7 +353,7 @@ Return<void> Network::setWepTxKeyIdx(
 
 	if (key_idx >=
 	    static_cast<uint32_t>(
-		ISupplicantNetwork::ParamSizeLimits::WEP_KEYS_MAX_NUM)) {
+		ISupplicantStaNetwork::ParamSizeLimits::WEP_KEYS_MAX_NUM)) {
 		HIDL_RETURN(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
 	wpa_ssid->wep_tx_keyidx = key_idx;
@@ -349,7 +362,7 @@ Return<void> Network::setWepTxKeyIdx(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setRequirePmf(bool enable, setRequirePmf_cb _hidl_cb)
+Return<void> StaNetwork::setRequirePmf(bool enable, setRequirePmf_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -363,8 +376,8 @@ Return<void> Network::setRequirePmf(bool enable, setRequirePmf_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapMethod(
-    ISupplicantNetwork::EapMethod method, setEapMethod_cb _hidl_cb)
+Return<void> StaNetwork::setEapMethod(
+    ISupplicantStaNetwork::EapMethod method, setEapMethod_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -417,8 +430,9 @@ Return<void> Network::setEapMethod(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapPhase2Method(
-    ISupplicantNetwork::EapPhase2Method method, setEapPhase2Method_cb _hidl_cb)
+Return<void> StaNetwork::setEapPhase2Method(
+    ISupplicantStaNetwork::EapPhase2Method method,
+    setEapPhase2Method_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -434,7 +448,7 @@ Return<void> Network::setEapPhase2Method(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapIdentity(
+Return<void> StaNetwork::setEapIdentity(
     const hidl_vec<uint8_t> &identity, setEapIdentity_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -451,7 +465,7 @@ Return<void> Network::setEapIdentity(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapAnonymousIdentity(
+Return<void> StaNetwork::setEapAnonymousIdentity(
     const hidl_vec<uint8_t> &identity, setEapAnonymousIdentity_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -470,7 +484,7 @@ Return<void> Network::setEapAnonymousIdentity(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapPassword(
+Return<void> StaNetwork::setEapPassword(
     const hidl_vec<uint8_t> &password, setEapPassword_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -489,7 +503,7 @@ Return<void> Network::setEapPassword(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapCACert(
+Return<void> StaNetwork::setEapCACert(
     const hidl_string &path, setEapCACert_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -505,7 +519,7 @@ Return<void> Network::setEapCACert(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapCAPath(
+Return<void> StaNetwork::setEapCAPath(
     const hidl_string &path, setEapCAPath_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -521,7 +535,7 @@ Return<void> Network::setEapCAPath(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapClientCert(
+Return<void> StaNetwork::setEapClientCert(
     const hidl_string &path, setEapClientCert_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -538,7 +552,7 @@ Return<void> Network::setEapClientCert(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapPrivateKey(
+Return<void> StaNetwork::setEapPrivateKey(
     const hidl_string &path, setEapPrivateKey_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -555,7 +569,7 @@ Return<void> Network::setEapPrivateKey(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapSubjectMatch(
+Return<void> StaNetwork::setEapSubjectMatch(
     const hidl_string &match, setEapSubjectMatch_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -572,7 +586,7 @@ Return<void> Network::setEapSubjectMatch(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapAltSubjectMatch(
+Return<void> StaNetwork::setEapAltSubjectMatch(
     const hidl_string &match, setEapAltSubjectMatch_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -589,7 +603,7 @@ Return<void> Network::setEapAltSubjectMatch(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapEngine(bool enable, setEapEngine_cb _hidl_cb)
+Return<void> StaNetwork::setEapEngine(bool enable, setEapEngine_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -601,7 +615,7 @@ Return<void> Network::setEapEngine(bool enable, setEapEngine_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapEngineID(
+Return<void> StaNetwork::setEapEngineID(
     const hidl_string &id, setEapEngineID_cb _hidl_cb)
 
 {
@@ -618,7 +632,7 @@ Return<void> Network::setEapEngineID(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::setEapDomainSuffixMatch(
+Return<void> StaNetwork::setEapDomainSuffixMatch(
     const hidl_string &match, setEapDomainSuffixMatch_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -635,7 +649,7 @@ Return<void> Network::setEapDomainSuffixMatch(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::getSsid(getSsid_cb _hidl_cb)
+Return<void> StaNetwork::getSsid(getSsid_cb _hidl_cb)
 {
 	std::vector<uint8_t> ssid;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -649,7 +663,7 @@ Return<void> Network::getSsid(getSsid_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, ssid);
 }
 
-Return<void> Network::getBssid(getBssid_cb _hidl_cb)
+Return<void> StaNetwork::getBssid(getBssid_cb _hidl_cb)
 {
 	hidl_array<uint8_t, 6> bssid;
 	os_memcpy(bssid.data(), kZeroBssid, ETH_ALEN);
@@ -666,7 +680,7 @@ Return<void> Network::getBssid(getBssid_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, bssid);
 }
 
-Return<void> Network::getScanSsid(getScanSsid_cb _hidl_cb)
+Return<void> StaNetwork::getScanSsid(getScanSsid_cb _hidl_cb)
 {
 	bool enabled = false;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -680,7 +694,7 @@ Return<void> Network::getScanSsid(getScanSsid_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, enabled);
 }
 
-Return<void> Network::getKeyMgmt(getKeyMgmt_cb _hidl_cb)
+Return<void> StaNetwork::getKeyMgmt(getKeyMgmt_cb _hidl_cb)
 {
 	uint32_t key_mgmt_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -695,7 +709,7 @@ Return<void> Network::getKeyMgmt(getKeyMgmt_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, key_mgmt_mask);
 }
 
-Return<void> Network::getProto(getProto_cb _hidl_cb)
+Return<void> StaNetwork::getProto(getProto_cb _hidl_cb)
 {
 	uint32_t proto_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -709,7 +723,7 @@ Return<void> Network::getProto(getProto_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, proto_mask);
 }
 
-Return<void> Network::getAuthAlg(getAuthAlg_cb _hidl_cb)
+Return<void> StaNetwork::getAuthAlg(getAuthAlg_cb _hidl_cb)
 {
 	uint32_t auth_alg_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -724,7 +738,7 @@ Return<void> Network::getAuthAlg(getAuthAlg_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, auth_alg_mask);
 }
 
-Return<void> Network::getGroupCipher(getGroupCipher_cb _hidl_cb)
+Return<void> StaNetwork::getGroupCipher(getGroupCipher_cb _hidl_cb)
 {
 	uint32_t group_cipher_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -739,7 +753,7 @@ Return<void> Network::getGroupCipher(getGroupCipher_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, group_cipher_mask);
 }
 
-Return<void> Network::getPairwiseCipher(getPairwiseCipher_cb _hidl_cb)
+Return<void> StaNetwork::getPairwiseCipher(getPairwiseCipher_cb _hidl_cb)
 {
 	uint32_t pairwise_cipher_mask = 0;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -754,7 +768,7 @@ Return<void> Network::getPairwiseCipher(getPairwiseCipher_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, pairwise_cipher_mask);
 }
 
-Return<void> Network::getPskPassphrase(getPskPassphrase_cb _hidl_cb)
+Return<void> StaNetwork::getPskPassphrase(getPskPassphrase_cb _hidl_cb)
 {
 	hidl_string psk;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -769,7 +783,7 @@ Return<void> Network::getPskPassphrase(getPskPassphrase_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, psk);
 }
 
-Return<void> Network::getWepKey(uint32_t key_idx, getWepKey_cb _hidl_cb)
+Return<void> StaNetwork::getWepKey(uint32_t key_idx, getWepKey_cb _hidl_cb)
 {
 	std::vector<uint8_t> wep_key;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -781,7 +795,7 @@ Return<void> Network::getWepKey(uint32_t key_idx, getWepKey_cb _hidl_cb)
 
 	if (key_idx >=
 	    static_cast<uint32_t>(
-		ISupplicantNetwork::ParamSizeLimits::WEP_KEYS_MAX_NUM)) {
+		ISupplicantStaNetwork::ParamSizeLimits::WEP_KEYS_MAX_NUM)) {
 		HIDL_RETURN(
 		    SupplicantStatusCode::FAILURE_ARGS_INVALID, wep_key);
 	}
@@ -793,7 +807,7 @@ Return<void> Network::getWepKey(uint32_t key_idx, getWepKey_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, wep_key);
 }
 
-Return<void> Network::getWepTxKeyIdx(getWepTxKeyIdx_cb _hidl_cb)
+Return<void> StaNetwork::getWepTxKeyIdx(getWepTxKeyIdx_cb _hidl_cb)
 {
 	uint32_t wep_tx_key_idx = UINT32_MAX;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -808,7 +822,7 @@ Return<void> Network::getWepTxKeyIdx(getWepTxKeyIdx_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, wep_tx_key_idx);
 }
 
-Return<void> Network::getRequirePmf(getRequirePmf_cb _hidl_cb)
+Return<void> StaNetwork::getRequirePmf(getRequirePmf_cb _hidl_cb)
 {
 	bool enabled = false;
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -822,7 +836,7 @@ Return<void> Network::getRequirePmf(getRequirePmf_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS, enabled);
 }
 
-Return<void> Network::enable(bool no_connect, enable_cb _hidl_cb)
+Return<void> StaNetwork::enable(bool no_connect, enable_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -845,7 +859,7 @@ Return<void> Network::enable(bool no_connect, enable_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::disable(disable_cb _hidl_cb)
+Return<void> StaNetwork::disable(disable_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -862,7 +876,7 @@ Return<void> Network::disable(disable_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::select(select_cb _hidl_cb)
+Return<void> StaNetwork::select(select_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	if (!wpa_ssid) {
@@ -881,8 +895,8 @@ Return<void> Network::select(select_cb _hidl_cb)
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::sendNetworkEapSimGsmAuthResponse(
-    const ISupplicantNetwork::NetworkResponseEapSimGsmAuthParams &params,
+Return<void> StaNetwork::sendNetworkEapSimGsmAuthResponse(
+    const ISupplicantStaNetwork::NetworkResponseEapSimGsmAuthParams &params,
     sendNetworkEapSimGsmAuthResponse_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -923,8 +937,8 @@ Return<void> Network::sendNetworkEapSimGsmAuthResponse(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::sendNetworkEapSimUmtsAuthResponse(
-    const ISupplicantNetwork::NetworkResponseEapSimUmtsAuthParams &params,
+Return<void> StaNetwork::sendNetworkEapSimUmtsAuthResponse(
+    const ISupplicantStaNetwork::NetworkResponseEapSimUmtsAuthParams &params,
     sendNetworkEapSimUmtsAuthResponse_cb _hidl_cb)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -971,7 +985,7 @@ Return<void> Network::sendNetworkEapSimUmtsAuthResponse(
 	HIDL_RETURN(SupplicantStatusCode::SUCCESS);
 }
 
-Return<void> Network::sendNetworkEapIdentityResponse(
+Return<void> StaNetwork::sendNetworkEapIdentityResponse(
     const hidl_vec<uint8_t> &identity,
     sendNetworkEapIdentityResponse_cb _hidl_cb)
 {
@@ -1014,7 +1028,7 @@ Return<void> Network::sendNetworkEapIdentityResponse(
  * is removed, all RPC method calls on this object will
  * return failure.
  */
-struct wpa_ssid *Network::retrieveNetworkPtr()
+struct wpa_ssid *StaNetwork::retrieveNetworkPtr()
 {
 	wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (!wpa_s)
@@ -1027,7 +1041,7 @@ struct wpa_ssid *Network::retrieveNetworkPtr()
  * pointer for
  * this network.
  */
-struct wpa_supplicant *Network::retrieveIfacePtr()
+struct wpa_supplicant *StaNetwork::retrieveIfacePtr()
 {
 	return wpa_supplicant_get_iface(
 	    (struct wpa_global *)wpa_global_, ifname_.c_str());
@@ -1038,13 +1052,13 @@ struct wpa_supplicant *Network::retrieveIfacePtr()
  *
  * Returns 0 if valid, 1 otherwise.
  */
-int Network::isPskPassphraseValid(const hidl_string &psk)
+int StaNetwork::isPskPassphraseValid(const hidl_string &psk)
 {
 	if (psk.size() <
-		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+		static_cast<uint32_t>(ISupplicantStaNetwork::ParamSizeLimits::
 					  PSK_PASSPHRASE_MIN_LEN_IN_BYTES) ||
 	    psk.size() >
-		static_cast<uint32_t>(ISupplicantNetwork::ParamSizeLimits::
+		static_cast<uint32_t>(ISupplicantStaNetwork::ParamSizeLimits::
 					  PSK_PASSPHRASE_MAX_LEN_IN_BYTES)) {
 		return 1;
 	}
@@ -1059,7 +1073,7 @@ int Network::isPskPassphraseValid(const hidl_string &psk)
  * after params update (except
  * bssid).
  */
-void Network::resetInternalStateAfterParamsUpdate()
+void StaNetwork::resetInternalStateAfterParamsUpdate()
 {
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
@@ -1082,7 +1096,7 @@ void Network::resetInternalStateAfterParamsUpdate()
  * instance for this network.
  * This function frees any existing data in these fields.
  */
-int Network::setStringFieldAndResetState(
+int StaNetwork::setStringFieldAndResetState(
     const char *value, uint8_t **to_update_field, const char *hexdump_prefix)
 {
 	return setStringFieldAndResetState(
@@ -1094,7 +1108,7 @@ int Network::setStringFieldAndResetState(
  * instance for this network.
  * This function frees any existing data in these fields.
  */
-int Network::setStringFieldAndResetState(
+int StaNetwork::setStringFieldAndResetState(
     const char *value, char **to_update_field, const char *hexdump_prefix)
 {
 	int value_len = strlen(value);
@@ -1116,7 +1130,7 @@ int Network::setStringFieldAndResetState(
  * instance for this network.
  * This function frees any existing data in these fields.
  */
-int Network::setStringKeyFieldAndResetState(
+int StaNetwork::setStringKeyFieldAndResetState(
     const char *value, char **to_update_field, const char *hexdump_prefix)
 {
 	int value_len = strlen(value);
@@ -1138,7 +1152,7 @@ int Network::setStringKeyFieldAndResetState(
  * field in |wpa_ssid| structue instance for this network.
  * This function frees any existing data in these fields.
  */
-int Network::setByteArrayFieldAndResetState(
+int StaNetwork::setByteArrayFieldAndResetState(
     const uint8_t *value, const size_t value_len, uint8_t **to_update_field,
     size_t *to_update_field_len, const char *hexdump_prefix)
 {
@@ -1164,7 +1178,7 @@ int Network::setByteArrayFieldAndResetState(
  * length field in |wpa_ssid| structue instance for this network.
  * This function frees any existing data in these fields.
  */
-int Network::setByteArrayKeyFieldAndResetState(
+int StaNetwork::setByteArrayKeyFieldAndResetState(
     const uint8_t *value, const size_t value_len, uint8_t **to_update_field,
     size_t *to_update_field_len, const char *hexdump_prefix)
 {
