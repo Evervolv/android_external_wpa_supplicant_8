@@ -44,6 +44,9 @@ public:
 	P2pNetwork(
 	    struct wpa_global* wpa_global, const char ifname[], int network_id);
 	~P2pNetwork() override = default;
+	// Refer to |StaIface::invalidate()|.
+	void invalidate();
+	bool isValid();
 
 	// Hidl methods exposed.
 	Return<void> getId(getId_cb _hidl_cb) override;
@@ -54,6 +57,13 @@ public:
 	    registerCallback_cb _hidl_cb) override;
 
 private:
+	// Corresponding worker functions for the HIDL methods.
+	std::pair<SupplicantStatus, uint32_t> getIdInternal();
+	std::pair<SupplicantStatus, std::string> getInterfaceNameInternal();
+	std::pair<SupplicantStatus, IfaceType> getTypeInternal();
+	SupplicantStatus registerCallbackInternal(
+	    const sp<ISupplicantP2pNetworkCallback>& callback);
+
 	struct wpa_ssid* retrieveNetworkPtr();
 	struct wpa_supplicant* retrieveIfacePtr();
 
@@ -64,6 +74,7 @@ private:
 	const std::string ifname_;
 	// Id of the network this hidl object controls.
 	const int network_id_;
+	bool is_valid_;
 
 	DISALLOW_COPY_AND_ASSIGN(P2pNetwork);
 };
