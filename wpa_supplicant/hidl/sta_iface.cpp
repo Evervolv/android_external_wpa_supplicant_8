@@ -134,6 +134,27 @@ Return<void> StaIface::initiateTdlsTeardown(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
 	    &StaIface::initiateTdlsTeardownInternal, _hidl_cb, mac_address);
 }
+Return<void> StaIface::initiateAnqpQuery(
+    const hidl_array<uint8_t, 6> &mac_address,
+    const hidl_vec<ISupplicantStaIface::AnqpInfoId> &info_elements,
+    const hidl_vec<ISupplicantStaIface::Hs20AnqpSubtypes> &sub_types,
+    initiateAnqpQuery_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::initiateAnqpQueryInternal, _hidl_cb, mac_address,
+	    info_elements, sub_types);
+}
+
+Return<void> StaIface::initiateHs20IconQuery(
+    const hidl_array<uint8_t, 6> &mac_address, const hidl_string &file_name,
+    initiateHs20IconQuery_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::initiateHs20IconQueryInternal, _hidl_cb, mac_address,
+	    file_name);
+}
 
 std::pair<SupplicantStatus, std::string> StaIface::getNameInternal()
 {
@@ -316,6 +337,22 @@ SupplicantStatus StaIface::initiateTdlsTeardownInternal(
 	if (ret) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaIface::initiateAnqpQueryInternal(
+    const std::array<uint8_t, 6> &mac_address,
+    const std::vector<ISupplicantStaIface::AnqpInfoId> &info_elements,
+    const std::vector<ISupplicantStaIface::Hs20AnqpSubtypes> &sub_types)
+{
+	// TODO: Add implementation.
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaIface::initiateHs20IconQueryInternal(
+    const std::array<uint8_t, 6> &mac_address, const std::string &file_name)
+{
+	// TODO: Add implementation.
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 

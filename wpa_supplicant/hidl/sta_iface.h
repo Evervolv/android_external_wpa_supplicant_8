@@ -87,6 +87,15 @@ public:
 	Return<void> initiateTdlsTeardown(
 	    const hidl_array<uint8_t, 6>& mac_address,
 	    initiateTdlsTeardown_cb _hidl_cb) override;
+	Return<void> initiateAnqpQuery(
+	    const hidl_array<uint8_t, 6>& mac_address,
+	    const hidl_vec<ISupplicantStaIface::AnqpInfoId>& info_elements,
+	    const hidl_vec<ISupplicantStaIface::Hs20AnqpSubtypes>& sub_types,
+	    initiateAnqpQuery_cb _hidl_cb) override;
+	Return<void> initiateHs20IconQuery(
+	    const hidl_array<uint8_t, 6>& mac_address,
+	    const hidl_string& file_name,
+	    initiateHs20IconQuery_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -111,6 +120,14 @@ private:
 	    const std::array<uint8_t, 6>& mac_address);
 	SupplicantStatus initiateTdlsTeardownInternal(
 	    const std::array<uint8_t, 6>& mac_address);
+	SupplicantStatus initiateAnqpQueryInternal(
+	    const std::array<uint8_t, 6>& mac_address,
+	    const std::vector<ISupplicantStaIface::AnqpInfoId>& info_elements,
+	    const std::vector<ISupplicantStaIface::Hs20AnqpSubtypes>&
+		sub_types);
+	SupplicantStatus initiateHs20IconQueryInternal(
+	    const std::array<uint8_t, 6>& mac_address,
+	    const std::string& file_name);
 
 	struct wpa_supplicant* retrieveIfacePtr();
 
