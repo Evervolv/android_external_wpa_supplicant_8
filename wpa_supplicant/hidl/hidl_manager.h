@@ -14,15 +14,23 @@
 #include <string>
 
 #include <android/hardware/wifi/supplicant/1.0/ISupplicantCallback.h>
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantIfaceCallback.h>
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantNetworkCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantP2pIfaceCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantP2pNetworkCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantStaIfaceCallback.h>
+#include <android/hardware/wifi/supplicant/1.0/ISupplicantStaNetworkCallback.h>
 
-#include "iface.h"
-#include "network.h"
+#include "p2p_iface.h"
+#include "p2p_network.h"
+#include "sta_iface.h"
+#include "sta_network.h"
 #include "supplicant.h"
 
-struct wpa_global;
-struct wpa_supplicant;
+extern "C" {
+#include "utils/common.h"
+#include "utils/includes.h"
+#include "wpa_supplicant_i.h"
+#include "driver_i.h"
+}
 
 namespace android {
 namespace hardware {
@@ -57,28 +65,32 @@ public:
 	    const char *param);
 
 	// Methods called from hidl objects.
-	int getIfaceHidlObjectByIfname(
+	int getP2pIfaceHidlObjectByIfname(
 	    const std::string &ifname,
-	    android::sp<
-		android::hardware::wifi::supplicant::V1_0::ISupplicantIface>
-		*iface_object);
-	int getNetworkHidlObjectByIfnameAndNetworkId(
+	    android::sp<ISupplicantP2pIface> *iface_object);
+	int getStaIfaceHidlObjectByIfname(
+	    const std::string &ifname,
+	    android::sp<ISupplicantStaIface> *iface_object);
+	int getP2pNetworkHidlObjectByIfnameAndNetworkId(
 	    const std::string &ifname, int network_id,
-	    android::sp<
-		android::hardware::wifi::supplicant::V1_0::ISupplicantNetwork>
-		*network_object);
+	    android::sp<ISupplicantP2pNetwork> *network_object);
+	int getStaNetworkHidlObjectByIfnameAndNetworkId(
+	    const std::string &ifname, int network_id,
+	    android::sp<ISupplicantStaNetwork> *network_object);
 	int addSupplicantCallbackHidlObject(
-	    const android::sp<
-		android::hardware::wifi::supplicant::V1_0::ISupplicantCallback>
-		&callback);
-	int addIfaceCallbackHidlObject(
+	    const android::sp<ISupplicantCallback> &callback);
+	int addP2pIfaceCallbackHidlObject(
 	    const std::string &ifname,
-	    const android::sp<android::hardware::wifi::supplicant::V1_0::
-				  ISupplicantIfaceCallback> &callback);
-	int addNetworkCallbackHidlObject(
+	    const android::sp<ISupplicantP2pIfaceCallback> &callback);
+	int addStaIfaceCallbackHidlObject(
+	    const std::string &ifname,
+	    const android::sp<ISupplicantStaIfaceCallback> &callback);
+	int addP2pNetworkCallbackHidlObject(
 	    const std::string &ifname, int network_id,
-	    const android::sp<android::hardware::wifi::supplicant::V1_0::
-				  ISupplicantNetworkCallback> &callback);
+	    const android::sp<ISupplicantP2pNetworkCallback> &callback);
+	int addStaNetworkCallbackHidlObject(
+	    const std::string &ifname, int network_id,
+	    const android::sp<ISupplicantStaNetworkCallback> &callback);
 
 private:
 	HidlManager() = default;
@@ -86,42 +98,40 @@ private:
 	HidlManager(const HidlManager &) = default;
 	HidlManager &operator=(const HidlManager &) = default;
 
-	const std::string getNetworkObjectMapKey(
-	    const std::string &ifname, int network_id);
-
 	void removeSupplicantCallbackHidlObject(
-	    const android::sp<
-		android::hardware::wifi::supplicant::V1_0::ISupplicantCallback>
-		&callback);
-	void removeIfaceCallbackHidlObject(
+	    const android::sp<ISupplicantCallback> &callback);
+	void removeP2pIfaceCallbackHidlObject(
 	    const std::string &ifname,
-	    const android::sp<android::hardware::wifi::supplicant::V1_0::
-				  ISupplicantIfaceCallback> &callback);
-	void removeNetworkCallbackHidlObject(
+	    const android::sp<ISupplicantP2pIfaceCallback> &callback);
+	void removeStaIfaceCallbackHidlObject(
+	    const std::string &ifname,
+	    const android::sp<ISupplicantStaIfaceCallback> &callback);
+	void removeP2pNetworkCallbackHidlObject(
 	    const std::string &ifname, int network_id,
-	    const android::sp<android::hardware::wifi::supplicant::V1_0::
-				  ISupplicantNetworkCallback> &callback);
-	template <class CallbackType>
-	int registerForDeathAndAddCallbackHidlObjectToList(
-	    const android::sp<CallbackType> &callback,
-	    const std::function<void(const android::sp<CallbackType> &)>
-		&on_hidl_died_fctor,
-	    std::vector<android::sp<CallbackType>> &callback_list);
+	    const android::sp<ISupplicantP2pNetworkCallback> &callback);
+	void removeStaNetworkCallbackHidlObject(
+	    const std::string &ifname, int network_id,
+	    const android::sp<ISupplicantStaNetworkCallback> &callback);
 
 	void callWithEachSupplicantCallback(
 	    const std::function<android::hardware::Return<void>(
-		android::sp<android::hardware::wifi::supplicant::V1_0::
-				ISupplicantCallback>)> &method);
-	void callWithEachIfaceCallback(
+		android::sp<ISupplicantCallback>)> &method);
+	void callWithEachP2pIfaceCallback(
 	    const std::string &ifname,
 	    const std::function<android::hardware::Return<void>(
-		android::sp<android::hardware::wifi::supplicant::V1_0::
-				ISupplicantIfaceCallback>)> &method);
-	void callWithEachNetworkCallback(
+		android::sp<ISupplicantP2pIfaceCallback>)> &method);
+	void callWithEachStaIfaceCallback(
+	    const std::string &ifname,
+	    const std::function<android::hardware::Return<void>(
+		android::sp<ISupplicantStaIfaceCallback>)> &method);
+	void callWithEachP2pNetworkCallback(
 	    const std::string &ifname, int network_id,
 	    const std::function<android::hardware::Return<void>(
-		android::sp<android::hardware::wifi::supplicant::V1_0::
-				ISupplicantNetworkCallback>)> &method);
+		android::sp<ISupplicantP2pNetworkCallback>)> &method);
+	void callWithEachStaNetworkCallback(
+	    const std::string &ifname, int network_id,
+	    const std::function<android::hardware::Return<void>(
+		android::sp<ISupplicantStaNetworkCallback>)> &method);
 
 	// HIDL Service name.
 	static const char kServiceName[];
@@ -129,35 +139,57 @@ private:
 	static HidlManager *instance_;
 	// The main hidl service object.
 	android::sp<Supplicant> supplicant_object_;
-	// Map of all the interface specific hidl objects controlled by
+	// Map of all the P2P interface specific hidl objects controlled by
 	// wpa_supplicant. This map is keyed in by the corresponding
 	// |ifname|.
-	std::map<const std::string, android::sp<Iface>> iface_object_map_;
-	// Map of all the network specific hidl objects controlled by
+	std::map<const std::string, android::sp<P2pIface>>
+	    p2p_iface_object_map_;
+	// Map of all the STA interface specific hidl objects controlled by
+	// wpa_supplicant. This map is keyed in by the corresponding
+	// |ifname|.
+	std::map<const std::string, android::sp<StaIface>>
+	    sta_iface_object_map_;
+	// Map of all the P2P network specific hidl objects controlled by
 	// wpa_supplicant. This map is keyed in by the corresponding
 	// |ifname| & |network_id|.
-	std::map<const std::string, android::sp<Network>> network_object_map_;
+	std::map<const std::string, android::sp<P2pNetwork>>
+	    p2p_network_object_map_;
+	// Map of all the STA network specific hidl objects controlled by
+	// wpa_supplicant. This map is keyed in by the corresponding
+	// |ifname| & |network_id|.
+	std::map<const std::string, android::sp<StaNetwork>>
+	    sta_network_object_map_;
 
 	// Callback registered for the main hidl service object.
-	std::vector<android::sp<
-	    android::hardware::wifi::supplicant::V1_0::ISupplicantCallback>>
-	    supplicant_callbacks_;
-	// Map of all the callbacks registered for interface specific
+	std::vector<android::sp<ISupplicantCallback>> supplicant_callbacks_;
+	// Map of all the callbacks registered for P2P interface specific
 	// hidl objects controlled by wpa_supplicant.  This map is keyed in by
 	// the corresponding |ifname|.
 	std::map<
 	    const std::string,
-	    std::vector<android::sp<android::hardware::wifi::supplicant::V1_0::
-					ISupplicantIfaceCallback>>>
-	    iface_callbacks_map_;
-	// Map of all the callbacks registered for network specific
+	    std::vector<android::sp<ISupplicantP2pIfaceCallback>>>
+	    p2p_iface_callbacks_map_;
+	// Map of all the callbacks registered for STA interface specific
+	// hidl objects controlled by wpa_supplicant.  This map is keyed in by
+	// the corresponding |ifname|.
+	std::map<
+	    const std::string,
+	    std::vector<android::sp<ISupplicantStaIfaceCallback>>>
+	    sta_iface_callbacks_map_;
+	// Map of all the callbacks registered for P2P network specific
 	// hidl objects controlled by wpa_supplicant.  This map is keyed in by
 	// the corresponding |ifname| & |network_id|.
 	std::map<
 	    const std::string,
-	    std::vector<android::sp<android::hardware::wifi::supplicant::V1_0::
-					ISupplicantNetworkCallback>>>
-	    network_callbacks_map_;
+	    std::vector<android::sp<ISupplicantP2pNetworkCallback>>>
+	    p2p_network_callbacks_map_;
+	// Map of all the callbacks registered for STA network specific
+	// hidl objects controlled by wpa_supplicant.  This map is keyed in by
+	// the corresponding |ifname| & |network_id|.
+	std::map<
+	    const std::string,
+	    std::vector<android::sp<ISupplicantStaNetworkCallback>>>
+	    sta_network_callbacks_map_;
 
 	/**
 	 * Helper class used to deregister the callback object reference from
