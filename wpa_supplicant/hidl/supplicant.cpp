@@ -64,6 +64,14 @@ Return<void> Supplicant::setDebugParams(
 	    show_timestamp, show_keys);
 }
 
+Return<void> Supplicant::setConcurrencyPriority(
+    IfaceType type, setConcurrencyPriority_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &Supplicant::setConcurrencyPriorityInternal, _hidl_cb, type);
+}
+
 Return<ISupplicant::DebugLevel> Supplicant::getDebugLevel()
 {
 	// TODO: Add SupplicantStatus in this method return for uniformity with
@@ -153,6 +161,12 @@ SupplicantStatus Supplicant::setDebugParamsInternal(
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus Supplicant::setConcurrencyPriorityInternal(IfaceType type)
+{
+	// TODO: Add implementation.
+	return SupplicantStatus{SupplicantStatusCode::SUCCESS, ""};
 }
 }  // namespace implementation
 }  // namespace V1_0
