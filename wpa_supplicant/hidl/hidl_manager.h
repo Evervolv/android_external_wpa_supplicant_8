@@ -196,109 +196,87 @@ private:
 // avoid nasty runtime conversion functions. So, adding compile time asserts
 // to guard against any internal changes breaking the hidl interface.
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicant::DebugLevel::EXCESSIVE) ==
-	MSG_EXCESSIVE,
+    static_cast<uint32_t>(ISupplicant::DebugLevel::EXCESSIVE) == MSG_EXCESSIVE,
     "Debug level value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicant::DebugLevel::ERROR) == MSG_ERROR,
+    static_cast<uint32_t>(ISupplicant::DebugLevel::ERROR) == MSG_ERROR,
     "Debug level value mismatch");
 
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::KeyMgmtMask::NONE) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::NONE) ==
 	WPA_KEY_MGMT_NONE,
     "KeyMgmt value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::KeyMgmtMask::WPA_PSK) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::WPA_PSK) ==
 	WPA_KEY_MGMT_PSK,
     "KeyMgmt value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::KeyMgmtMask::WPA_EAP) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::WPA_EAP) ==
 	WPA_KEY_MGMT_IEEE8021X,
     "KeyMgmt value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::KeyMgmtMask::IEEE8021X) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::IEEE8021X) ==
 	WPA_KEY_MGMT_IEEE8021X_NO_WPA,
     "KeyMgmt value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::ProtoMask::WPA) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::WPA) ==
 	WPA_PROTO_WPA,
     "Proto value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::ProtoMask::RSN) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::RSN) ==
 	WPA_PROTO_RSN,
     "Proto value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::ProtoMask::OSEN) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::OSEN) ==
 	WPA_PROTO_OSEN,
     "Proto value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::AuthAlgMask::OPEN) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::AuthAlgMask::OPEN) ==
 	WPA_AUTH_ALG_OPEN,
     "AuthAlg value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::AuthAlgMask::SHARED) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::AuthAlgMask::SHARED) ==
 	WPA_AUTH_ALG_SHARED,
     "AuthAlg value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::AuthAlgMask::LEAP) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::AuthAlgMask::LEAP) ==
 	WPA_AUTH_ALG_LEAP,
     "AuthAlg value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::GroupCipherMask::WEP40) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::WEP40) ==
 	WPA_CIPHER_WEP40,
     "GroupCipher value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::GroupCipherMask::WEP104) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::WEP104) ==
 	WPA_CIPHER_WEP104,
     "GroupCipher value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::GroupCipherMask::TKIP) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::TKIP) ==
 	WPA_CIPHER_TKIP,
     "GroupCipher value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::GroupCipherMask::CCMP) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::CCMP) ==
 	WPA_CIPHER_CCMP,
     "GroupCipher value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::PairwiseCipherMask::NONE) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::NONE) ==
 	WPA_CIPHER_NONE,
     "PairwiseCipher value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::PairwiseCipherMask::TKIP) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::TKIP) ==
 	WPA_CIPHER_TKIP,
     "PairwiseCipher value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantNetwork::PairwiseCipherMask::CCMP) ==
+    static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::CCMP) ==
 	WPA_CIPHER_CCMP,
     "PairwiseCipher value mismatch");
 
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantIfaceCallback::State::DISCONNECTED) ==
+    static_cast<uint32_t>(ISupplicantStaIfaceCallback::State::DISCONNECTED) ==
 	WPA_DISCONNECTED,
     "State value mismatch");
 static_assert(
-    static_cast<uint32_t>(android::hardware::wifi::supplicant::V1_0::
-			      ISupplicantIfaceCallback::State::COMPLETED) ==
+    static_cast<uint32_t>(ISupplicantStaIfaceCallback::State::COMPLETED) ==
 	WPA_COMPLETED,
     "State value mismatch");
 

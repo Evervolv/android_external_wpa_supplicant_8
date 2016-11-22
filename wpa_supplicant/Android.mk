@@ -1669,8 +1669,8 @@ LOCAL_C_INCLUDES := $(INCLUDES)
 LOCAL_SRC_FILES := \
     hidl/hidl.cpp \
     hidl/hidl_manager.cpp \
-    hidl/iface.cpp \
-    hidl/network.cpp \
+    hidl/sta_iface.cpp \
+    hidl/sta_network.cpp \
     hidl/supplicant.cpp
 LOCAL_SHARED_LIBRARIES := \
     android.hardware.wifi.supplicant@1.0 \
