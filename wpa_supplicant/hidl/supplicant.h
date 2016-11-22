@@ -39,6 +39,7 @@ class Supplicant : public android::hardware::wifi::supplicant::V1_0::ISupplicant
 public:
 	Supplicant(struct wpa_global* global);
 	~Supplicant() override = default;
+	bool isValid();
 
 	// Hidl methods exposed.
 	Return<void> getInterface(
@@ -53,8 +54,21 @@ public:
 	Return<ISupplicant::DebugLevel> getDebugLevel() override;
 	Return<bool> isDebugShowTimestampEnabled() override;
 	Return<bool> isDebugShowKeysEnabled() override;
+	Return<void> setConcurrencyPriority(
+	    IfaceType type, setConcurrencyPriority_cb _hidl_cb) override;
 
 private:
+	// Corresponding worker functions for the HIDL methods.
+	std::pair<SupplicantStatus, sp<ISupplicantIface>> getInterfaceInternal(
+	    const IfaceInfo& iface_info);
+	std::pair<SupplicantStatus, std::vector<ISupplicant::IfaceInfo>>
+	listInterfacesInternal();
+	SupplicantStatus registerCallbackInternal(
+	    const sp<ISupplicantCallback>& callback);
+	SupplicantStatus setDebugParamsInternal(
+	    ISupplicant::DebugLevel level, bool show_timestamp, bool show_keys);
+	SupplicantStatus setConcurrencyPriorityInternal(IfaceType type);
+
 	// Raw pointer to the global structure maintained by the core.
 	struct wpa_global* wpa_global_;
 	// Driver name to be used for creating interfaces.
