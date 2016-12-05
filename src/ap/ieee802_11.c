@@ -1580,8 +1580,15 @@ static void handle_auth(struct hostapd_data *hapd,
 	 *
 	 * In mesh mode, the station was already added to the driver when the
 	 * NEW_PEER_CANDIDATE event is received.
+	 *
+	 * If PMF was negotiated for the existing association, skip this to
+	 * avoid dropping the STA entry and the associated keys. This is needed
+	 * to allow the original connection work until the attempt can complete
+	 * (re)association, so that unprotected Authentication frame cannot be
+	 * used to bypass PMF protection.
 	 */
 	if (FULL_AP_CLIENT_STATE_SUPP(hapd->iface->drv_flags) &&
+	    (!(sta->flags & WLAN_STA_MFP) || !ap_sta_is_authorized(sta)) &&
 	    !(hapd->conf->mesh & MESH_ENABLED) &&
 	    !(sta->added_unassoc)) {
 		/*
@@ -3225,16 +3232,6 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 	sta->sa_query_timed_out = 0;
 #endif /* CONFIG_IEEE80211W */
 
-	if (sta->flags & WLAN_STA_WDS) {
-		int ret;
-		char ifname_wds[IFNAMSIZ + 1];
-
-		ret = hostapd_set_wds_sta(hapd, ifname_wds, sta->addr,
-					  sta->aid, 1);
-		if (!ret)
-			hostapd_set_wds_encryption(hapd, sta, ifname_wds);
-	}
-
 	if (sta->eapol_sm == NULL) {
 		/*
 		 * This STA does not use RADIUS server for EAP authentication,
@@ -3250,6 +3247,19 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 	}
 
 	hostapd_set_sta_flags(hapd, sta);
+
+	if (sta->flags & WLAN_STA_WDS) {
+		int ret;
+		char ifname_wds[IFNAMSIZ + 1];
+
+		wpa_printf(MSG_DEBUG, "Reenable 4-address WDS mode for STA "
+			   MACSTR " (aid %u)",
+			   MAC2STR(sta->addr), sta->aid);
+		ret = hostapd_set_wds_sta(hapd, ifname_wds, sta->addr,
+					  sta->aid, 1);
+		if (!ret)
+			hostapd_set_wds_encryption(hapd, sta, ifname_wds);
+	}
 
 	if (sta->auth_alg == WLAN_AUTH_FT)
 		wpa_auth_sm_event(sta->wpa_sm, WPA_ASSOC_FT);

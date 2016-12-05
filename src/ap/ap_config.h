@@ -601,6 +601,8 @@ struct hostapd_bss_config {
 	u8 fils_cache_id[FILS_CACHE_ID_LEN];
 	int fils_cache_id_set;
 #endif /* CONFIG_FILS */
+
+	int multicast_to_unicast;
 };
 
 
@@ -626,6 +628,8 @@ struct hostapd_config {
 
 	int *supported_rates;
 	int *basic_rates;
+	unsigned int beacon_rate;
+	enum beacon_rate_type rate_type;
 
 	const struct wpa_driver_ops *driver;
 	char *driver_params;

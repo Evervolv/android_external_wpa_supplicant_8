@@ -142,6 +142,7 @@ struct ieee802_1x_kay_ctx {
 	int (*macsec_deinit)(void *ctx);
 	int (*macsec_get_capability)(void *priv, enum macsec_cap *cap);
 	int (*enable_protect_frames)(void *ctx, Boolean enabled);
+	int (*enable_encrypt)(void *ctx, Boolean enabled);
 	int (*set_replay_protect)(void *ctx, Boolean enabled, u32 window);
 	int (*set_current_cipher_suite)(void *ctx, u64 cs);
 	int (*enable_controlled_port)(void *ctx, Boolean enabled);
@@ -181,6 +182,7 @@ struct ieee802_1x_kay {
 	enum macsec_cap macsec_capable;
 	Boolean macsec_desired;
 	Boolean macsec_protect;
+	Boolean macsec_encrypt;
 	Boolean macsec_replay_protect;
 	u32 macsec_replay_window;
 	enum validate_frames macsec_validate;
@@ -229,9 +231,11 @@ struct ieee802_1x_kay {
 };
 
 
+u64 mka_sci_u64(struct ieee802_1x_mka_sci *sci);
+
 struct ieee802_1x_kay *
 ieee802_1x_kay_init(struct ieee802_1x_kay_ctx *ctx, enum macsec_policy policy,
-		    const char *ifname, const u8 *addr);
+		    u16 port, const char *ifname, const u8 *addr);
 void ieee802_1x_kay_deinit(struct ieee802_1x_kay *kay);
 
 struct ieee802_1x_mka_participant *
