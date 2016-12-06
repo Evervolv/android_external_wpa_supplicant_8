@@ -379,6 +379,17 @@ ieee802_1x_kay_get_cipher_suite(struct ieee802_1x_mka_participant *participant,
 }
 
 
+u64 mka_sci_u64(struct ieee802_1x_mka_sci *sci)
+{
+	struct ieee802_1x_mka_sci tmp;
+
+	os_memcpy(tmp.addr, sci->addr, ETH_ALEN);
+	tmp.port = sci->port;
+
+	return *((u64 *) &tmp);
+}
+
+
 static Boolean sci_equal(const struct ieee802_1x_mka_sci *a,
 			 const struct ieee802_1x_mka_sci *b)
 {
@@ -3071,7 +3082,7 @@ static void kay_l2_receive(void *ctx, const u8 *src_addr, const u8 *buf,
  */
 struct ieee802_1x_kay *
 ieee802_1x_kay_init(struct ieee802_1x_kay_ctx *ctx, enum macsec_policy policy,
-		    const char *ifname, const u8 *addr)
+		    u16 port, const char *ifname, const u8 *addr)
 {
 	struct ieee802_1x_kay *kay;
 
@@ -3093,7 +3104,7 @@ ieee802_1x_kay_init(struct ieee802_1x_kay_ctx *ctx, enum macsec_policy policy,
 
 	os_strlcpy(kay->if_name, ifname, IFNAMSIZ);
 	os_memcpy(kay->actor_sci.addr, addr, ETH_ALEN);
-	kay->actor_sci.port = host_to_be16(0x0001);
+	kay->actor_sci.port = host_to_be16(port ? port : 0x0001);
 	kay->actor_priority = DEFAULT_PRIO_NOT_KEY_SERVER;
 
 	/* While actor acts as a key server, shall distribute sakey */
@@ -3111,7 +3122,14 @@ ieee802_1x_kay_init(struct ieee802_1x_kay_ctx *ctx, enum macsec_policy policy,
 
 	dl_list_init(&kay->participant_list);
 
-	if (policy == DO_NOT_SECURE) {
+	if (policy != DO_NOT_SECURE &&
+	    secy_get_capability(kay, &kay->macsec_capable) < 0) {
+		os_free(kay);
+		return NULL;
+	}
+
+	if (policy == DO_NOT_SECURE ||
+	    kay->macsec_capable == MACSEC_CAP_NOT_IMPLEMENTED) {
 		kay->macsec_capable = MACSEC_CAP_NOT_IMPLEMENTED;
 		kay->macsec_desired = FALSE;
 		kay->macsec_protect = FALSE;
@@ -3120,20 +3138,16 @@ ieee802_1x_kay_init(struct ieee802_1x_kay_ctx *ctx, enum macsec_policy policy,
 		kay->macsec_replay_window = 0;
 		kay->macsec_confidentiality = CONFIDENTIALITY_NONE;
 	} else {
-		if (secy_get_capability(kay, &kay->macsec_capable) < 0) {
-			os_free(kay);
-			return NULL;
-		}
-
 		kay->macsec_desired = TRUE;
 		kay->macsec_protect = TRUE;
+		kay->macsec_encrypt = policy == SHOULD_ENCRYPT;
 		kay->macsec_validate = Strict;
 		kay->macsec_replay_protect = FALSE;
 		kay->macsec_replay_window = 0;
 		if (kay->macsec_capable >= MACSEC_CAP_INTEG_AND_CONF)
 			kay->macsec_confidentiality = CONFIDENTIALITY_OFFSET_0;
 		else
-			kay->macsec_confidentiality = MACSEC_CAP_INTEGRITY;
+			kay->macsec_confidentiality = CONFIDENTIALITY_NONE;
 	}
 
 	wpa_printf(MSG_DEBUG, "KaY: state machine created");
@@ -3337,8 +3351,16 @@ ieee802_1x_kay_create_mka(struct ieee802_1x_kay *kay, struct mka_key_name *ckn,
 	usecs = os_random() % (MKA_HELLO_TIME * 1000);
 	eloop_register_timeout(0, usecs, ieee802_1x_participant_timer,
 			       participant, NULL);
-	participant->mka_life = MKA_LIFE_TIME / 1000 + time(NULL) +
-		usecs / 1000000;
+
+	/* Disable MKA lifetime for PSK mode.
+	 * The peer(s) can take a long time to come up, because we
+	 * create a "standby" MKA, and we need it to remain live until
+	 * some peer appears.
+	 */
+	if (mode != PSK) {
+		participant->mka_life = MKA_LIFE_TIME / 1000 + time(NULL) +
+			usecs / 1000000;
+	}
 
 	return participant;
 

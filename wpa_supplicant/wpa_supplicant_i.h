@@ -652,6 +652,12 @@ struct wpa_supplicant {
 	int normal_scans; /* normal scans run before sched_scan */
 	int scan_for_connection; /* whether the scan request was triggered for
 				  * finding a connection */
+	/*
+	 * A unique cookie representing the vendor scan request. This cookie is
+	 * returned from the driver interface. 0 indicates that there is no
+	 * pending vendor scan request.
+	 */
+	u64 curr_scan_cookie;
 #define MAX_SCAN_ID 16
 	int scan_id[MAX_SCAN_ID];
 	unsigned int scan_id_count;
@@ -1310,6 +1316,6 @@ int wpa_is_bss_tmp_disallowed(struct wpa_supplicant *wpa_s, const u8 *bssid);
 struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 				     int i, struct wpa_bss *bss,
 				     struct wpa_ssid *group,
-				     int only_first_ssid);
+				     int only_first_ssid, int debug_print);
 
 #endif /* WPA_SUPPLICANT_I_H */

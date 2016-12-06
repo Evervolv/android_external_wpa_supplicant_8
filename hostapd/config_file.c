@@ -685,12 +685,12 @@ static int hostapd_config_parse_key_mgmt(int line, const char *value)
 			val |= WPA_KEY_MGMT_PSK;
 		else if (os_strcmp(start, "WPA-EAP") == 0)
 			val |= WPA_KEY_MGMT_IEEE8021X;
-#ifdef CONFIG_IEEE80211R
+#ifdef CONFIG_IEEE80211R_AP
 		else if (os_strcmp(start, "FT-PSK") == 0)
 			val |= WPA_KEY_MGMT_FT_PSK;
 		else if (os_strcmp(start, "FT-EAP") == 0)
 			val |= WPA_KEY_MGMT_FT_IEEE8021X;
-#endif /* CONFIG_IEEE80211R */
+#endif /* CONFIG_IEEE80211R_AP */
 #ifdef CONFIG_IEEE80211W
 		else if (os_strcmp(start, "WPA-PSK-SHA256") == 0)
 			val |= WPA_KEY_MGMT_PSK_SHA256;
@@ -716,12 +716,12 @@ static int hostapd_config_parse_key_mgmt(int line, const char *value)
 			val |= WPA_KEY_MGMT_FILS_SHA256;
 		else if (os_strcmp(start, "FILS-SHA384") == 0)
 			val |= WPA_KEY_MGMT_FILS_SHA384;
-#ifdef CONFIG_IEEE80211R
+#ifdef CONFIG_IEEE80211R_AP
 		else if (os_strcmp(start, "FT-FILS-SHA256") == 0)
 			val |= WPA_KEY_MGMT_FT_FILS_SHA256;
 		else if (os_strcmp(start, "FT-FILS-SHA384") == 0)
 			val |= WPA_KEY_MGMT_FT_FILS_SHA384;
-#endif /* CONFIG_IEEE80211R */
+#endif /* CONFIG_IEEE80211R_AP */
 #endif /* CONFIG_FILS */
 		else {
 			wpa_printf(MSG_ERROR, "Line %d: invalid key_mgmt '%s'",
@@ -991,7 +991,7 @@ static int hostapd_config_tx_queue(struct hostapd_config *conf,
 }
 
 
-#ifdef CONFIG_IEEE80211R
+#ifdef CONFIG_IEEE80211R_AP
 static int add_r0kh(struct hostapd_bss_config *bss, char *value)
 {
 	struct ft_remote_r0kh *r0kh;
@@ -1081,7 +1081,7 @@ static int add_r1kh(struct hostapd_bss_config *bss, char *value)
 
 	return 0;
 }
-#endif /* CONFIG_IEEE80211R */
+#endif /* CONFIG_IEEE80211R_AP */
 
 
 #ifdef CONFIG_IEEE80211N
@@ -2534,7 +2534,7 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "peerkey") == 0) {
 		bss->peerkey = atoi(pos);
 #endif /* CONFIG_PEERKEY */
-#ifdef CONFIG_IEEE80211R
+#ifdef CONFIG_IEEE80211R_AP
 	} else if (os_strcmp(buf, "mobility_domain") == 0) {
 		if (os_strlen(pos) != 2 * MOBILITY_DOMAIN_ID_LEN ||
 		    hexstr2bin(pos, bss->mobility_domain,
@@ -2574,7 +2574,7 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		bss->ft_over_ds = atoi(pos);
 	} else if (os_strcmp(buf, "ft_psk_generate_local") == 0) {
 		bss->ft_psk_generate_local = atoi(pos);
-#endif /* CONFIG_IEEE80211R */
+#endif /* CONFIG_IEEE80211R_AP */
 #ifndef CONFIG_NO_CTRL_IFACE
 	} else if (os_strcmp(buf, "ctrl_interface") == 0) {
 		os_free(bss->ctrl_interface);
@@ -2755,6 +2755,40 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 			wpa_printf(MSG_ERROR, "Line %d: invalid rate list",
 				   line);
 			return 1;
+		}
+	} else if (os_strcmp(buf, "beacon_rate") == 0) {
+		int val;
+
+		if (os_strncmp(pos, "ht:", 3) == 0) {
+			val = atoi(pos + 3);
+			if (val < 0 || val > 31) {
+				wpa_printf(MSG_ERROR,
+					   "Line %d: invalid beacon_rate HT-MCS %d",
+					   line, val);
+				return 1;
+			}
+			conf->rate_type = BEACON_RATE_HT;
+			conf->beacon_rate = val;
+		} else if (os_strncmp(pos, "vht:", 4) == 0) {
+			val = atoi(pos + 4);
+			if (val < 0 || val > 9) {
+				wpa_printf(MSG_ERROR,
+					   "Line %d: invalid beacon_rate VHT-MCS %d",
+					   line, val);
+				return 1;
+			}
+			conf->rate_type = BEACON_RATE_VHT;
+			conf->beacon_rate = val;
+		} else {
+			val = atoi(pos);
+			if (val < 10 || val > 10000) {
+				wpa_printf(MSG_ERROR,
+					   "Line %d: invalid legacy beacon_rate %d",
+					   line, val);
+				return 1;
+			}
+			conf->rate_type = BEACON_RATE_LEGACY;
+			conf->beacon_rate = val;
 		}
 	} else if (os_strcmp(buf, "preamble") == 0) {
 		if (atoi(pos))
@@ -3526,6 +3560,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		}
 		bss->fils_cache_id_set = 1;
 #endif /* CONFIG_FILS */
+	} else if (os_strcmp(buf, "multicast_to_unicast") == 0) {
+		bss->multicast_to_unicast = atoi(pos);
 	} else {
 		wpa_printf(MSG_ERROR,
 			   "Line %d: unknown configuration item '%s'",
