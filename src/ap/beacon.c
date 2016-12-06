@@ -1223,6 +1223,8 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 	params->dtim_period = hapd->conf->dtim_period;
 	params->beacon_int = hapd->iconf->beacon_int;
 	params->basic_rates = hapd->iface->basic_rates;
+	params->beacon_rate = hapd->iconf->beacon_rate;
+	params->rate_type = hapd->iconf->rate_type;
 	params->ssid = hapd->conf->ssid.ssid;
 	params->ssid_len = hapd->conf->ssid.ssid_len;
 	if ((hapd->conf->wpa & (WPA_PROTO_WPA | WPA_PROTO_RSN)) ==
@@ -1286,6 +1288,7 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 		params->osen = 1;
 	}
 #endif /* CONFIG_HS20 */
+	params->multicast_to_unicast = hapd->conf->multicast_to_unicast;
 	params->pbss = hapd->conf->pbss;
 	return 0;
 }
