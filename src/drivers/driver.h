@@ -458,6 +458,20 @@ struct wpa_driver_scan_params {
 	 */
 	const u8 *bssid;
 
+	/**
+	 * scan_cookie - Unique identification representing the scan request
+	 *
+	 * This scan_cookie carries a unique identification representing the
+	 * scan request if the host driver/kernel supports concurrent scan
+	 * requests. This cookie is returned from the corresponding driver
+	 * interface.
+	 *
+	 * Note: Unlike other parameters in this structure, scan_cookie is used
+	 * only to return information instead of setting parameters for the
+	 * scan.
+	 */
+	u64 scan_cookie;
+
 	/*
 	 * NOTE: Whenever adding new parameters here, please make sure
 	 * wpa_scan_clone_params() and wpa_scan_free_params() get updated with
@@ -965,6 +979,22 @@ struct wpa_driver_ap_params {
 	int *basic_rates;
 
 	/**
+	 * beacon_rate: Beacon frame data rate
+	 *
+	 * This parameter can be used to set a specific Beacon frame data rate
+	 * for the BSS. The interpretation of this value depends on the
+	 * rate_type (legacy: in 100 kbps units, HT: HT-MCS, VHT: VHT-MCS). If
+	 * beacon_rate == 0 and rate_type == 0 (BEACON_RATE_LEGACY), the default
+	 * Beacon frame data rate is used.
+	 */
+	unsigned int beacon_rate;
+
+	/**
+	 * beacon_rate_type: Beacon data rate type (legacy/HT/VHT)
+	 */
+	enum beacon_rate_type rate_type;
+
+	/**
 	 * proberesp - Probe Response template
 	 *
 	 * This is used by drivers that reply to Probe Requests internally in
@@ -1140,6 +1170,27 @@ struct wpa_driver_ap_params {
 	 * infrastructure BSS. Valid only for DMG network.
 	 */
 	int pbss;
+
+	/**
+	 * multicast_to_unicast - Whether to use multicast_to_unicast
+	 *
+	 * If this is non-zero, the AP is requested to perform multicast to
+	 * unicast conversion for ARP, IPv4, and IPv6 frames (possibly within
+	 * 802.1Q). If enabled, such frames are to be sent to each station
+	 * separately, with the DA replaced by their own MAC address rather
+	 * than the group address.
+	 *
+	 * Note that this may break certain expectations of the receiver, such
+	 * as the ability to drop unicast IP packets received within multicast
+	 * L2 frames, or the ability to not send ICMP destination unreachable
+	 * messages for packets received in L2 multicast (which is required,
+	 * but the receiver can't tell the difference if this new option is
+	 * enabled.)
+	 *
+	 * This also doesn't implement the 802.11 DMS (directed multicast
+	 * service).
+	 */
+	int multicast_to_unicast;
 };
 
 struct wpa_driver_mesh_bss_params {
@@ -1313,6 +1364,12 @@ struct wpa_driver_capa {
 #define WPA_DRIVER_FLAGS_P2P_LISTEN_OFFLOAD     0x0000020000000000ULL
 /** Driver supports FILS */
 #define WPA_DRIVER_FLAGS_SUPPORT_FILS		0x0000040000000000ULL
+/** Driver supports Beacon frame TX rate configuration (legacy rates) */
+#define WPA_DRIVER_FLAGS_BEACON_RATE_LEGACY	0x0000080000000000ULL
+/** Driver supports Beacon frame TX rate configuration (HT rates) */
+#define WPA_DRIVER_FLAGS_BEACON_RATE_HT		0x0000100000000000ULL
+/** Driver supports Beacon frame TX rate configuration (VHT rates) */
+#define WPA_DRIVER_FLAGS_BEACON_RATE_VHT	0x0000200000000000ULL
 	u64 flags;
 
 #define FULL_AP_CLIENT_STATE_SUPP(drv_flags) \
@@ -3339,6 +3396,15 @@ struct wpa_driver_ops {
 	int (*enable_protect_frames)(void *priv, Boolean enabled);
 
 	/**
+	 * enable_encrypt - Set encryption status
+	 * @priv: Private driver interface data
+	 * @enabled: TRUE = encrypt outgoing traffic
+	 *           FALSE = integrity-only protection on outgoing traffic
+	 * Returns: 0 on success, -1 on failure (or if not supported)
+	 */
+	int (*enable_encrypt)(void *priv, Boolean enabled);
+
+	/**
 	 * set_replay_protect - Set replay protect status and window size
 	 * @priv: Private driver interface data
 	 * @enabled: TRUE = replay protect enabled
@@ -3564,9 +3630,12 @@ struct wpa_driver_ops {
 	/**
 	 * abort_scan - Request the driver to abort an ongoing scan
 	 * @priv: Private driver interface data
+	 * @scan_cookie: Cookie identifying the scan request. This is used only
+	 *	when the vendor interface QCA_NL80211_VENDOR_SUBCMD_TRIGGER_SCAN
+	 *	was used to trigger scan. Otherwise, 0 is used.
 	 * Returns 0 on success, -1 on failure
 	 */
-	int (*abort_scan)(void *priv);
+	int (*abort_scan)(void *priv, u64 scan_cookie);
 
 	/**
 	 * configure_data_frame_filters - Request to configure frame filters
@@ -5002,6 +5071,10 @@ extern const struct wpa_driver_ops wpa_driver_wired_ops; /* driver_wired.c */
 /* driver_macsec_qca.c */
 extern const struct wpa_driver_ops wpa_driver_macsec_qca_ops;
 #endif /* CONFIG_DRIVER_MACSEC_QCA */
+#ifdef CONFIG_DRIVER_MACSEC_LINUX
+/* driver_macsec_linux.c */
+extern const struct wpa_driver_ops wpa_driver_macsec_linux_ops;
+#endif /* CONFIG_DRIVER_MACSEC_LINUX */
 #ifdef CONFIG_DRIVER_ROBOSWITCH
 /* driver_roboswitch.c */
 extern const struct wpa_driver_ops wpa_driver_roboswitch_ops;

@@ -1181,16 +1181,108 @@ static void wpa_driver_nl80211_event_rtm_dellink(void *ctx,
 }
 
 
-unsigned int nl80211_get_assoc_freq(struct wpa_driver_nl80211_data *drv)
+struct nl80211_get_assoc_freq_arg {
+	struct wpa_driver_nl80211_data *drv;
+	unsigned int assoc_freq;
+	unsigned int ibss_freq;
+	u8 assoc_bssid[ETH_ALEN];
+	u8 assoc_ssid[SSID_MAX_LEN];
+	u8 assoc_ssid_len;
+};
+
+static int nl80211_get_assoc_freq_handler(struct nl_msg *msg, void *arg)
+{
+	struct nlattr *tb[NL80211_ATTR_MAX + 1];
+	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
+	struct nlattr *bss[NL80211_BSS_MAX + 1];
+	static struct nla_policy bss_policy[NL80211_BSS_MAX + 1] = {
+		[NL80211_BSS_BSSID] = { .type = NLA_UNSPEC },
+		[NL80211_BSS_FREQUENCY] = { .type = NLA_U32 },
+		[NL80211_BSS_INFORMATION_ELEMENTS] = { .type = NLA_UNSPEC },
+		[NL80211_BSS_STATUS] = { .type = NLA_U32 },
+	};
+	struct nl80211_get_assoc_freq_arg *ctx = arg;
+	enum nl80211_bss_status status;
+
+	nla_parse(tb, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
+		  genlmsg_attrlen(gnlh, 0), NULL);
+	if (!tb[NL80211_ATTR_BSS] ||
+	    nla_parse_nested(bss, NL80211_BSS_MAX, tb[NL80211_ATTR_BSS],
+			     bss_policy) ||
+	    !bss[NL80211_BSS_STATUS])
+		return NL_SKIP;
+
+	status = nla_get_u32(bss[NL80211_BSS_STATUS]);
+	if (status == NL80211_BSS_STATUS_ASSOCIATED &&
+	    bss[NL80211_BSS_FREQUENCY]) {
+		ctx->assoc_freq = nla_get_u32(bss[NL80211_BSS_FREQUENCY]);
+		wpa_printf(MSG_DEBUG, "nl80211: Associated on %u MHz",
+			   ctx->assoc_freq);
+	}
+	if (status == NL80211_BSS_STATUS_IBSS_JOINED &&
+	    bss[NL80211_BSS_FREQUENCY]) {
+		ctx->ibss_freq = nla_get_u32(bss[NL80211_BSS_FREQUENCY]);
+		wpa_printf(MSG_DEBUG, "nl80211: IBSS-joined on %u MHz",
+			   ctx->ibss_freq);
+	}
+	if (status == NL80211_BSS_STATUS_ASSOCIATED &&
+	    bss[NL80211_BSS_BSSID]) {
+		os_memcpy(ctx->assoc_bssid,
+			  nla_data(bss[NL80211_BSS_BSSID]), ETH_ALEN);
+		wpa_printf(MSG_DEBUG, "nl80211: Associated with "
+			   MACSTR, MAC2STR(ctx->assoc_bssid));
+	}
+
+	if (status == NL80211_BSS_STATUS_ASSOCIATED &&
+	    bss[NL80211_BSS_INFORMATION_ELEMENTS]) {
+		const u8 *ie, *ssid;
+		size_t ie_len;
+
+		ie = nla_data(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
+		ie_len = nla_len(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
+		ssid = get_ie(ie, ie_len, WLAN_EID_SSID);
+		if (ssid && ssid[1] > 0 && ssid[1] <= SSID_MAX_LEN) {
+			ctx->assoc_ssid_len = ssid[1];
+			os_memcpy(ctx->assoc_ssid, ssid + 2, ssid[1]);
+		}
+	}
+
+	return NL_SKIP;
+}
+
+
+int nl80211_get_assoc_ssid(struct wpa_driver_nl80211_data *drv, u8 *ssid)
 {
 	struct nl_msg *msg;
 	int ret;
-	struct nl80211_bss_info_arg arg;
+	struct nl80211_get_assoc_freq_arg arg;
 
 	msg = nl80211_drv_msg(drv, NLM_F_DUMP, NL80211_CMD_GET_SCAN);
 	os_memset(&arg, 0, sizeof(arg));
 	arg.drv = drv;
-	ret = send_and_recv_msgs(drv, msg, bss_info_handler, &arg);
+	ret = send_and_recv_msgs(drv, msg, nl80211_get_assoc_freq_handler,
+				 &arg);
+	if (ret == 0) {
+		os_memcpy(ssid, arg.assoc_ssid, arg.assoc_ssid_len);
+		return arg.assoc_ssid_len;
+	}
+	wpa_printf(MSG_DEBUG, "nl80211: Scan result fetch failed: ret=%d (%s)",
+		   ret, strerror(-ret));
+	return ret;
+}
+
+
+unsigned int nl80211_get_assoc_freq(struct wpa_driver_nl80211_data *drv)
+{
+	struct nl_msg *msg;
+	int ret;
+	struct nl80211_get_assoc_freq_arg arg;
+
+	msg = nl80211_drv_msg(drv, NLM_F_DUMP, NL80211_CMD_GET_SCAN);
+	os_memset(&arg, 0, sizeof(arg));
+	arg.drv = drv;
+	ret = send_and_recv_msgs(drv, msg, nl80211_get_assoc_freq_handler,
+				 &arg);
 	if (ret == 0) {
 		unsigned int freq = drv->nlmode == NL80211_IFTYPE_ADHOC ?
 			arg.ibss_freq : arg.assoc_freq;
@@ -3517,6 +3609,147 @@ static int nl80211_set_mesh_config(void *priv,
 #endif /* CONFIG_MESH */
 
 
+static int nl80211_put_beacon_rate(struct nl_msg *msg, const u64 flags,
+				   struct wpa_driver_ap_params *params)
+{
+	struct nlattr *bands, *band;
+	struct nl80211_txrate_vht vht_rate;
+
+	if (!params->freq ||
+	    (params->beacon_rate == 0 &&
+	     params->rate_type == BEACON_RATE_LEGACY))
+		return 0;
+
+	bands = nla_nest_start(msg, NL80211_ATTR_TX_RATES);
+	if (!bands)
+		return -1;
+
+	switch (params->freq->mode) {
+	case HOSTAPD_MODE_IEEE80211B:
+	case HOSTAPD_MODE_IEEE80211G:
+		band = nla_nest_start(msg, NL80211_BAND_2GHZ);
+		break;
+	case HOSTAPD_MODE_IEEE80211A:
+		band = nla_nest_start(msg, NL80211_BAND_5GHZ);
+		break;
+	case HOSTAPD_MODE_IEEE80211AD:
+		band = nla_nest_start(msg, NL80211_BAND_60GHZ);
+		break;
+	default:
+		return 0;
+	}
+
+	if (!band)
+		return -1;
+
+	os_memset(&vht_rate, 0, sizeof(vht_rate));
+
+	switch (params->rate_type) {
+	case BEACON_RATE_LEGACY:
+		if (!(flags & WPA_DRIVER_FLAGS_BEACON_RATE_LEGACY)) {
+			wpa_printf(MSG_INFO,
+				   "nl80211: Driver does not support setting Beacon frame rate (legacy)");
+			return -1;
+		}
+
+		if (nla_put_u8(msg, NL80211_TXRATE_LEGACY,
+			       (u8) params->beacon_rate / 5) ||
+		    nla_put(msg, NL80211_TXRATE_HT, 0, NULL) ||
+		    (params->freq->vht_enabled &&
+		     nla_put(msg, NL80211_TXRATE_VHT, sizeof(vht_rate),
+			     &vht_rate)))
+			return -1;
+
+		wpa_printf(MSG_DEBUG, " * beacon_rate = legacy:%u (* 100 kbps)",
+			   params->beacon_rate);
+		break;
+	case BEACON_RATE_HT:
+		if (!(flags & WPA_DRIVER_FLAGS_BEACON_RATE_HT)) {
+			wpa_printf(MSG_INFO,
+				   "nl80211: Driver does not support setting Beacon frame rate (HT)");
+			return -1;
+		}
+		if (nla_put(msg, NL80211_TXRATE_LEGACY, 0, NULL) ||
+		    nla_put_u8(msg, NL80211_TXRATE_HT, params->beacon_rate) ||
+		    (params->freq->vht_enabled &&
+		     nla_put(msg, NL80211_TXRATE_VHT, sizeof(vht_rate),
+			     &vht_rate)))
+			return -1;
+		wpa_printf(MSG_DEBUG, " * beacon_rate = HT-MCS %u",
+			   params->beacon_rate);
+		break;
+	case BEACON_RATE_VHT:
+		if (!(flags & WPA_DRIVER_FLAGS_BEACON_RATE_VHT)) {
+			wpa_printf(MSG_INFO,
+				   "nl80211: Driver does not support setting Beacon frame rate (VHT)");
+			return -1;
+		}
+		vht_rate.mcs[0] = BIT(params->beacon_rate);
+		if (nla_put(msg, NL80211_TXRATE_LEGACY, 0, NULL))
+			return -1;
+		if (nla_put(msg, NL80211_TXRATE_HT, 0, NULL))
+			return -1;
+		if (nla_put(msg, NL80211_TXRATE_VHT, sizeof(vht_rate),
+			    &vht_rate))
+			return -1;
+		wpa_printf(MSG_DEBUG, " * beacon_rate = VHT-MCS %u",
+			   params->beacon_rate);
+		break;
+	}
+
+	nla_nest_end(msg, band);
+	nla_nest_end(msg, bands);
+
+	return 0;
+}
+
+
+static int nl80211_set_multicast_to_unicast(struct i802_bss *bss,
+					    int multicast_to_unicast)
+{
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+	int ret;
+
+	msg = nl80211_bss_msg(bss, 0, NL80211_CMD_SET_MULTICAST_TO_UNICAST);
+	if (!msg ||
+	    (multicast_to_unicast &&
+	     nla_put_flag(msg, NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED))) {
+		wpa_printf(MSG_ERROR,
+			   "nl80211: Failed to build NL80211_CMD_SET_MULTICAST_TO_UNICAST msg for %s",
+			   bss->ifname);
+		nlmsg_free(msg);
+		return -ENOBUFS;
+	}
+
+	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
+
+	switch (ret) {
+	case 0:
+		wpa_printf(MSG_DEBUG,
+			   "nl80211: multicast to unicast %s on interface %s",
+			   multicast_to_unicast ? "enabled" : "disabled",
+			   bss->ifname);
+		break;
+	case -EOPNOTSUPP:
+		if (!multicast_to_unicast)
+			break;
+		wpa_printf(MSG_INFO,
+			   "nl80211: multicast to unicast not supported on interface %s",
+			   bss->ifname);
+		break;
+	default:
+		wpa_printf(MSG_ERROR,
+			   "nl80211: %s multicast to unicast failed with %d (%s) on interface %s",
+			   multicast_to_unicast ? "enabling" : "disabling",
+			   ret, strerror(-ret), bss->ifname);
+		break;
+	}
+
+	return ret;
+}
+
+
 static int wpa_driver_nl80211_set_ap(void *priv,
 				     struct wpa_driver_ap_params *params)
 {
@@ -3547,6 +3780,8 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 		    params->tail, params->tail_len);
 	wpa_printf(MSG_DEBUG, "nl80211: ifindex=%d", bss->ifindex);
 	wpa_printf(MSG_DEBUG, "nl80211: beacon_int=%d", params->beacon_int);
+	wpa_printf(MSG_DEBUG, "nl80211: beacon_rate=%u", params->beacon_rate);
+	wpa_printf(MSG_DEBUG, "nl80211: rate_type=%d", params->rate_type);
 	wpa_printf(MSG_DEBUG, "nl80211: dtim_period=%d", params->dtim_period);
 	wpa_hexdump_ascii(MSG_DEBUG, "nl80211: ssid",
 			  params->ssid, params->ssid_len);
@@ -3556,6 +3791,7 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 	    nla_put(msg, NL80211_ATTR_BEACON_TAIL, params->tail_len,
 		    params->tail) ||
 	    nl80211_put_beacon_int(msg, params->beacon_int) ||
+	    nl80211_put_beacon_rate(msg, drv->capa.flags, params) ||
 	    nl80211_put_dtim_period(msg, params->dtim_period) ||
 	    nla_put(msg, NL80211_ATTR_SSID, params->ssid_len, params->ssid))
 		goto fail;
@@ -3733,6 +3969,8 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 		nl80211_set_bss(bss, params->cts_protect, params->preamble,
 				params->short_slot_time, params->ht_opmode,
 				params->isolate, params->basic_rates);
+		nl80211_set_multicast_to_unicast(bss,
+						 params->multicast_to_unicast);
 		if (beacon_set && params->freq &&
 		    params->freq->bandwidth != bss->bandwidth) {
 			wpa_printf(MSG_DEBUG,
@@ -5647,8 +5885,6 @@ static int i802_read_sta_data(struct i802_bss *bss,
 {
 	struct nl_msg *msg;
 
-	os_memset(data, 0, sizeof(*data));
-
 	if (!(msg = nl80211_bss_msg(bss, 0, NL80211_CMD_GET_STATION)) ||
 	    nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr)) {
 		nlmsg_free(msg);
@@ -5754,6 +5990,7 @@ static int i802_get_inact_sec(void *priv, const u8 *addr)
 	struct hostap_sta_driver_data data;
 	int ret;
 
+	os_memset(&data, 0, sizeof(data));
 	data.inactive_msec = (unsigned long) -1;
 	ret = i802_read_sta_data(priv, &data, addr);
 	if (ret == -ENOENT)
@@ -7756,6 +7993,8 @@ static int driver_nl80211_read_sta_data(void *priv,
 					const u8 *addr)
 {
 	struct i802_bss *bss = priv;
+
+	os_memset(data, 0, sizeof(*data));
 	return i802_read_sta_data(bss, data, addr);
 }
 

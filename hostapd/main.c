@@ -480,7 +480,7 @@ static void usage(void)
 		"   -f   log output to debug file instead of stdout\n"
 #endif /* CONFIG_DEBUG_FILE */
 #ifdef CONFIG_DEBUG_LINUX_TRACING
-		"   -T = record to Linux tracing in addition to logging\n"
+		"   -T   record to Linux tracing in addition to logging\n"
 		"        (records all messages regardless of debug verbosity)\n"
 #endif /* CONFIG_DEBUG_LINUX_TRACING */
 		"   -i   list of interface names to use\n"
@@ -549,14 +549,14 @@ static int hostapd_get_ctrl_iface_group(struct hapd_interfaces *interfaces,
 
 static int hostapd_get_interface_names(char ***if_names,
 				       size_t *if_names_size,
-				       char *optarg)
+				       char *arg)
 {
 	char *if_name, *tmp, **nnames;
 	size_t i;
 
-	if (!optarg)
+	if (!arg)
 		return -1;
-	if_name = strtok_r(optarg, ",", &tmp);
+	if_name = strtok_r(arg, ",", &tmp);
 
 	while (if_name) {
 		nnames = os_realloc_array(*if_names, 1 + *if_names_size,
