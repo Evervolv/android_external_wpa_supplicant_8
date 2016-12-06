@@ -176,6 +176,17 @@ static void wpas_trigger_scan_cb(struct wpa_radio_work *work, int deinit)
 		params->only_new_results = 1;
 	}
 	ret = wpa_drv_scan(wpa_s, params);
+	/*
+	 * Store the obtained vendor scan cookie (if any) in wpa_s context.
+	 * The current design is to allow only one scan request on each
+	 * interface, hence having this scan cookie stored in wpa_s context is
+	 * fine for now.
+	 *
+	 * Revisit this logic if concurrent scan operations per interface
+	 * is supported.
+	 */
+	if (ret == 0)
+		wpa_s->curr_scan_cookie = params->scan_cookie;
 	wpa_scan_free_params(params);
 	work->ctx = NULL;
 	if (ret) {
@@ -703,11 +714,6 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 	size_t max_ssids;
 	int connect_without_scan = 0;
 
-	if (wpa_s->pno || wpa_s->pno_sched_pending) {
-		wpa_dbg(wpa_s, MSG_DEBUG, "Skip scan - PNO is in progress");
-		return;
-	}
-
 	if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED) {
 		wpa_dbg(wpa_s, MSG_DEBUG, "Skip scan - interface disabled");
 		return;
@@ -765,6 +771,21 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 	     (ssid->mode != WPAS_MODE_AP && ssid->mode != WPAS_MODE_P2P_GO))) {
 		wpa_dbg(wpa_s, MSG_DEBUG, "Delay station mode scan while P2P operation is in progress");
 		wpa_supplicant_req_scan(wpa_s, 5, 0);
+		return;
+	}
+
+	/*
+	 * Don't cancel the scan based on ongoing PNO; defer it. Some scans are
+	 * used for changing modes inside wpa_supplicant (roaming,
+	 * auto-reconnect, etc). Discarding the scan might hurt these processes.
+	 * The normal use case for PNO is to suspend the host immediately after
+	 * starting PNO, so the periodic 100 ms attempts to run the scan do not
+	 * normally happen in practice multiple times, i.e., this is simply
+	 * restarting scanning once the host is woken up and PNO stopped.
+	 */
+	if (wpa_s->pno || wpa_s->pno_sched_pending) {
+		wpa_dbg(wpa_s, MSG_DEBUG, "Defer scan - PNO is in progress");
+		wpa_supplicant_req_scan(wpa_s, 0, 100000);
 		return;
 	}
 
@@ -1047,7 +1068,8 @@ ssid_list_set:
 	}
 #endif /* CONFIG_P2P */
 
-	if (wpa_s->mac_addr_rand_enable & MAC_ADDR_RAND_SCAN) {
+	if ((wpa_s->mac_addr_rand_enable & MAC_ADDR_RAND_SCAN) &&
+	    wpa_s->wpa_state <= WPA_SCANNING) {
 		params.mac_addr_rand = 1;
 		if (wpa_s->mac_addr_scan) {
 			params.mac_addr = wpa_s->mac_addr_scan;
@@ -1469,7 +1491,8 @@ scan:
 
 	wpa_setband_scan_freqs(wpa_s, scan_params);
 
-	if (wpa_s->mac_addr_rand_enable & MAC_ADDR_RAND_SCHED_SCAN) {
+	if ((wpa_s->mac_addr_rand_enable & MAC_ADDR_RAND_SCHED_SCAN) &&
+	    wpa_s->wpa_state <= WPA_SCANNING) {
 		params.mac_addr_rand = 1;
 		if (wpa_s->mac_addr_sched_scan) {
 			params.mac_addr = wpa_s->mac_addr_sched_scan;
@@ -2524,7 +2547,8 @@ int wpas_start_pno(struct wpa_supplicant *wpa_s)
 		params.freqs = wpa_s->manual_sched_scan_freqs;
 	}
 
-	if (wpa_s->mac_addr_rand_enable & MAC_ADDR_RAND_PNO) {
+	if ((wpa_s->mac_addr_rand_enable & MAC_ADDR_RAND_PNO) &&
+	    wpa_s->wpa_state <= WPA_SCANNING) {
 		params.mac_addr_rand = 1;
 		if (wpa_s->mac_addr_pno) {
 			params.mac_addr = wpa_s->mac_addr_pno;
@@ -2622,18 +2646,20 @@ int wpas_mac_addr_rand_scan_set(struct wpa_supplicant *wpa_s,
 
 int wpas_abort_ongoing_scan(struct wpa_supplicant *wpa_s)
 {
-	int scan_work = !!wpa_s->scan_work;
+	struct wpa_radio_work *work;
+	struct wpa_radio *radio = wpa_s->radio;
 
-#ifdef CONFIG_P2P
-	scan_work |= !!wpa_s->p2p_scan_work;
-#endif /* CONFIG_P2P */
-
-	if (scan_work && wpa_s->own_scan_running) {
+	dl_list_for_each(work, &radio->work, struct wpa_radio_work, list) {
+		if (work->wpa_s != wpa_s || !work->started ||
+		    (os_strcmp(work->type, "scan") != 0 &&
+		     os_strcmp(work->type, "p2p-scan") != 0))
+			continue;
 		wpa_dbg(wpa_s, MSG_DEBUG, "Abort an ongoing scan");
-		return wpa_drv_abort_scan(wpa_s);
+		return wpa_drv_abort_scan(wpa_s, wpa_s->curr_scan_cookie);
 	}
 
-	return 0;
+	wpa_dbg(wpa_s, MSG_DEBUG, "No ongoing scan/p2p-scan found to abort");
+	return -1;
 }
 
 

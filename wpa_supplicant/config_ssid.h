@@ -728,6 +728,47 @@ struct wpa_ssid {
 	 *    determine whether to use a secure session or not.
 	 */
 	int macsec_policy;
+
+	/**
+	 * macsec_integ_only - Determines how MACsec are transmitted
+	 *
+	 * This setting applies only when MACsec is in use, i.e.,
+	 *  - macsec_policy is enabled
+	 *  - the key server has decided to enable MACsec
+	 *
+	 * 0: Encrypt traffic (default)
+	 * 1: Integrity only
+	 */
+	int macsec_integ_only;
+
+	/**
+	 * macsec_port - MACsec port (in SCI)
+	 *
+	 * Port component of the SCI.
+	 *
+	 * Range: 1-65534 (default: 1)
+	 */
+	int macsec_port;
+
+	/**
+	 * mka_ckn - MKA pre-shared CKN
+	 */
+#define MACSEC_CKN_LEN 32
+	u8 mka_ckn[MACSEC_CKN_LEN];
+
+	/**
+	 * mka_cak - MKA pre-shared CAK
+	 */
+#define MACSEC_CAK_LEN 16
+	u8 mka_cak[MACSEC_CAK_LEN];
+
+#define MKA_PSK_SET_CKN BIT(0)
+#define MKA_PSK_SET_CAK BIT(1)
+#define MKA_PSK_SET (MKA_PSK_SET_CKN | MKA_PSK_SET_CAK)
+	/**
+	 * mka_psk_set - Whether mka_ckn and mka_cak are set
+	 */
+	u8 mka_psk_set;
 #endif /* CONFIG_MACSEC */
 
 #ifdef CONFIG_HS20

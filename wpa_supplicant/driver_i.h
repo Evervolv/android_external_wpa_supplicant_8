@@ -731,6 +731,14 @@ static inline int wpa_drv_enable_protect_frames(struct wpa_supplicant *wpa_s,
 	return wpa_s->driver->enable_protect_frames(wpa_s->drv_priv, enabled);
 }
 
+static inline int wpa_drv_enable_encrypt(struct wpa_supplicant *wpa_s,
+						Boolean enabled)
+{
+	if (!wpa_s->driver->enable_encrypt)
+		return -1;
+	return wpa_s->driver->enable_encrypt(wpa_s->drv_priv, enabled);
+}
+
 static inline int wpa_drv_set_replay_protect(struct wpa_supplicant *wpa_s,
 					     Boolean enabled, u32 window)
 {
@@ -908,11 +916,12 @@ static inline int wpa_drv_set_prob_oper_freq(struct wpa_supplicant *wpa_s,
 	return wpa_s->driver->set_prob_oper_freq(wpa_s->drv_priv, freq);
 }
 
-static inline int wpa_drv_abort_scan(struct wpa_supplicant *wpa_s)
+static inline int wpa_drv_abort_scan(struct wpa_supplicant *wpa_s,
+				     u64 scan_cookie)
 {
 	if (!wpa_s->driver->abort_scan)
 		return -1;
-	return wpa_s->driver->abort_scan(wpa_s->drv_priv);
+	return wpa_s->driver->abort_scan(wpa_s->drv_priv, scan_cookie);
 }
 
 static inline int wpa_drv_configure_frame_filters(struct wpa_supplicant *wpa_s,
