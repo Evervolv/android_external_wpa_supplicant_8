@@ -154,39 +154,40 @@ private:
 	SupplicantStatus stopFindInternal();
 	SupplicantStatus flushInternal();
 	std::pair<SupplicantStatus, std::vector<uint8_t>> connectInternal(
-	    const hidl_array<uint8_t, 6>& peer_address,
+	    const std::array<uint8_t, 6>& peer_address,
 	    ISupplicantP2pIface::WpsProvisionMethod provision_method,
-	    const hidl_vec<uint8_t>& pre_selected_pin, bool join_existing_group,
-	    bool persistent, uint32_t go_intent);
+	    const std::vector<uint8_t>& pre_selected_pin,
+	    bool join_existing_group, bool persistent, uint32_t go_intent);
 	SupplicantStatus cancelConnectInternal();
 	SupplicantStatus provisionDiscoveryInternal(
-	    const hidl_array<uint8_t, 6>& peer_address,
+	    const std::array<uint8_t, 6>& peer_address,
 	    ISupplicantP2pIface::WpsProvisionMethod provision_method);
 	SupplicantStatus addGroupInternal(
 	    bool persistent, uint32_t persistent_network_id);
 	SupplicantStatus removeGroupInternal(const hidl_string& group_ifname);
 	SupplicantStatus rejectInternal(
-	    const hidl_array<uint8_t, 6>& peer_address);
+	    const std::array<uint8_t, 6>& peer_address);
 	SupplicantStatus inviteInternal(
 	    const hidl_string& group_ifname,
-	    const hidl_array<uint8_t, 6>& go_device_address,
-	    const hidl_array<uint8_t, 6>& peer_address);
+	    const std::array<uint8_t, 6>& go_device_address,
+	    const std::array<uint8_t, 6>& peer_address);
 	SupplicantStatus reinvokeInternal(
 	    uint32_t persistent_network_id,
-	    const hidl_array<uint8_t, 6>& peer_address);
+	    const std::array<uint8_t, 6>& peer_address);
 	SupplicantStatus configureExtListenInternal(
 	    bool enable, uint32_t period_in_millis,
 	    uint32_t interval_in_millis);
 	SupplicantStatus setListenChannelInternal(
 	    uint32_t channel, uint32_t operating_class);
 	std::pair<SupplicantStatus, std::vector<uint8_t>> getSsidInternal(
-	    const hidl_array<uint8_t, 6>& peer_address);
+	    const std::array<uint8_t, 6>& peer_address);
 	std::pair<SupplicantStatus, uint32_t> getGroupCapabilityInternal(
-	    const hidl_array<uint8_t, 6>& peer_address);
+	    const std::array<uint8_t, 6>& peer_address);
 	SupplicantStatus addBonjourServiceInternal(
-	    const hidl_vec<uint8_t>& query, const hidl_vec<uint8_t>& response);
+	    const std::vector<uint8_t>& query,
+	    const std::vector<uint8_t>& response);
 	SupplicantStatus removeBonjourServiceInternal(
-	    const hidl_vec<uint8_t>& query);
+	    const std::vector<uint8_t>& query);
 	SupplicantStatus addUpnpServiceInternal(
 	    uint32_t version, const hidl_string& service_name);
 	SupplicantStatus removeUpnpServiceInternal(
@@ -194,8 +195,8 @@ private:
 	SupplicantStatus flushServicesInternal(
 	    uint32_t version, const hidl_string& service_name);
 	std::pair<SupplicantStatus, uint64_t> requestServiceDiscoveryInternal(
-	    const hidl_array<uint8_t, 6>& peer_address,
-	    const hidl_vec<uint8_t>& query);
+	    const std::array<uint8_t, 6>& peer_address,
+	    const std::vector<uint8_t>& query);
 	SupplicantStatus cancelServiceDiscoveryInternal(uint64_t identifier);
 
 	struct wpa_supplicant* retrieveIfacePtr();
