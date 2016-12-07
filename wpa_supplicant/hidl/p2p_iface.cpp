@@ -196,8 +196,8 @@ Return<void> P2pIface::invite(
 {
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
-	    &P2pIface::inviteInternal, _hidl_cb, go_device_address,
-	    peer_address);
+	    &P2pIface::inviteInternal, _hidl_cb, group_ifname,
+	    go_device_address, peer_address);
 }
 
 Return<void> P2pIface::reinvoke(
@@ -296,8 +296,8 @@ Return<void> P2pIface::requestServiceDiscovery(
 {
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
-	    &P2pIface::requestServiceDiscoveryInternal, _hidl_cb, version,
-	    peer_address, query);
+	    &P2pIface::requestServiceDiscoveryInternal, _hidl_cb, peer_address,
+	    query);
 }
 
 Return<void> P2pIface::cancelServiceDiscovery(
@@ -435,9 +435,9 @@ SupplicantStatus P2pIface::flushInternal()
 }
 
 std::pair<SupplicantStatus, std::vector<uint8_t>> P2pIface::connectInternal(
-    const hidl_array<uint8_t, 6>& peer_address,
+    const std::array<uint8_t, 6>& peer_address,
     ISupplicantP2pIface::WpsProvisionMethod provision_method,
-    const hidl_vec<uint8_t>& pre_selected_pin, bool join_existing_group,
+    const std::vector<uint8_t>& pre_selected_pin, bool join_existing_group,
     bool persistent, uint32_t go_intent)
 {
 	// TODO: Add implementation.
@@ -451,7 +451,7 @@ SupplicantStatus P2pIface::cancelConnectInternal()
 }
 
 SupplicantStatus P2pIface::provisionDiscoveryInternal(
-    const hidl_array<uint8_t, 6>& peer_address,
+    const std::array<uint8_t, 6>& peer_address,
     ISupplicantP2pIface::WpsProvisionMethod provision_method)
 {
 	// TODO: Add implementation.
@@ -472,7 +472,7 @@ SupplicantStatus P2pIface::removeGroupInternal(const hidl_string& group_ifname)
 }
 
 SupplicantStatus P2pIface::rejectInternal(
-    const hidl_array<uint8_t, 6>& peer_address)
+    const std::array<uint8_t, 6>& peer_address)
 {
 	// TODO: Add implementation.
 	return {SupplicantStatusCode::SUCCESS, ""};
@@ -480,15 +480,15 @@ SupplicantStatus P2pIface::rejectInternal(
 
 SupplicantStatus P2pIface::inviteInternal(
     const hidl_string& group_ifname,
-    const hidl_array<uint8_t, 6>& go_device_address,
-    const hidl_array<uint8_t, 6>& peer_address)
+    const std::array<uint8_t, 6>& go_device_address,
+    const std::array<uint8_t, 6>& peer_address)
 {
 	// TODO: Add implementation.
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
 SupplicantStatus P2pIface::reinvokeInternal(
-    uint32_t persistent_network_id, const hidl_array<uint8_t, 6>& peer_address)
+    uint32_t persistent_network_id, const std::array<uint8_t, 6>& peer_address)
 {
 	// TODO: Add implementation.
 	return {SupplicantStatusCode::SUCCESS, ""};
@@ -509,28 +509,28 @@ SupplicantStatus P2pIface::setListenChannelInternal(
 }
 
 std::pair<SupplicantStatus, std::vector<uint8_t>> P2pIface::getSsidInternal(
-    const hidl_array<uint8_t, 6>& peer_address)
+    const std::array<uint8_t, 6>& peer_address)
 {
 	// TODO: Add implementation.
 	return {{SupplicantStatusCode::SUCCESS, ""}, {}};
 }
 
 std::pair<SupplicantStatus, uint32_t> P2pIface::getGroupCapabilityInternal(
-    const hidl_array<uint8_t, 6>& peer_address)
+    const std::array<uint8_t, 6>& peer_address)
 {
 	// TODO: Add implementation.
 	return {{SupplicantStatusCode::SUCCESS, ""}, 0};
 }
 
 SupplicantStatus P2pIface::addBonjourServiceInternal(
-    const hidl_vec<uint8_t>& query, const hidl_vec<uint8_t>& response)
+    const std::vector<uint8_t>& query, const std::vector<uint8_t>& response)
 {
 	// TODO: Add implementation.
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
 SupplicantStatus P2pIface::removeBonjourServiceInternal(
-    const hidl_vec<uint8_t>& query)
+    const std::vector<uint8_t>& query)
 {
 	// TODO: Add implementation.
 	return {SupplicantStatusCode::SUCCESS, ""};
@@ -558,7 +558,8 @@ SupplicantStatus P2pIface::flushServicesInternal(
 }
 
 std::pair<SupplicantStatus, uint64_t> P2pIface::requestServiceDiscoveryInternal(
-    const hidl_array<uint8_t, 6>& peer_address, const hidl_vec<uint8_t>& query)
+    const std::array<uint8_t, 6>& peer_address,
+    const std::vector<uint8_t>& query)
 {
 	// TODO: Add implementation.
 	return {{SupplicantStatusCode::SUCCESS, ""}, 0};
