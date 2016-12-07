@@ -191,6 +191,7 @@ private:
 	    std::vector<android::sp<ISupplicantStaNetworkCallback>>>
 	    sta_network_callbacks_map_;
 
+#if 0  // TODO(b/31632518): HIDL object death notifications.
 	/**
 	 * Helper class used to deregister the callback object reference from
 	 * our callback list on the death of the hidl object.
@@ -222,6 +223,7 @@ private:
 		const std::function<void(const android::sp<CallbackType> &)>
 		    on_hidl_died_;
 	};
+#endif
 };
 
 // The hidl interface uses some values which are the same as internal ones to
