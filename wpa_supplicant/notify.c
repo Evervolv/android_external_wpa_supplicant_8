@@ -13,7 +13,6 @@
 #include "config.h"
 #include "wpa_supplicant_i.h"
 #include "wps_supplicant.h"
-#include "hidl/hidl.h"
 #include "dbus/dbus_common.h"
 #include "dbus/dbus_old.h"
 #include "dbus/dbus_new.h"
@@ -24,6 +23,7 @@
 #include "p2p_supplicant.h"
 #include "sme.h"
 #include "notify.h"
+#include "hidl/hidl.h"
 
 int wpas_notify_supplicant_initialized(struct wpa_global *global)
 {
@@ -871,6 +871,8 @@ void wpas_notify_anqp_query_done(struct wpa_supplicant *wpa_s, const u8* bssid,
 #ifdef CONFIG_INTERWORKING
 	if (!wpa_s || !bssid || !anqp)
 		return;
+
+	wpas_hidl_notify_anqp_query_done(wpa_s, bssid, result, anqp);
 #endif /* CONFIG_INTERWORKING */
 }
 
@@ -881,6 +883,9 @@ void wpas_notify_hs20_icon_query_done(struct wpa_supplicant *wpa_s, const u8* bs
 #ifdef CONFIG_HS20
 	if (!wpa_s || !bssid || !file_name || !image)
 		return;
+
+	wpas_hidl_notify_hs20_icon_query_done(wpa_s, bssid, file_name, image,
+					      image_length);
 #endif /* CONFIG_HS20 */
 }
 
@@ -891,6 +896,8 @@ void wpas_notify_hs20_rx_subscription_remediation(struct wpa_supplicant *wpa_s,
 #ifdef CONFIG_HS20
 	if (!wpa_s || !url)
 		return;
+
+	wpas_hidl_notify_hs20_rx_subscription_remediation(wpa_s, url, osu_method);
 #endif /* CONFIG_HS20 */
 }
 
@@ -901,5 +908,8 @@ void wpas_notify_hs20_rx_deauth_imminent_notice(struct wpa_supplicant *wpa_s,
 #ifdef CONFIG_HS20
 	if (!wpa_s || !url)
 		return;
+
+	wpas_hidl_notify_hs20_rx_deauth_imminent_notice(wpa_s, code, reauth_delay,
+							url);
 #endif /* CONFIG_HS20 */
 }
