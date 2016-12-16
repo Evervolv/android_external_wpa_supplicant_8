@@ -181,3 +181,80 @@ int wpas_hidl_notify_network_request(
 	return hidl_manager->notifyNetworkRequest(
 	    wpa_s, ssid, rtype, default_txt);
 }
+
+void wpas_hidl_notify_anqp_query_done(
+    struct wpa_supplicant *wpa_s, const u8 *bssid, const char *result,
+    const struct wpa_bss_anqp *anqp)
+{
+	if (!wpa_s || !wpa_s->global->hidl || !bssid || !result || !anqp)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying ANQP query done to hidl control: " MACSTR "result: %s",
+	    MAC2STR(bssid), result);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyAnqpQueryDone(wpa_s, bssid, result, anqp);
+}
+
+void wpas_hidl_notify_hs20_icon_query_done(
+    struct wpa_supplicant *wpa_s, const u8 *bssid, const char *file_name,
+    const u8 *image, u32 image_length)
+{
+	if (!wpa_s || !wpa_s->global->hidl || !bssid || !file_name || !image)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG, "Notifying HS20 icon query done to hidl control: " MACSTR
+		       "file_name: %s",
+	    MAC2STR(bssid), file_name);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyHs20IconQueryDone(
+	    wpa_s, bssid, file_name, image, image_length);
+}
+
+void wpas_hidl_notify_hs20_rx_subscription_remediation(
+    struct wpa_supplicant *wpa_s, const char *url, u8 osu_method)
+{
+	if (!wpa_s || !wpa_s->global->hidl || !url)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying HS20 subscription remediation rx to hidl control: %s",
+	    url);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyHs20RxSubscriptionRemediation(
+	    wpa_s, url, osu_method);
+}
+
+void wpas_hidl_notify_hs20_rx_deauth_imminent_notice(
+    struct wpa_supplicant *wpa_s, u8 code, u16 reauth_delay, const char *url)
+{
+	if (!wpa_s || !wpa_s->global->hidl || !url)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying HS20 deauth imminent notice rx to hidl control: %s",
+	    url);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyHs20RxDeauthImminentNotice(
+	    wpa_s, code, reauth_delay, url);
+}
