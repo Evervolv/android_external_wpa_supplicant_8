@@ -720,6 +720,67 @@ void HidlManager::notifyHs20RxDeauthImminentNotice(
 }
 
 /**
+ * Notify all listeners about the reason code for disconnection from the
+ * currently connected network.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface on which
+ * the network is present.
+ */
+void HidlManager::notifyDisconnectReason(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	const u8 *bssid = wpa_s->bssid;
+	if (is_zero_ether_addr(bssid)) {
+		bssid = wpa_s->pending_bssid;
+	}
+	std::array<uint8_t, 6> hidl_bssid;
+	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onDisconnected,
+		std::placeholders::_1, hidl_bssid, wpa_s->disconnect_reason < 0,
+		wpa_s->disconnect_reason));
+}
+
+/**
+ * Notify all listeners about association reject from the access point to which
+ * we are attempting to connect.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface on which
+ * the network is present.
+ */
+void HidlManager::notifyAssocReject(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	const u8 *bssid = wpa_s->bssid;
+	if (is_zero_ether_addr(bssid)) {
+		bssid = wpa_s->pending_bssid;
+	}
+	std::array<uint8_t, 6> hidl_bssid;
+	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onAssociationRejected,
+		std::placeholders::_1, hidl_bssid, wpa_s->assoc_status_code));
+}
+
+/**
  * Retrieve the |ISupplicantP2pIface| hidl object reference using the provided
  * ifname.
  *
