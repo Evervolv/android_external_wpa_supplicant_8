@@ -139,6 +139,9 @@ public:
 	    requestServiceDiscovery_cb _hidl_cb) override;
 	Return<void> cancelServiceDiscovery(
 	    uint64_t identifier, cancelServiceDiscovery_cb _hidl_cb) override;
+	Return<void> setMiracastMode(
+	    ISupplicantP2pIface::MiracastMode mode,
+	    setMiracastMode_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -211,6 +214,8 @@ private:
 	    const std::array<uint8_t, 6>& peer_address,
 	    const std::vector<uint8_t>& query);
 	SupplicantStatus cancelServiceDiscoveryInternal(uint64_t identifier);
+	SupplicantStatus setMiracastModeInternal(
+	    ISupplicantP2pIface::MiracastMode mode);
 
 	struct wpa_supplicant* retrieveIfacePtr();
 	struct wpa_supplicant* retrieveGroupIfacePtr(
