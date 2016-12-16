@@ -315,6 +315,53 @@ static_assert(
     "State value mismatch");
 
 static_assert(
+    static_cast<uint32_t>(ISupplicantStaIface::AnqpInfoId::VENUE_NAME) ==
+	ANQP_VENUE_NAME,
+    "ANQP ID value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantStaIface::AnqpInfoId::ROAMING_CONSORTIUM) ==
+	ANQP_ROAMING_CONSORTIUM,
+    "ANQP ID value mismatch");
+static_assert(
+    static_cast<uint32_t>(ISupplicantStaIface::AnqpInfoId::NAI_REALM) ==
+	ANQP_NAI_REALM,
+    "ANQP ID value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantStaIface::AnqpInfoId::IP_ADDR_TYPE_AVAILABILITY) ==
+	ANQP_IP_ADDR_TYPE_AVAILABILITY,
+    "ANQP ID value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantStaIface::AnqpInfoId::ANQP_3GPP_CELLULAR_NETWORK) ==
+	ANQP_3GPP_CELLULAR_NETWORK,
+    "ANQP ID value mismatch");
+static_assert(
+    static_cast<uint32_t>(ISupplicantStaIface::AnqpInfoId::DOMAIN_NAME) ==
+	ANQP_DOMAIN_NAME,
+    "ANQP ID value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantStaIface::Hs20AnqpSubtypes::OPERATOR_FRIENDLY_NAME) ==
+	HS20_STYPE_OPERATOR_FRIENDLY_NAME,
+    "HS Subtype value mismatch");
+static_assert(
+    static_cast<uint32_t>(ISupplicantStaIface::Hs20AnqpSubtypes::WAN_METRICS) ==
+	HS20_STYPE_WAN_METRICS,
+    "HS Subtype value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantStaIface::Hs20AnqpSubtypes::CONNECTION_CAPABILITY) ==
+	HS20_STYPE_CONNECTION_CAPABILITY,
+    "HS Subtype value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantStaIface::Hs20AnqpSubtypes::OSU_PROVIDERS_LIST) ==
+	HS20_STYPE_OSU_PROVIDERS_LIST,
+    "HS Subtype value mismatch");
+
+static_assert(
     static_cast<uint32_t>(
 	ISupplicantP2pIface::GroupCapabilityMask::GROUP_OWNER) ==
 	P2P_GROUP_CAPAB_GROUP_OWNER,
