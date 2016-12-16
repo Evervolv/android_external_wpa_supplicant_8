@@ -48,6 +48,8 @@ constexpr uint32_t kEapPhase2MethodMax =
     static_cast<uint32_t>(ISupplicantStaNetwork::EapPhase2Method::GTC) + 1;
 constexpr char const *kEapPhase2MethodStrings[kEapPhase2MethodMax] = {
     "NULL", "PAP", "MSCHAP", "MSCHAPV2", "GTC"};
+constexpr char kEapPhase2AuthPrefix[] = "auth=";
+constexpr char kEapPhase2AuthEapPrefix[] = "autheap=";
 }  // namespace
 
 namespace android {
@@ -394,6 +396,107 @@ Return<void> StaNetwork::getRequirePmf(getRequirePmf_cb _hidl_cb)
 	    &StaNetwork::getRequirePmfInternal, _hidl_cb);
 }
 
+Return<void> StaNetwork::getEapMethod(getEapMethod_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapMethodInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapPhase2Method(getEapPhase2Method_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapPhase2MethodInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapIdentity(getEapIdentity_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapIdentityInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapAnonymousIdentity(
+    getEapAnonymousIdentity_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapAnonymousIdentityInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapPassword(getEapPassword_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapPasswordInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapCACert(getEapCACert_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapCACertInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapCAPath(getEapCAPath_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapCAPathInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapClientCert(getEapClientCert_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapClientCertInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapPrivateKey(getEapPrivateKey_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapPrivateKeyInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapSubjectMatch(getEapSubjectMatch_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapSubjectMatchInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapAltSubjectMatch(
+    getEapAltSubjectMatch_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapSubjectMatchInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapEngine(getEapEngine_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapEngineInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapEngineID(getEapEngineID_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapEngineIDInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getEapDomainSuffixMatch(
+    getEapDomainSuffixMatch_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getEapDomainSuffixMatchInternal, _hidl_cb);
+}
+
 Return<void> StaNetwork::enable(bool no_connect, enable_cb _hidl_cb)
 {
 	return validateAndCall(
@@ -662,10 +765,16 @@ SupplicantStatus StaNetwork::setRequirePmfInternal(bool enable)
 SupplicantStatus StaNetwork::setEapMethodInternal(
     ISupplicantStaNetwork::EapMethod method)
 {
+	uint32_t eap_method_idx = static_cast<
+	    std::underlying_type<ISupplicantStaNetwork::EapMethod>::type>(
+	    method);
+	if (eap_method_idx >= kEapMethodMax) {
+		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
+	}
+
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	int retrieved_vendor, retrieved_method;
-	const char *method_str =
-	    kEapMethodStrings[static_cast<uint32_t>(method)];
+	const char *method_str = kEapMethodStrings[eap_method_idx];
 	// This string lookup is needed to check if the device supports the
 	// corresponding EAP type.
 	retrieved_method = eap_peer_get_type(method_str, &retrieved_vendor);
@@ -709,10 +818,34 @@ SupplicantStatus StaNetwork::setEapMethodInternal(
 SupplicantStatus StaNetwork::setEapPhase2MethodInternal(
     ISupplicantStaNetwork::EapPhase2Method method)
 {
+	uint32_t eap_phase2_method_idx = static_cast<
+	    std::underlying_type<ISupplicantStaNetwork::EapPhase2Method>::type>(
+	    method);
+	if (eap_phase2_method_idx >= kEapPhase2MethodMax) {
+		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
+	}
+
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	// EAP method needs to be set for us to construct the eap
+	// phase 2 method string.
+	SupplicantStatus status;
+	ISupplicantStaNetwork::EapMethod eap_method;
+	std::tie(status, eap_method) = getEapMethodInternal();
+	if (status.code != SupplicantStatusCode::SUCCESS) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN,
+			"EAP method not set"};
+	}
+	std::string eap_phase2_str;
+	if (eap_method == ISupplicantStaNetwork::EapMethod::TTLS &&
+	    method == ISupplicantStaNetwork::EapPhase2Method::GTC) {
+		eap_phase2_str = kEapPhase2AuthEapPrefix;
+	} else {
+		eap_phase2_str = kEapPhase2AuthPrefix;
+	}
+	eap_phase2_str += kEapPhase2MethodStrings[eap_phase2_method_idx];
 	if (setStringFieldAndResetState(
-		kEapPhase2MethodStrings[static_cast<uint32_t>(method)],
-		&(wpa_ssid->eap.phase2), "eap phase2")) {
+		eap_phase2_str.c_str(), &(wpa_ssid->eap.phase2),
+		"eap phase2")) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
@@ -950,10 +1083,201 @@ std::pair<SupplicantStatus, bool> StaNetwork::getRequirePmfInternal()
 		(wpa_ssid->ieee80211w == MGMT_FRAME_PROTECTION_REQUIRED)};
 }
 
+std::pair<SupplicantStatus, ISupplicantStaNetwork::EapMethod>
+StaNetwork::getEapMethodInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.eap_methods) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	// wpa_supplicant can support setting multiple eap methods for each
+	// network. But, this is not really used by Android. So, just reading
+	// the first EAP method for each network.
+	const std::string eap_method_str = eap_get_name(
+	    wpa_ssid->eap.eap_methods[0].vendor,
+	    static_cast<EapType>(wpa_ssid->eap.eap_methods[0].method));
+	size_t eap_method_idx =
+	    std::find(
+		std::begin(kEapMethodStrings), std::end(kEapMethodStrings),
+		eap_method_str) -
+	    std::begin(kEapMethodStrings);
+	if (eap_method_idx >= kEapMethodMax) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		static_cast<ISupplicantStaNetwork::EapMethod>(eap_method_idx)};
+}
+
+std::pair<SupplicantStatus, ISupplicantStaNetwork::EapPhase2Method>
+StaNetwork::getEapPhase2MethodInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.phase2) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	const std::string eap_phase2_method_str_with_prefix =
+	    wpa_ssid->eap.phase2;
+	std::string eap_phase2_method_str;
+	// Strip out the phase 2 method prefix before doing a reverse lookup
+	// of phase 2 string to the Eap Phase 2 type.
+	if (eap_phase2_method_str_with_prefix.find(kEapPhase2AuthPrefix) == 0) {
+		eap_phase2_method_str =
+		    eap_phase2_method_str_with_prefix.substr(
+			strlen(kEapPhase2AuthPrefix),
+			eap_phase2_method_str_with_prefix.size());
+	} else if (
+	    eap_phase2_method_str_with_prefix.find(kEapPhase2AuthEapPrefix) ==
+	    0) {
+		eap_phase2_method_str =
+		    eap_phase2_method_str_with_prefix.substr(
+			strlen(kEapPhase2AuthEapPrefix),
+			eap_phase2_method_str_with_prefix.size());
+	}
+	size_t eap_phase2_method_idx =
+	    std::find(
+		std::begin(kEapPhase2MethodStrings),
+		std::end(kEapPhase2MethodStrings), eap_phase2_method_str) -
+	    std::begin(kEapPhase2MethodStrings);
+	if (eap_phase2_method_idx >= kEapPhase2MethodMax) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		static_cast<ISupplicantStaNetwork::EapPhase2Method>(
+		    eap_phase2_method_idx)};
+}
+
+std::pair<SupplicantStatus, std::vector<uint8_t>>
+StaNetwork::getEapIdentityInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.identity) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		std::vector<uint8_t>(
+		    wpa_ssid->eap.identity,
+		    wpa_ssid->eap.identity + wpa_ssid->eap.identity_len)};
+}
+
+std::pair<SupplicantStatus, std::vector<uint8_t>>
+StaNetwork::getEapAnonymousIdentityInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.anonymous_identity) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		std::vector<uint8_t>(
+		    wpa_ssid->eap.anonymous_identity,
+		    wpa_ssid->eap.anonymous_identity +
+			wpa_ssid->eap.anonymous_identity_len)};
+}
+
+std::pair<SupplicantStatus, std::vector<uint8_t>>
+StaNetwork::getEapPasswordInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.password) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		std::vector<uint8_t>(
+		    wpa_ssid->eap.password,
+		    wpa_ssid->eap.password + wpa_ssid->eap.password_len)};
+}
+
+std::pair<SupplicantStatus, std::string> StaNetwork::getEapCACertInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.ca_cert) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		reinterpret_cast<char *>(wpa_ssid->eap.ca_cert)};
+}
+
+std::pair<SupplicantStatus, std::string> StaNetwork::getEapCAPathInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.ca_path) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		reinterpret_cast<char *>(wpa_ssid->eap.ca_path)};
+}
+
+std::pair<SupplicantStatus, std::string> StaNetwork::getEapClientCertInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.client_cert) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		reinterpret_cast<char *>(wpa_ssid->eap.client_cert)};
+}
+
+std::pair<SupplicantStatus, std::string> StaNetwork::getEapPrivateKeyInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.private_key) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		reinterpret_cast<char *>(wpa_ssid->eap.private_key)};
+}
+
+std::pair<SupplicantStatus, std::string>
+StaNetwork::getEapSubjectMatchInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.subject_match) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		reinterpret_cast<char *>(wpa_ssid->eap.subject_match)};
+}
+
+std::pair<SupplicantStatus, std::string>
+StaNetwork::getEapAltSubjectMatchInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.altsubject_match) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		reinterpret_cast<char *>(wpa_ssid->eap.altsubject_match)};
+}
+
+std::pair<SupplicantStatus, bool> StaNetwork::getEapEngineInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	return {{SupplicantStatusCode::SUCCESS, ""}, wpa_ssid->eap.engine == 1};
+}
+
+std::pair<SupplicantStatus, std::string> StaNetwork::getEapEngineIDInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.engine_id) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""}, {wpa_ssid->eap.engine_id}};
+}
+
+std::pair<SupplicantStatus, std::string>
+StaNetwork::getEapDomainSuffixMatchInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->eap.domain_suffix_match) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		{wpa_ssid->eap.domain_suffix_match}};
+}
+
 SupplicantStatus StaNetwork::enableInternal(bool no_connect)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	if (wpa_ssid->disabled != 0) {
+	if (wpa_ssid->disabled == 2) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
@@ -1118,8 +1442,7 @@ struct wpa_ssid *StaNetwork::retrieveNetworkPtr()
  */
 struct wpa_supplicant *StaNetwork::retrieveIfacePtr()
 {
-	return wpa_supplicant_get_iface(
-	    (struct wpa_global *)wpa_global_, ifname_.c_str());
+	return wpa_supplicant_get_iface(wpa_global_, ifname_.c_str());
 }
 
 /**
