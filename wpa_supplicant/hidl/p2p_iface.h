@@ -22,9 +22,11 @@
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
-#include "wpa_supplicant_i.h"
+#include "p2p/p2p.h"
+#include "p2p/p2p_i.h"
+#include "p2p_supplicant.h"
+#include "p2p_supplicant.h"
 #include "config.h"
-#include "driver_i.h"
 }
 
 namespace android {
@@ -63,18 +65,21 @@ public:
 	    registerCallback_cb _hidl_cb) override;
 	Return<void> getDeviceAddress(getDeviceAddress_cb _hidl_cb) override;
 	Return<void> setSsidPostfix(
-	    const hidl_string& postfix, setSsidPostfix_cb _hidl_cb) override;
+	    const hidl_vec<uint8_t>& postfix,
+	    setSsidPostfix_cb _hidl_cb) override;
 	Return<void> setGroupIdle(
-	    uint32_t timeout_in_sec, setGroupIdle_cb _hidl_cb) override;
+	    const hidl_string& group_ifname, uint32_t timeout_in_sec,
+	    setGroupIdle_cb _hidl_cb) override;
 	Return<void> setPowerSave(
-	    bool enable, setPowerSave_cb _hidl_cb) override;
+	    const hidl_string& group_ifname, bool enable,
+	    setPowerSave_cb _hidl_cb) override;
 	Return<void> find(uint32_t timeout_in_sec, find_cb _hidl_cb) override;
 	Return<void> stopFind(stopFind_cb _hidl_cb) override;
 	Return<void> flush(flush_cb _hidl_cb) override;
 	Return<void> connect(
 	    const hidl_array<uint8_t, 6>& peer_address,
 	    ISupplicantP2pIface::WpsProvisionMethod provision_method,
-	    const hidl_vec<uint8_t>& pre_selected_pin, bool join_existing_group,
+	    const hidl_string& pre_selected_pin, bool join_existing_group,
 	    bool persistent, uint32_t go_intent, connect_cb _hidl_cb) override;
 	Return<void> cancelConnect(cancelConnect_cb _hidl_cb) override;
 	Return<void> provisionDiscovery(
@@ -82,7 +87,7 @@ public:
 	    ISupplicantP2pIface::WpsProvisionMethod provision_method,
 	    provisionDiscovery_cb _hidl_cb) override;
 	Return<void> addGroup(
-	    bool persistent, uint32_t persistent_network_id,
+	    bool persistent, SupplicantNetworkId persistent_network_id,
 	    addGroup_cb _hidl_cb) override;
 	Return<void> removeGroup(
 	    const hidl_string& group_ifname, removeGroup_cb _hidl_cb) override;
@@ -95,7 +100,7 @@ public:
 	    const hidl_array<uint8_t, 6>& peer_address,
 	    invite_cb _hidl_cb) override;
 	Return<void> reinvoke(
-	    uint32_t persistent_network_id,
+	    SupplicantNetworkId persistent_network_id,
 	    const hidl_array<uint8_t, 6>& peer_address,
 	    reinvoke_cb _hidl_cb) override;
 	Return<void> configureExtListen(
@@ -104,6 +109,9 @@ public:
 	Return<void> setListenChannel(
 	    uint32_t channel, uint32_t operating_class,
 	    setListenChannel_cb _hidl_cb) override;
+	Return<void> setDisallowedFrequencies(
+	    const hidl_vec<FreqRange>& ranges,
+	    setDisallowedFrequencies_cb _hidl_cb) override;
 	Return<void> getSsid(
 	    const hidl_array<uint8_t, 6>& peer_address,
 	    getSsid_cb _hidl_cb) override;
@@ -147,38 +155,43 @@ private:
 	    const sp<ISupplicantP2pIfaceCallback>& callback);
 	std::pair<SupplicantStatus, std::array<uint8_t, 6>>
 	getDeviceAddressInternal();
-	SupplicantStatus setSsidPostfixInternal(const hidl_string& postfix);
-	SupplicantStatus setGroupIdleInternal(uint32_t timeout_in_sec);
-	SupplicantStatus setPowerSaveInternal(bool enable);
+	SupplicantStatus setSsidPostfixInternal(
+	    const std::vector<uint8_t>& postfix);
+	SupplicantStatus setGroupIdleInternal(
+	    const std::string& group_ifname, uint32_t timeout_in_sec);
+	SupplicantStatus setPowerSaveInternal(
+	    const std::string& group_ifname, bool enable);
 	SupplicantStatus findInternal(uint32_t timeout_in_sec);
 	SupplicantStatus stopFindInternal();
 	SupplicantStatus flushInternal();
-	std::pair<SupplicantStatus, std::vector<uint8_t>> connectInternal(
+	std::pair<SupplicantStatus, std::string> connectInternal(
 	    const std::array<uint8_t, 6>& peer_address,
 	    ISupplicantP2pIface::WpsProvisionMethod provision_method,
-	    const std::vector<uint8_t>& pre_selected_pin,
-	    bool join_existing_group, bool persistent, uint32_t go_intent);
+	    const std::string& pre_selected_pin, bool join_existing_group,
+	    bool persistent, uint32_t go_intent);
 	SupplicantStatus cancelConnectInternal();
 	SupplicantStatus provisionDiscoveryInternal(
 	    const std::array<uint8_t, 6>& peer_address,
 	    ISupplicantP2pIface::WpsProvisionMethod provision_method);
 	SupplicantStatus addGroupInternal(
-	    bool persistent, uint32_t persistent_network_id);
-	SupplicantStatus removeGroupInternal(const hidl_string& group_ifname);
+	    bool persistent, SupplicantNetworkId persistent_network_id);
+	SupplicantStatus removeGroupInternal(const std::string& group_ifname);
 	SupplicantStatus rejectInternal(
 	    const std::array<uint8_t, 6>& peer_address);
 	SupplicantStatus inviteInternal(
-	    const hidl_string& group_ifname,
+	    const std::string& group_ifname,
 	    const std::array<uint8_t, 6>& go_device_address,
 	    const std::array<uint8_t, 6>& peer_address);
 	SupplicantStatus reinvokeInternal(
-	    uint32_t persistent_network_id,
+	    SupplicantNetworkId persistent_network_id,
 	    const std::array<uint8_t, 6>& peer_address);
 	SupplicantStatus configureExtListenInternal(
 	    bool enable, uint32_t period_in_millis,
 	    uint32_t interval_in_millis);
 	SupplicantStatus setListenChannelInternal(
 	    uint32_t channel, uint32_t operating_class);
+	SupplicantStatus setDisallowedFrequenciesInternal(
+	    const std::vector<FreqRange>& ranges);
 	std::pair<SupplicantStatus, std::vector<uint8_t>> getSsidInternal(
 	    const std::array<uint8_t, 6>& peer_address);
 	std::pair<SupplicantStatus, uint32_t> getGroupCapabilityInternal(
@@ -189,21 +202,23 @@ private:
 	SupplicantStatus removeBonjourServiceInternal(
 	    const std::vector<uint8_t>& query);
 	SupplicantStatus addUpnpServiceInternal(
-	    uint32_t version, const hidl_string& service_name);
+	    uint32_t version, const std::string& service_name);
 	SupplicantStatus removeUpnpServiceInternal(
-	    uint32_t version, const hidl_string& service_name);
+	    uint32_t version, const std::string& service_name);
 	SupplicantStatus flushServicesInternal(
-	    uint32_t version, const hidl_string& service_name);
+	    uint32_t version, const std::string& service_name);
 	std::pair<SupplicantStatus, uint64_t> requestServiceDiscoveryInternal(
 	    const std::array<uint8_t, 6>& peer_address,
 	    const std::vector<uint8_t>& query);
 	SupplicantStatus cancelServiceDiscoveryInternal(uint64_t identifier);
 
 	struct wpa_supplicant* retrieveIfacePtr();
+	struct wpa_supplicant* retrieveGroupIfacePtr(
+	    const std::string& group_ifname);
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
 	// the lifetime of the process.
-	const struct wpa_global* wpa_global_;
+	struct wpa_global* wpa_global_;
 	// Name of the iface this hidl object controls
 	const std::string ifname_;
 	bool is_valid_;
