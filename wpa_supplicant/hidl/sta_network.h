@@ -131,6 +131,25 @@ public:
 	    uint32_t key_idx, getWepKey_cb _hidl_cb) override;
 	Return<void> getWepTxKeyIdx(getWepTxKeyIdx_cb _hidl_cb) override;
 	Return<void> getRequirePmf(getRequirePmf_cb _hidl_cb) override;
+	Return<void> getEapMethod(getEapMethod_cb _hidl_cb) override;
+	Return<void> getEapPhase2Method(
+	    getEapPhase2Method_cb _hidl_cb) override;
+	Return<void> getEapIdentity(getEapIdentity_cb _hidl_cb) override;
+	Return<void> getEapAnonymousIdentity(
+	    getEapAnonymousIdentity_cb _hidl_cb) override;
+	Return<void> getEapPassword(getEapPassword_cb _hidl_cb) override;
+	Return<void> getEapCACert(getEapCACert_cb _hidl_cb) override;
+	Return<void> getEapCAPath(getEapCAPath_cb _hidl_cb) override;
+	Return<void> getEapClientCert(getEapClientCert_cb _hidl_cb) override;
+	Return<void> getEapPrivateKey(getEapPrivateKey_cb _hidl_cb) override;
+	Return<void> getEapSubjectMatch(
+	    getEapSubjectMatch_cb _hidl_cb) override;
+	Return<void> getEapAltSubjectMatch(
+	    getEapAltSubjectMatch_cb _hidl_cb) override;
+	Return<void> getEapEngine(getEapEngine_cb _hidl_cb) override;
+	Return<void> getEapEngineID(getEapEngineID_cb _hidl_cb) override;
+	Return<void> getEapDomainSuffixMatch(
+	    getEapDomainSuffixMatch_cb _hidl_cb) override;
 	Return<void> enable(bool no_connect, enable_cb _hidl_cb) override;
 	Return<void> disable(disable_cb _hidl_cb) override;
 	Return<void> select(select_cb _hidl_cb) override;
@@ -201,6 +220,27 @@ private:
 	    uint32_t key_idx);
 	std::pair<SupplicantStatus, uint32_t> getWepTxKeyIdxInternal();
 	std::pair<SupplicantStatus, bool> getRequirePmfInternal();
+	std::pair<SupplicantStatus, ISupplicantStaNetwork::EapMethod>
+	getEapMethodInternal();
+	std::pair<SupplicantStatus, ISupplicantStaNetwork::EapPhase2Method>
+	getEapPhase2MethodInternal();
+	std::pair<SupplicantStatus, std::vector<uint8_t>>
+	getEapIdentityInternal();
+	std::pair<SupplicantStatus, std::vector<uint8_t>>
+	getEapAnonymousIdentityInternal();
+	std::pair<SupplicantStatus, std::vector<uint8_t>>
+	getEapPasswordInternal();
+	std::pair<SupplicantStatus, std::string> getEapCACertInternal();
+	std::pair<SupplicantStatus, std::string> getEapCAPathInternal();
+	std::pair<SupplicantStatus, std::string> getEapClientCertInternal();
+	std::pair<SupplicantStatus, std::string> getEapPrivateKeyInternal();
+	std::pair<SupplicantStatus, std::string> getEapSubjectMatchInternal();
+	std::pair<SupplicantStatus, std::string>
+	getEapAltSubjectMatchInternal();
+	std::pair<SupplicantStatus, bool> getEapEngineInternal();
+	std::pair<SupplicantStatus, std::string> getEapEngineIDInternal();
+	std::pair<SupplicantStatus, std::string>
+	getEapDomainSuffixMatchInternal();
 	SupplicantStatus enableInternal(bool no_connect);
 	SupplicantStatus disableInternal();
 	SupplicantStatus selectInternal();
@@ -237,7 +277,7 @@ private:
 
 	// Reference to the global wpa_struct. This is assumed to be valid
 	// for the lifetime of the process.
-	const struct wpa_global* wpa_global_;
+	struct wpa_global* wpa_global_;
 	// Name of the iface this network belongs to.
 	const std::string ifname_;
 	// Id of the network this hidl object controls.
