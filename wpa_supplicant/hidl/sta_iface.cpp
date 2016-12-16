@@ -19,6 +19,74 @@ extern "C" {
 
 namespace {
 constexpr uint32_t kMaxAnqpElems = 100;
+constexpr char kGetMacAddress[] = "MACADDR";
+constexpr char kStartRxFilter[] = "RXFILTER-START";
+constexpr char kStopRxFilter[] = "RXFILTER-STOP";
+constexpr char kAddRxFilter[] = "RXFILTER-ADD";
+constexpr char kRemoveRxFilter[] = "RXFILTER-REMOVE";
+constexpr char kSetBtCoexistenceMode[] = "BTCOEXMODE";
+constexpr char kSetBtCoexistenceScanStart[] = "BTCOEXSCAN-START";
+constexpr char kSetBtCoexistenceScanStop[] = "BTCOEXSCAN-STOP";
+constexpr char kSetSupendModeEnabled[] = "SETSUSPENDMODE 1";
+constexpr char kSetSupendModeDisabled[] = "SETSUSPENDMODE 0";
+constexpr char kSetCountryCode[] = "COUNTRY ";
+
+using android::hardware::wifi::supplicant::V1_0::ISupplicantStaIface;
+using android::hardware::wifi::supplicant::V1_0::SupplicantStatus;
+using android::hardware::wifi::supplicant::V1_0::SupplicantStatusCode;
+
+uint8_t convertHidlRxFilterTypeToInternal(
+    ISupplicantStaIface::RxFilterType type)
+{
+	switch (type) {
+	case ISupplicantStaIface::RxFilterType::V4_MULTICAST:
+		return 2;
+	case ISupplicantStaIface::RxFilterType::V6_MULTICAST:
+		return 3;
+	};
+	WPA_ASSERT(false);
+}
+
+uint8_t convertHidlBtCoexModeToInternal(
+    ISupplicantStaIface::BtCoexistenceMode mode)
+{
+	switch (mode) {
+	case ISupplicantStaIface::BtCoexistenceMode::ENABLED:
+		return 0;
+	case ISupplicantStaIface::BtCoexistenceMode::DISABLED:
+		return 1;
+	case ISupplicantStaIface::BtCoexistenceMode::SENSE:
+		return 2;
+	};
+	WPA_ASSERT(false);
+}
+
+SupplicantStatus doZeroArgDriverCommand(
+    struct wpa_supplicant *wpa_s, const char *cmd)
+{
+	std::vector<char> cmd_vec(cmd, cmd + strlen(cmd) + 1);
+	char driver_cmd_reply_buf[4096] = {};
+	if (wpa_drv_driver_cmd(
+		wpa_s, cmd_vec.data(), driver_cmd_reply_buf,
+		sizeof(driver_cmd_reply_buf))) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus doOneArgDriverCommand(
+    struct wpa_supplicant *wpa_s, const char *cmd, uint8_t arg)
+{
+	std::string cmd_str = std::string(cmd) + " " + std::to_string(arg);
+	return doZeroArgDriverCommand(wpa_s, cmd_str.c_str());
+}
+
+SupplicantStatus doOneArgDriverCommand(
+    struct wpa_supplicant *wpa_s, const char *cmd, const std::string &arg)
+{
+	std::string cmd_str = std::string(cmd) + " " + arg;
+	return doZeroArgDriverCommand(wpa_s, cmd_str.c_str());
+}
 }  // namespace
 
 namespace android {
@@ -164,6 +232,77 @@ Return<void> StaIface::initiateHs20IconQuery(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
 	    &StaIface::initiateHs20IconQueryInternal, _hidl_cb, mac_address,
 	    file_name);
+}
+
+Return<void> StaIface::getMacAddress(getMacAddress_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::getMacAddressInternal, _hidl_cb);
+}
+
+Return<void> StaIface::startRxFilter(startRxFilter_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::startRxFilterInternal, _hidl_cb);
+}
+
+Return<void> StaIface::stopRxFilter(stopRxFilter_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::stopRxFilterInternal, _hidl_cb);
+}
+
+Return<void> StaIface::addRxFilter(
+    ISupplicantStaIface::RxFilterType type, addRxFilter_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::addRxFilterInternal, _hidl_cb, type);
+}
+
+Return<void> StaIface::removeRxFilter(
+    ISupplicantStaIface::RxFilterType type, removeRxFilter_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::removeRxFilterInternal, _hidl_cb, type);
+}
+
+Return<void> StaIface::setBtCoexistenceMode(
+    ISupplicantStaIface::BtCoexistenceMode mode,
+    setBtCoexistenceMode_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setBtCoexistenceModeInternal, _hidl_cb, mode);
+}
+
+Return<void> StaIface::setBtCoexistenceScanModeEnabled(
+    bool enable, setBtCoexistenceScanModeEnabled_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setBtCoexistenceScanModeEnabledInternal, _hidl_cb,
+	    enable);
+}
+
+Return<void> StaIface::setSuspendModeEnabled(
+    bool enable, setSuspendModeEnabled_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setSuspendModeEnabledInternal, _hidl_cb, enable);
+}
+
+Return<void> StaIface::setCountryCode(
+    const hidl_array<int8_t, 2> &code, setCountryCode_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setCountryCodeInternal, _hidl_cb, code);
 }
 
 std::pair<SupplicantStatus, std::string> StaIface::getNameInternal()
@@ -398,6 +537,112 @@ SupplicantStatus StaIface::initiateHs20IconQueryInternal(
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
+std::pair<SupplicantStatus, std::array<uint8_t, 6>>
+StaIface::getMacAddressInternal()
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	std::vector<char> cmd(
+	    kGetMacAddress, kGetMacAddress + sizeof(kGetMacAddress));
+	char driver_cmd_reply_buf[4096] = {};
+	int ret = wpa_drv_driver_cmd(
+	    wpa_s, cmd.data(), driver_cmd_reply_buf,
+	    sizeof(driver_cmd_reply_buf));
+	// Reply is of the format: "Macaddr = XX:XX:XX:XX:XX:XX"
+	std::string reply_str = driver_cmd_reply_buf;
+	if (ret || reply_str.empty() ||
+	    reply_str.find("=") == std::string::npos) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	// Remove all whitespace first and then split using the delimiter "=".
+	reply_str.erase(
+	    remove_if(reply_str.begin(), reply_str.end(), isspace),
+	    reply_str.end());
+	std::string mac_addr_str =
+	    reply_str.substr(reply_str.find("=") + 1, reply_str.size());
+	std::array<uint8_t, 6> mac_addr;
+	if (hwaddr_aton(mac_addr_str.c_str(), mac_addr.data())) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""}, mac_addr};
+}
+
+SupplicantStatus StaIface::startRxFilterInternal()
+{
+	return doZeroArgDriverCommand(retrieveIfacePtr(), kStartRxFilter);
+}
+
+SupplicantStatus StaIface::stopRxFilterInternal()
+{
+	return doZeroArgDriverCommand(retrieveIfacePtr(), kStopRxFilter);
+}
+
+SupplicantStatus StaIface::addRxFilterInternal(
+    ISupplicantStaIface::RxFilterType type)
+{
+	return doOneArgDriverCommand(
+	    retrieveIfacePtr(), kAddRxFilter,
+	    convertHidlRxFilterTypeToInternal(type));
+}
+
+SupplicantStatus StaIface::removeRxFilterInternal(
+    ISupplicantStaIface::RxFilterType type)
+{
+	return doOneArgDriverCommand(
+	    retrieveIfacePtr(), kRemoveRxFilter,
+	    convertHidlRxFilterTypeToInternal(type));
+}
+
+SupplicantStatus StaIface::setBtCoexistenceModeInternal(
+    ISupplicantStaIface::BtCoexistenceMode mode)
+{
+	return doOneArgDriverCommand(
+	    retrieveIfacePtr(), kSetBtCoexistenceMode,
+	    convertHidlBtCoexModeToInternal(mode));
+}
+
+SupplicantStatus StaIface::setBtCoexistenceScanModeEnabledInternal(bool enable)
+{
+	const char *cmd;
+	if (enable) {
+		cmd = kSetBtCoexistenceScanStart;
+	} else {
+		cmd = kSetBtCoexistenceScanStop;
+	}
+	return doZeroArgDriverCommand(retrieveIfacePtr(), cmd);
+}
+
+SupplicantStatus StaIface::setSuspendModeEnabledInternal(bool enable)
+{
+	const char *cmd;
+	if (enable) {
+		cmd = kSetSupendModeEnabled;
+	} else {
+		cmd = kSetSupendModeDisabled;
+	}
+	return doZeroArgDriverCommand(retrieveIfacePtr(), cmd);
+}
+
+SupplicantStatus StaIface::setCountryCodeInternal(
+    const std::array<int8_t, 2> &code)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	SupplicantStatus status = doOneArgDriverCommand(
+	    wpa_s, kSetCountryCode,
+	    std::string(std::begin(code), std::end(code)));
+	if (status.code != SupplicantStatusCode::SUCCESS) {
+		return status;
+	}
+	struct p2p_data *p2p = wpa_s->global->p2p;
+	if (p2p) {
+		char country[3];
+		country[0] = code[0];
+		country[1] = code[1];
+		country[2] = 0x04;
+		p2p_set_country(p2p, country);
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
 /**
  * Retrieve the underlying |wpa_supplicant| struct
  * pointer for this iface.
@@ -408,7 +653,6 @@ wpa_supplicant *StaIface::retrieveIfacePtr()
 {
 	return wpa_supplicant_get_iface(wpa_global_, ifname_.c_str());
 }
-
 }  // namespace implementation
 }  // namespace V1_0
 }  // namespace wifi
