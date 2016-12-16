@@ -74,6 +74,8 @@ public:
 	void notifyHs20RxDeauthImminentNotice(
 	    struct wpa_supplicant *wpa_s, u8 code, u16 reauth_delay,
 	    const char *url);
+	void notifyDisconnectReason(struct wpa_supplicant *wpa_s);
+	void notifyAssocReject(struct wpa_supplicant *wpa_s);
 
 	// Methods called from hidl objects.
 	int getP2pIfaceHidlObjectByIfname(

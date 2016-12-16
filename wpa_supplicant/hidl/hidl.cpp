@@ -258,3 +258,35 @@ void wpas_hidl_notify_hs20_rx_deauth_imminent_notice(
 	hidl_manager->notifyHs20RxDeauthImminentNotice(
 	    wpa_s, code, reauth_delay, url);
 }
+
+void wpas_hidl_notify_disconnect_reason(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG, "Notifying disconnect reason to hidl control: %d",
+	    wpa_s->disconnect_reason);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyDisconnectReason(wpa_s);
+}
+
+void wpas_hidl_notify_assoc_reject(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG, "Notifying assoc reject to hidl control: %d",
+	    wpa_s->assoc_status_code);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyAssocReject(wpa_s);
+}
