@@ -133,7 +133,7 @@ private:
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
 	// the lifetime of the process.
-	const struct wpa_global* wpa_global_;
+	struct wpa_global* wpa_global_;
 	// Name of the iface this hidl object controls
 	const std::string ifname_;
 	bool is_valid_;
