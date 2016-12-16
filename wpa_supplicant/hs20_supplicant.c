@@ -20,6 +20,7 @@
 #include "driver_i.h"
 #include "config.h"
 #include "scan.h"
+#include "notify.h"
 #include "bss.h"
 #include "blacklist.h"
 #include "gas_query.h"
@@ -439,6 +440,10 @@ static int hs20_process_icon_binary_file(struct wpa_supplicant *wpa_s,
 				RX_HS20_ICON MACSTR " %s %u",
 				MAC2STR(sa), icon->file_name,
 				(unsigned int) icon->image_len);
+			wpas_notify_hs20_icon_query_done(wpa_s, sa,
+							 icon->file_name,
+							 icon->image,
+							 icon->image_len);
 			return 0;
 		}
 	}
@@ -1161,6 +1166,7 @@ void hs20_rx_subscription_remediation(struct wpa_supplicant *wpa_s,
 			osu_method, url);
 	else
 		wpa_msg(wpa_s, MSG_INFO, HS20_SUBSCRIPTION_REMEDIATION);
+	wpas_notify_hs20_rx_subscription_remediation(wpa_s, url, osu_method);
 }
 
 
@@ -1174,6 +1180,7 @@ void hs20_rx_deauth_imminent_notice(struct wpa_supplicant *wpa_s, u8 code,
 
 	wpa_msg(wpa_s, MSG_INFO, HS20_DEAUTH_IMMINENT_NOTICE "%u %u %s",
 		code, reauth_delay, url);
+	wpas_notify_hs20_rx_deauth_imminent_notice(wpa_s, code, reauth_delay, url);
 
 	if (code == HS20_DEAUTH_REASON_CODE_BSS) {
 		wpa_printf(MSG_DEBUG, "HS 2.0: Add BSS to blacklist");
