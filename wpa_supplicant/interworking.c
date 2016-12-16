@@ -3025,6 +3025,7 @@ out_parse_done:
 out:
 	wpa_msg(wpa_s, MSG_INFO, ANQP_QUERY_DONE "addr=" MACSTR " result=%s",
 		MAC2STR(dst), anqp_result);
+	wpas_notify_anqp_query_done(wpa_s, dst, anqp_result, bss ? bss->anqp : NULL);
 }
 
 
