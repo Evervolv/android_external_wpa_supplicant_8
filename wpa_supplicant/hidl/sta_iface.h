@@ -96,6 +96,25 @@ public:
 	    const hidl_array<uint8_t, 6>& mac_address,
 	    const hidl_string& file_name,
 	    initiateHs20IconQuery_cb _hidl_cb) override;
+	Return<void> getMacAddress(getMacAddress_cb _hidl_cb) override;
+	Return<void> startRxFilter(startRxFilter_cb _hidl_cb) override;
+	Return<void> stopRxFilter(stopRxFilter_cb _hidl_cb) override;
+	Return<void> addRxFilter(
+	    ISupplicantStaIface::RxFilterType type,
+	    addRxFilter_cb _hidl_cb) override;
+	Return<void> removeRxFilter(
+	    ISupplicantStaIface::RxFilterType type,
+	    removeRxFilter_cb _hidl_cb) override;
+	Return<void> setBtCoexistenceMode(
+	    ISupplicantStaIface::BtCoexistenceMode mode,
+	    setBtCoexistenceMode_cb _hidl_cb) override;
+	Return<void> setBtCoexistenceScanModeEnabled(
+	    bool enable, setBtCoexistenceScanModeEnabled_cb _hidl_cb) override;
+	Return<void> setSuspendModeEnabled(
+	    bool enable, setSuspendModeEnabled_cb _hidl_cb) override;
+	Return<void> setCountryCode(
+	    const hidl_array<int8_t, 2>& code,
+	    setCountryCode_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -128,6 +147,20 @@ private:
 	SupplicantStatus initiateHs20IconQueryInternal(
 	    const std::array<uint8_t, 6>& mac_address,
 	    const std::string& file_name);
+	std::pair<SupplicantStatus, std::array<uint8_t, 6>>
+	getMacAddressInternal();
+	SupplicantStatus startRxFilterInternal();
+	SupplicantStatus stopRxFilterInternal();
+	SupplicantStatus addRxFilterInternal(
+	    ISupplicantStaIface::RxFilterType type);
+	SupplicantStatus removeRxFilterInternal(
+	    ISupplicantStaIface::RxFilterType type);
+	SupplicantStatus setBtCoexistenceModeInternal(
+	    ISupplicantStaIface::BtCoexistenceMode mode);
+	SupplicantStatus setBtCoexistenceScanModeEnabledInternal(bool enable);
+	SupplicantStatus setSuspendModeEnabledInternal(bool enable);
+	SupplicantStatus setCountryCodeInternal(
+	    const std::array<int8_t, 2>& code);
 
 	struct wpa_supplicant* retrieveIfacePtr();
 
