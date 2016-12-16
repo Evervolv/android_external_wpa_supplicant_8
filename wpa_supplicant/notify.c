@@ -863,3 +863,43 @@ void wpas_notify_network_type_changed(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_P2P */
 }
+
+void wpas_notify_anqp_query_done(struct wpa_supplicant *wpa_s, const u8* bssid,
+				 const char *result,
+				 const struct wpa_bss_anqp *anqp)
+{
+#ifdef CONFIG_INTERWORKING
+	if (!wpa_s || !bssid || !anqp)
+		return;
+#endif /* CONFIG_INTERWORKING */
+}
+
+void wpas_notify_hs20_icon_query_done(struct wpa_supplicant *wpa_s, const u8* bssid,
+				      const char* file_name, const u8* image,
+				      u32 image_length)
+{
+#ifdef CONFIG_HS20
+	if (!wpa_s || !bssid || !file_name || !image)
+		return;
+#endif /* CONFIG_HS20 */
+}
+
+void wpas_notify_hs20_rx_subscription_remediation(struct wpa_supplicant *wpa_s,
+						  const char* url,
+						  u8 osu_method)
+{
+#ifdef CONFIG_HS20
+	if (!wpa_s || !url)
+		return;
+#endif /* CONFIG_HS20 */
+}
+
+void wpas_notify_hs20_rx_deauth_imminent_notice(struct wpa_supplicant *wpa_s,
+						u8 code, u16 reauth_delay,
+						const char *url)
+{
+#ifdef CONFIG_HS20
+	if (!wpa_s || !url)
+		return;
+#endif /* CONFIG_HS20 */
+}
