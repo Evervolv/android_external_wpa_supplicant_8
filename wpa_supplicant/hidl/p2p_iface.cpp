@@ -15,6 +15,22 @@ namespace {
 const char kConfigMethodStrPbc[] = "pbc";
 const char kConfigMethodStrDisplay[] = "display";
 const char kConfigMethodStrKeypad[] = "keypad";
+constexpr char kSetMiracastMode[] = "MIRACAST ";
+
+using android::hardware::wifi::supplicant::V1_0::ISupplicantP2pIface;
+uint8_t convertHidlMiracastModeToInternal(
+    ISupplicantP2pIface::MiracastMode mode)
+{
+	switch (mode) {
+	case ISupplicantP2pIface::MiracastMode::DISABLED:
+		return 0;
+	case ISupplicantP2pIface::MiracastMode::SOURCE:
+		return 1;
+	case ISupplicantP2pIface::MiracastMode::SINK:
+		return 2;
+	};
+	WPA_ASSERT(false);
+}
 }  // namespace
 
 namespace android {
@@ -324,6 +340,14 @@ Return<void> P2pIface::cancelServiceDiscovery(
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
 	    &P2pIface::cancelServiceDiscoveryInternal, _hidl_cb, identifier);
+}
+
+Return<void> P2pIface::setMiracastMode(
+    ISupplicantP2pIface::MiracastMode mode, setMiracastMode_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::setMiracastModeInternal, _hidl_cb, mode);
 }
 
 std::pair<SupplicantStatus, std::string> P2pIface::getNameInternal()
@@ -832,6 +856,24 @@ SupplicantStatus P2pIface::cancelServiceDiscoveryInternal(uint64_t identifier)
 {
 	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
 	if (wpas_p2p_sd_cancel_request(wpa_s, identifier)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus P2pIface::setMiracastModeInternal(
+    ISupplicantP2pIface::MiracastMode mode)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	uint8_t mode_internal = convertHidlMiracastModeToInternal(mode);
+	const std::string cmd_str =
+	    kSetMiracastMode + std::to_string(mode_internal);
+	std::vector<char> cmd(
+	    cmd_str.c_str(), cmd_str.c_str() + cmd_str.size() + 1);
+	char driver_cmd_reply_buf[4096] = {};
+	if (wpa_drv_driver_cmd(
+		wpa_s, cmd.data(), driver_cmd_reply_buf,
+		sizeof(driver_cmd_reply_buf))) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
