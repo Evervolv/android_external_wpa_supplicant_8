@@ -63,6 +63,17 @@ public:
 	int notifyNetworkRequest(
 	    struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid, int type,
 	    const char *param);
+	void notifyAnqpQueryDone(
+	    struct wpa_supplicant *wpa_s, const u8 *bssid, const char *result,
+	    const struct wpa_bss_anqp *anqp);
+	void notifyHs20IconQueryDone(
+	    struct wpa_supplicant *wpa_s, const u8 *bssid,
+	    const char *file_name, const u8 *image, u32 image_length);
+	void notifyHs20RxSubscriptionRemediation(
+	    struct wpa_supplicant *wpa_s, const char *url, u8 osu_method);
+	void notifyHs20RxDeauthImminentNotice(
+	    struct wpa_supplicant *wpa_s, u8 code, u16 reauth_delay,
+	    const char *url);
 
 	// Methods called from hidl objects.
 	int getP2pIfaceHidlObjectByIfname(
