@@ -36,6 +36,18 @@ int wpas_hidl_notify_state_changed(struct wpa_supplicant *wpa_s);
 int wpas_hidl_notify_network_request(
     struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid,
     enum wpa_ctrl_req_type rtype, const char *default_txt);
+void wpas_hidl_notify_anqp_query_done(
+    struct wpa_supplicant *wpa_s, const u8 *bssid, const char *result,
+    const struct wpa_bss_anqp *anqp);
+void wpas_hidl_notify_hs20_icon_query_done(
+    struct wpa_supplicant *wpa_s, const u8 *bssid, const char *file_name,
+    const u8 *image, u32 image_length);
+void wpas_hidl_notify_hs20_rx_subscription_remediation(
+    struct wpa_supplicant *wpa_s, const char *url, u8 osu_method);
+void wpas_hidl_notify_hs20_rx_deauth_imminent_notice(
+    struct wpa_supplicant *wpa_s, u8 code, u16 reauth_delay, const char *url);
+void wpas_hidl_notify_disconnect_reason(struct wpa_supplicant *wpa_s);
+void wpas_hidl_notify_assoc_reject(struct wpa_supplicant *wpa_s);
 #else   // CONFIG_CTRL_IFACE_HIDL
 static inline int wpas_hidl_register_interface(struct wpa_supplicant *wpa_s)
 {
@@ -65,6 +77,26 @@ static inline int wpas_hidl_notify_network_request(
 {
 	return 0;
 }
+static void wpas_hidl_notify_anqp_query_done(
+    struct wpa_supplicant *wpa_s, const u8 *bssid, const char *result,
+    const struct wpa_bss_anqp *anqp)
+{
+}
+static void wpas_hidl_notify_hs20_icon_query_done(
+    struct wpa_supplicant *wpa_s, const u8 *bssid, const char *file_name,
+    const u8 *image, u32 image_length)
+{
+}
+static void wpas_hidl_notify_hs20_rx_subscription_remediation(
+    struct wpa_supplicant *wpa_s, const char *url, u8 osu_method)
+{
+}
+static void wpas_hidl_notify_hs20_rx_deauth_imminent_notice(
+    struct wpa_supplicant *wpa_s, u8 code, u16 reauth_delay, const char *url)
+{
+}
+static void wpas_hidl_notify_disconnect_reason(struct wpa_supplicant *wpa_s) {}
+static void wpas_hidl_notify_assoc_reject(struct wpa_supplicant *wpa_s) {}
 #endif  // CONFIG_CTRL_IFACE_HIDL
 
 #ifdef _cplusplus

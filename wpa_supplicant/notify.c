@@ -13,7 +13,6 @@
 #include "config.h"
 #include "wpa_supplicant_i.h"
 #include "wps_supplicant.h"
-#include "hidl/hidl.h"
 #include "dbus/dbus_common.h"
 #include "dbus/dbus_old.h"
 #include "dbus/dbus_new.h"
@@ -24,6 +23,7 @@
 #include "p2p_supplicant.h"
 #include "sme.h"
 #include "notify.h"
+#include "hidl/hidl.h"
 
 int wpas_notify_supplicant_initialized(struct wpa_global *global)
 {
@@ -144,6 +144,8 @@ void wpas_notify_disconnect_reason(struct wpa_supplicant *wpa_s)
 		return;
 
 	wpas_dbus_signal_prop_changed(wpa_s, WPAS_DBUS_PROP_DISCONNECT_REASON);
+
+	wpas_hidl_notify_assoc_reject(wpa_s);
 }
 
 
@@ -153,6 +155,8 @@ void wpas_notify_assoc_status_code(struct wpa_supplicant *wpa_s)
 		return;
 
 	wpas_dbus_signal_prop_changed(wpa_s, WPAS_DBUS_PROP_ASSOC_STATUS_CODE);
+
+	wpas_hidl_notify_assoc_reject(wpa_s);
 }
 
 
@@ -862,4 +866,54 @@ void wpas_notify_network_type_changed(struct wpa_supplicant *wpa_s,
 		wpas_dbus_register_network(wpa_s, ssid);
 	}
 #endif /* CONFIG_P2P */
+}
+
+void wpas_notify_anqp_query_done(struct wpa_supplicant *wpa_s, const u8* bssid,
+				 const char *result,
+				 const struct wpa_bss_anqp *anqp)
+{
+#ifdef CONFIG_INTERWORKING
+	if (!wpa_s || !bssid || !anqp)
+		return;
+
+	wpas_hidl_notify_anqp_query_done(wpa_s, bssid, result, anqp);
+#endif /* CONFIG_INTERWORKING */
+}
+
+void wpas_notify_hs20_icon_query_done(struct wpa_supplicant *wpa_s, const u8* bssid,
+				      const char* file_name, const u8* image,
+				      u32 image_length)
+{
+#ifdef CONFIG_HS20
+	if (!wpa_s || !bssid || !file_name || !image)
+		return;
+
+	wpas_hidl_notify_hs20_icon_query_done(wpa_s, bssid, file_name, image,
+					      image_length);
+#endif /* CONFIG_HS20 */
+}
+
+void wpas_notify_hs20_rx_subscription_remediation(struct wpa_supplicant *wpa_s,
+						  const char* url,
+						  u8 osu_method)
+{
+#ifdef CONFIG_HS20
+	if (!wpa_s || !url)
+		return;
+
+	wpas_hidl_notify_hs20_rx_subscription_remediation(wpa_s, url, osu_method);
+#endif /* CONFIG_HS20 */
+}
+
+void wpas_notify_hs20_rx_deauth_imminent_notice(struct wpa_supplicant *wpa_s,
+						u8 code, u16 reauth_delay,
+						const char *url)
+{
+#ifdef CONFIG_HS20
+	if (!wpa_s || !url)
+		return;
+
+	wpas_hidl_notify_hs20_rx_deauth_imminent_notice(wpa_s, code, reauth_delay,
+							url);
+#endif /* CONFIG_HS20 */
 }

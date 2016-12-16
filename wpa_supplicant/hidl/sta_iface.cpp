@@ -11,6 +11,16 @@
 #include "hidl_return_util.h"
 #include "sta_iface.h"
 
+extern "C" {
+#include "gas_query.h"
+#include "interworking.h"
+#include "hs20_supplicant.h"
+}
+
+namespace {
+constexpr uint32_t kMaxAnqpElems = 100;
+}  // namespace
+
 namespace android {
 namespace hardware {
 namespace wifi {
@@ -345,14 +355,46 @@ SupplicantStatus StaIface::initiateAnqpQueryInternal(
     const std::vector<ISupplicantStaIface::AnqpInfoId> &info_elements,
     const std::vector<ISupplicantStaIface::Hs20AnqpSubtypes> &sub_types)
 {
-	// TODO: Add implementation.
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (info_elements.size() > kMaxAnqpElems) {
+		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
+	}
+	uint16_t *info_elems_buf = static_cast<uint16_t *>(
+	    os_malloc(sizeof(uint16_t) * info_elements.size()));
+	if (!info_elems_buf) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	uint32_t num_info_elems = 0;
+	for (const auto &info_element : info_elements) {
+		info_elems_buf[num_info_elems++] =
+		    static_cast<std::underlying_type<
+			ISupplicantStaIface::AnqpInfoId>::type>(info_element);
+	}
+	uint32_t sub_types_bitmask = 0;
+	for (const auto &type : sub_types) {
+		sub_types_bitmask |= BIT(
+		    static_cast<std::underlying_type<
+			ISupplicantStaIface::Hs20AnqpSubtypes>::type>(type));
+	}
+	if (anqp_send_req(
+		wpa_s, mac_address.data(), info_elems_buf, num_info_elems,
+		sub_types_bitmask, false)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
 SupplicantStatus StaIface::initiateHs20IconQueryInternal(
     const std::array<uint8_t, 6> &mac_address, const std::string &file_name)
 {
-	// TODO: Add implementation.
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	wpa_s->fetch_osu_icon_in_progress = 0;
+	if (hs20_anqp_send_req(
+		wpa_s, mac_address.data(), BIT(HS20_STYPE_ICON_REQUEST),
+		reinterpret_cast<const uint8_t *>(file_name.c_str()),
+		file_name.size(), true)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
@@ -364,8 +406,7 @@ SupplicantStatus StaIface::initiateHs20IconQueryInternal(
  */
 wpa_supplicant *StaIface::retrieveIfacePtr()
 {
-	return wpa_supplicant_get_iface(
-	    (struct wpa_global *)wpa_global_, ifname_.c_str());
+	return wpa_supplicant_get_iface(wpa_global_, ifname_.c_str());
 }
 
 }  // namespace implementation

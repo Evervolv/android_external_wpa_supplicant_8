@@ -287,6 +287,16 @@ void callWithEachNetworkCallback(
 		method(callback);
 	}
 }
+
+std::vector<uint8_t> convertWpaBufToVector(const struct wpabuf *buf)
+{
+	if (buf) {
+		return std::vector<uint8_t>(
+		    wpabuf_head_u8(buf), wpabuf_head_u8(buf) + wpabuf_len(buf));
+	} else {
+		return std::vector<uint8_t>();
+	}
+}
 }  // namespace
 
 namespace android {
@@ -521,7 +531,7 @@ int HidlManager::notifyStateChange(struct wpa_supplicant *wpa_s)
 	// Invoke the |onStateChanged| method on all registered callbacks.
 	ISupplicantStaIfaceCallback::State hidl_state =
 	    static_cast<ISupplicantStaIfaceCallback::State>(wpa_s->wpa_state);
-	hidl_array<uint8_t, 6> hidl_bssid;
+	std::array<uint8_t, 6> hidl_bssid;
 	os_memcpy(hidl_bssid.data(), wpa_s->bssid, ETH_ALEN);
 	uint32_t hidl_network_id = UINT32_MAX;
 	std::vector<uint8_t> hidl_ssid;
@@ -564,6 +574,210 @@ int HidlManager::notifyNetworkRequest(
 	// TODO(b/31646740): Parse the param string to find the appropriate
 	// callback.
 	return 0;
+}
+
+/**
+ * Notify all listeners about the end of an ANQP query.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface.
+ * @param bssid BSSID of the access point.
+ * @param result Result of the operation ("SUCCESS" or "FAILURE").
+ * @param anqp |wpa_bss_anqp| ANQP data fetched.
+ */
+void HidlManager::notifyAnqpQueryDone(
+    struct wpa_supplicant *wpa_s, const u8 *bssid, const char *result,
+    const struct wpa_bss_anqp *anqp)
+{
+	if (!wpa_s || !bssid || !result || !anqp)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	ISupplicantStaIfaceCallback::AnqpData hidl_anqp_data;
+	ISupplicantStaIfaceCallback::Hs20AnqpData hidl_hs20_anqp_data;
+	if (std::string(result) == "SUCCESS") {
+		hidl_anqp_data.venueName =
+		    convertWpaBufToVector(anqp->venue_name);
+		hidl_anqp_data.roamingConsortium =
+		    convertWpaBufToVector(anqp->roaming_consortium);
+		hidl_anqp_data.ipAddrTypeAvailability =
+		    convertWpaBufToVector(anqp->ip_addr_type_availability);
+		hidl_anqp_data.naiRealm =
+		    convertWpaBufToVector(anqp->nai_realm);
+		hidl_anqp_data.anqp3gppCellularNetwork =
+		    convertWpaBufToVector(anqp->anqp_3gpp);
+		hidl_anqp_data.domainName =
+		    convertWpaBufToVector(anqp->domain_name);
+
+		hidl_hs20_anqp_data.operatorFriendlyName =
+		    convertWpaBufToVector(anqp->hs20_operator_friendly_name);
+		hidl_hs20_anqp_data.wanMetrics =
+		    convertWpaBufToVector(anqp->hs20_wan_metrics);
+		hidl_hs20_anqp_data.connectionCapability =
+		    convertWpaBufToVector(anqp->hs20_connection_capability);
+		hidl_hs20_anqp_data.osuProvidersList =
+		    convertWpaBufToVector(anqp->hs20_osu_providers_list);
+	}
+
+	std::array<uint8_t, 6> hidl_bssid;
+	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantStaIfaceCallback::onAnqpQueryDone,
+			       std::placeholders::_1, hidl_bssid,
+			       hidl_anqp_data, hidl_hs20_anqp_data));
+}
+
+/**
+ * Notify all listeners about the end of an HS20 icon query.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface.
+ * @param bssid BSSID of the access point.
+ * @param file_name Name of the icon file.
+ * @param image Raw bytes of the icon file.
+ * @param image_length Size of the the icon file.
+ */
+void HidlManager::notifyHs20IconQueryDone(
+    struct wpa_supplicant *wpa_s, const u8 *bssid, const char *file_name,
+    const u8 *image, u32 image_length)
+{
+	if (!wpa_s || !bssid || !file_name || !image)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	std::vector<uint8_t> hidl_image(image, image + image_length);
+	std::array<uint8_t, 6> hidl_bssid;
+	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onHs20IconQueryDone,
+		std::placeholders::_1, hidl_bssid, file_name, hidl_image));
+}
+
+/**
+ * Notify all listeners about the reception of HS20 subscription
+ * remediation notification from the server.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface.
+ * @param url URL of the server.
+ * @param osu_method OSU method (OMA_DM or SOAP_XML_SPP).
+ */
+void HidlManager::notifyHs20RxSubscriptionRemediation(
+    struct wpa_supplicant *wpa_s, const char *url, u8 osu_method)
+{
+	if (!wpa_s || !url)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	ISupplicantStaIfaceCallback::OsuMethod hidl_osu_method = {};
+	if (osu_method & 0x1) {
+		hidl_osu_method =
+		    ISupplicantStaIfaceCallback::OsuMethod::OMA_DM;
+	} else if (osu_method & 0x2) {
+		hidl_osu_method =
+		    ISupplicantStaIfaceCallback::OsuMethod::SOAP_XML_SPP;
+	}
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onHs20SubscriptionRemediation,
+		std::placeholders::_1, hidl_osu_method, url));
+}
+
+/**
+ * Notify all listeners about the reception of HS20 immient deauth
+ * notification from the server.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface.
+ * @param code Deauth reason code sent from server.
+ * @param reauth_delay Reauthentication delay in seconds sent from server.
+ * @param url URL of the server.
+ */
+void HidlManager::notifyHs20RxDeauthImminentNotice(
+    struct wpa_supplicant *wpa_s, u8 code, u16 reauth_delay, const char *url)
+{
+	if (!wpa_s || !url)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onHs20DeauthImminentNotice,
+		std::placeholders::_1, code, reauth_delay, url));
+}
+
+/**
+ * Notify all listeners about the reason code for disconnection from the
+ * currently connected network.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface on which
+ * the network is present.
+ */
+void HidlManager::notifyDisconnectReason(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	const u8 *bssid = wpa_s->bssid;
+	if (is_zero_ether_addr(bssid)) {
+		bssid = wpa_s->pending_bssid;
+	}
+	std::array<uint8_t, 6> hidl_bssid;
+	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onDisconnected,
+		std::placeholders::_1, hidl_bssid, wpa_s->disconnect_reason < 0,
+		wpa_s->disconnect_reason));
+}
+
+/**
+ * Notify all listeners about association reject from the access point to which
+ * we are attempting to connect.
+ *
+ * @param wpa_s |wpa_supplicant| struct corresponding to the interface on which
+ * the network is present.
+ */
+void HidlManager::notifyAssocReject(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	const u8 *bssid = wpa_s->bssid;
+	if (is_zero_ether_addr(bssid)) {
+		bssid = wpa_s->pending_bssid;
+	}
+	std::array<uint8_t, 6> hidl_bssid;
+	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onAssociationRejected,
+		std::placeholders::_1, hidl_bssid, wpa_s->assoc_status_code));
 }
 
 /**
