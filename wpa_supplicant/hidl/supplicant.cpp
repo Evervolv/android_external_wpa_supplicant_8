@@ -165,7 +165,15 @@ SupplicantStatus Supplicant::setDebugParamsInternal(
 
 SupplicantStatus Supplicant::setConcurrencyPriorityInternal(IfaceType type)
 {
-	// TODO: Add implementation.
+	if (type == IfaceType::STA) {
+		wpa_global_->conc_pref =
+		    wpa_global::wpa_conc_pref::WPA_CONC_PREF_STA;
+	} else if (type == IfaceType::P2P) {
+		wpa_global_->conc_pref =
+		    wpa_global::wpa_conc_pref::WPA_CONC_PREF_P2P;
+	} else {
+		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
+	}
 	return SupplicantStatus{SupplicantStatusCode::SUCCESS, ""};
 }
 }  // namespace implementation

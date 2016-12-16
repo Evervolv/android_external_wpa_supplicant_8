@@ -314,6 +314,41 @@ static_assert(
 	WPA_COMPLETED,
     "State value mismatch");
 
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantP2pIface::GroupCapabilityMask::GROUP_OWNER) ==
+	P2P_GROUP_CAPAB_GROUP_OWNER,
+    "P2P capability value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantP2pIface::GroupCapabilityMask::PERSISTENT_GROUP) ==
+	P2P_GROUP_CAPAB_PERSISTENT_GROUP,
+    "P2P capability value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantP2pIface::GroupCapabilityMask::GROUP_LIMIT) ==
+	P2P_GROUP_CAPAB_GROUP_LIMIT,
+    "P2P capability value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantP2pIface::GroupCapabilityMask::INTRA_BSS_DIST) ==
+	P2P_GROUP_CAPAB_INTRA_BSS_DIST,
+    "P2P capability value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantP2pIface::GroupCapabilityMask::CROSS_CONN) ==
+	P2P_GROUP_CAPAB_CROSS_CONN,
+    "P2P capability value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantP2pIface::GroupCapabilityMask::PERSISTENT_RECONN) ==
+	P2P_GROUP_CAPAB_PERSISTENT_RECONN,
+    "P2P capability value mismatch");
+static_assert(
+    static_cast<uint32_t>(
+	ISupplicantP2pIface::GroupCapabilityMask::GROUP_FORMATION) ==
+	P2P_GROUP_CAPAB_GROUP_FORMATION,
+    "P2P capability value mismatch");
 }  // namespace implementation
 }  // namespace V1_0
 }  // namespace wifi
