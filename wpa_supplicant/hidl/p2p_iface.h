@@ -104,7 +104,7 @@ public:
 	    const hidl_array<uint8_t, 6>& peer_address,
 	    reinvoke_cb _hidl_cb) override;
 	Return<void> configureExtListen(
-	    bool enable, uint32_t period_in_millis, uint32_t interval_in_millis,
+	    uint32_t period_in_millis, uint32_t interval_in_millis,
 	    configureExtListen_cb _hidl_cb) override;
 	Return<void> setListenChannel(
 	    uint32_t channel, uint32_t operating_class,
@@ -130,9 +130,7 @@ public:
 	Return<void> removeUpnpService(
 	    uint32_t version, const hidl_string& service_name,
 	    removeUpnpService_cb _hidl_cb) override;
-	Return<void> flushServices(
-	    uint32_t version, const hidl_string& service_name,
-	    flushServices_cb _hidl_cb) override;
+	Return<void> flushServices(flushServices_cb _hidl_cb) override;
 	Return<void> requestServiceDiscovery(
 	    const hidl_array<uint8_t, 6>& peer_address,
 	    const hidl_vec<uint8_t>& query,
@@ -189,8 +187,7 @@ private:
 	    SupplicantNetworkId persistent_network_id,
 	    const std::array<uint8_t, 6>& peer_address);
 	SupplicantStatus configureExtListenInternal(
-	    bool enable, uint32_t period_in_millis,
-	    uint32_t interval_in_millis);
+	    uint32_t period_in_millis, uint32_t interval_in_millis);
 	SupplicantStatus setListenChannelInternal(
 	    uint32_t channel, uint32_t operating_class);
 	SupplicantStatus setDisallowedFrequenciesInternal(
@@ -208,8 +205,7 @@ private:
 	    uint32_t version, const std::string& service_name);
 	SupplicantStatus removeUpnpServiceInternal(
 	    uint32_t version, const std::string& service_name);
-	SupplicantStatus flushServicesInternal(
-	    uint32_t version, const std::string& service_name);
+	SupplicantStatus flushServicesInternal();
 	std::pair<SupplicantStatus, uint64_t> requestServiceDiscoveryInternal(
 	    const std::array<uint8_t, 6>& peer_address,
 	    const std::vector<uint8_t>& query);
