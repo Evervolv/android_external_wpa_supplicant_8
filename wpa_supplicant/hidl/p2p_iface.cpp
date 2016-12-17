@@ -237,13 +237,13 @@ Return<void> P2pIface::reinvoke(
 }
 
 Return<void> P2pIface::configureExtListen(
-    bool enable, uint32_t period_in_millis, uint32_t interval_in_millis,
+    uint32_t period_in_millis, uint32_t interval_in_millis,
     configureExtListen_cb _hidl_cb)
 {
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
-	    &P2pIface::configureExtListenInternal, _hidl_cb, enable,
-	    period_in_millis, interval_in_millis);
+	    &P2pIface::configureExtListenInternal, _hidl_cb, period_in_millis,
+	    interval_in_millis);
 }
 
 Return<void> P2pIface::setListenChannel(
@@ -315,13 +315,11 @@ Return<void> P2pIface::removeUpnpService(
 	    service_name);
 }
 
-Return<void> P2pIface::flushServices(
-    uint32_t version, const hidl_string& service_name,
-    flushServices_cb _hidl_cb)
+Return<void> P2pIface::flushServices(flushServices_cb _hidl_cb)
 {
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
-	    &P2pIface::flushServicesInternal, _hidl_cb, version, service_name);
+	    &P2pIface::flushServicesInternal, _hidl_cb);
 }
 
 Return<void> P2pIface::requestServiceDiscovery(
@@ -682,7 +680,7 @@ SupplicantStatus P2pIface::reinvokeInternal(
 }
 
 SupplicantStatus P2pIface::configureExtListenInternal(
-    bool enable, uint32_t period_in_millis, uint32_t interval_in_millis)
+    uint32_t period_in_millis, uint32_t interval_in_millis)
 {
 	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
 	if (wpas_p2p_ext_listen(wpa_s, period_in_millis, interval_in_millis)) {
@@ -825,8 +823,7 @@ SupplicantStatus P2pIface::removeUpnpServiceInternal(
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
-SupplicantStatus P2pIface::flushServicesInternal(
-    uint32_t version, const std::string& service_name)
+SupplicantStatus P2pIface::flushServicesInternal()
 {
 	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
 	wpas_p2p_service_flush(wpa_s);
