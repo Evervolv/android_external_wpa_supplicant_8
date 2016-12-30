@@ -8,8 +8,8 @@
  */
 
 #include <hwbinder/IPCThreadState.h>
-#include <hwbinder/ProcessState.h>
 
+#include <hidl/HidlTransportSupport.h>
 #include "hidl_manager.h"
 
 extern "C" {
@@ -20,7 +20,7 @@ extern "C" {
 #include "utils/includes.h"
 }
 
-using android::hardware::ProcessState;
+using android::hardware::configureRpcThreadpool;
 using android::hardware::IPCThreadState;
 using android::hardware::wifi::supplicant::V1_0::implementation::HidlManager;
 
@@ -44,7 +44,7 @@ struct wpas_hidl_priv *wpas_hidl_init(struct wpa_global *global)
 
 	wpa_printf(MSG_DEBUG, "Initing hidl control");
 
-	ProcessState::self()->setThreadPoolMaxThreadCount(0);
+	configureRpcThreadpool(1, true /* callerWillJoin */);
 	IPCThreadState::self()->disableBackgroundScheduling(true);
 	IPCThreadState::self()->setupPolling(&priv->hidl_fd);
 	if (priv->hidl_fd < 0)
