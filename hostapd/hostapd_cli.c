@@ -1,6 +1,6 @@
 /*
  * hostapd - command line interface for hostapd daemon
- * Copyright (c) 2004-2016, Jouni Malinen <j@w1.fi>
+ * Copyright (c) 2004-2017, Jouni Malinen <j@w1.fi>
  *
  * This software may be distributed under the terms of the BSD license.
  * See README for more details.
@@ -21,7 +21,7 @@
 
 static const char *const hostapd_cli_version =
 "hostapd_cli v" VERSION_STR "\n"
-"Copyright (c) 2004-2016, Jouni Malinen <j@w1.fi> and contributors";
+"Copyright (c) 2004-2017, Jouni Malinen <j@w1.fi> and contributors";
 
 static struct wpa_ctrl *ctrl_conn;
 static int hostapd_cli_quit = 0;
@@ -320,7 +320,7 @@ static int hostapd_cli_cmd_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
 }
 
 
-static char ** hostapd_complete_sta(const char *str, int pos)
+static char ** hostapd_complete_stations(const char *str, int pos)
 {
 	int arg = get_cmd_arg_num(str, pos);
 	char **res = NULL;
@@ -367,21 +367,6 @@ static int hostapd_cli_cmd_deauthenticate(struct wpa_ctrl *ctrl, int argc,
 }
 
 
-static char ** hostapd_complete_deauthenticate(const char *str, int pos)
-{
-	int arg = get_cmd_arg_num(str, pos);
-	char **res = NULL;
-
-	switch (arg) {
-	case 1:
-		res = cli_txt_list_array(&stations);
-		break;
-	}
-
-	return res;
-}
-
-
 static int hostapd_cli_cmd_disassociate(struct wpa_ctrl *ctrl, int argc,
 					char *argv[])
 {
@@ -397,21 +382,6 @@ static int hostapd_cli_cmd_disassociate(struct wpa_ctrl *ctrl, int argc,
 	else
 		os_snprintf(buf, sizeof(buf), "DISASSOCIATE %s", argv[0]);
 	return wpa_ctrl_command(ctrl, buf);
-}
-
-
-static char ** hostapd_complete_disassociate(const char *str, int pos)
-{
-	int arg = get_cmd_arg_num(str, pos);
-	char **res = NULL;
-
-	switch (arg) {
-	case 1:
-		res = cli_txt_list_array(&stations);
-		break;
-	}
-
-	return res;
 }
 
 
@@ -1072,6 +1042,44 @@ static int hostapd_cli_cmd_set(struct wpa_ctrl *ctrl, int argc, char *argv[])
 }
 
 
+static char ** hostapd_complete_set(const char *str, int pos)
+{
+	int arg = get_cmd_arg_num(str, pos);
+	const char *fields[] = {
+#ifdef CONFIG_WPS_TESTING
+		"wps_version_number", "wps_testing_dummy_cred",
+		"wps_corrupt_pkhash",
+#endif /* CONFIG_WPS_TESTING */
+#ifdef CONFIG_INTERWORKING
+		"gas_frag_limit",
+#endif /* CONFIG_INTERWORKING */
+#ifdef CONFIG_TESTING_OPTIONS
+		"ext_mgmt_frame_handling", "ext_eapol_frame_io",
+#endif /* CONFIG_TESTING_OPTIONS */
+#ifdef CONFIG_MBO
+		"mbo_assoc_disallow",
+#endif /* CONFIG_MBO */
+		"deny_mac_file", "accept_mac_file",
+	};
+	int i, num_fields = ARRAY_SIZE(fields);
+
+	if (arg == 1) {
+		char **res;
+
+		res = os_calloc(num_fields + 1, sizeof(char *));
+		if (!res)
+			return NULL;
+		for (i = 0; i < num_fields; i++) {
+			res[i] = os_strdup(fields[i]);
+			if (!res[i])
+				return res;
+		}
+		return res;
+	}
+	return NULL;
+}
+
+
 static int hostapd_cli_cmd_get(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	char cmd[256];
@@ -1089,6 +1097,31 @@ static int hostapd_cli_cmd_get(struct wpa_ctrl *ctrl, int argc, char *argv[])
 		return -1;
 	}
 	return wpa_ctrl_command(ctrl, cmd);
+}
+
+
+static char ** hostapd_complete_get(const char *str, int pos)
+{
+	int arg = get_cmd_arg_num(str, pos);
+	const char *fields[] = {
+		"version", "tls_library",
+	};
+	int i, num_fields = ARRAY_SIZE(fields);
+
+	if (arg == 1) {
+		char **res;
+
+		res = os_calloc(num_fields + 1, sizeof(char *));
+		if (!res)
+			return NULL;
+		for (i = 0; i < num_fields; i++) {
+			res[i] = os_strdup(fields[i]);
+			if (!res[i])
+				return res;
+		}
+		return res;
+	}
+	return NULL;
 }
 
 
@@ -1343,9 +1376,11 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	  "= pings hostapd" },
 	{ "mib", hostapd_cli_cmd_mib, NULL,
 	  "= get MIB variables (dot1x, dot11, radius)" },
-	{ "relog", hostapd_cli_cmd_relog, NULL, NULL },
-	{ "status", hostapd_cli_cmd_status, NULL, NULL },
-	{ "sta", hostapd_cli_cmd_sta, hostapd_complete_sta,
+	{ "relog", hostapd_cli_cmd_relog, NULL,
+	  "= reload/truncate debug log output file" },
+	{ "status", hostapd_cli_cmd_status, NULL,
+	  "= show interface status info" },
+	{ "sta", hostapd_cli_cmd_sta, hostapd_complete_stations,
 	  "<addr> = get MIB variables for one station" },
 	{ "all_sta", hostapd_cli_cmd_all_sta, NULL,
 	   "= get MIB variables for all stations" },
@@ -1354,17 +1389,17 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	{ "new_sta", hostapd_cli_cmd_new_sta, NULL,
 	  "<addr> = add a new station" },
 	{ "deauthenticate", hostapd_cli_cmd_deauthenticate,
-	  hostapd_complete_deauthenticate,
+	  hostapd_complete_stations,
 	  "<addr> = deauthenticate a station" },
 	{ "disassociate", hostapd_cli_cmd_disassociate,
-	  hostapd_complete_disassociate,
+	  hostapd_complete_stations,
 	  "<addr> = disassociate a station" },
 #ifdef CONFIG_TAXONOMY
-	{ "signature", hostapd_cli_cmd_signature, NULL,
+	{ "signature", hostapd_cli_cmd_signature, hostapd_complete_stations,
 	  "<addr> = get taxonomy signature for a station" },
 #endif /* CONFIG_TAXONOMY */
 #ifdef CONFIG_IEEE80211W
-	{ "sa_query", hostapd_cli_cmd_sa_query, NULL,
+	{ "sa_query", hostapd_cli_cmd_sa_query, hostapd_complete_stations,
 	  "<addr> = send SA Query to a station" },
 #endif /* CONFIG_IEEE80211W */
 #ifdef CONFIG_WPS
@@ -1393,9 +1428,12 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	{ "wps_get_status", hostapd_cli_cmd_wps_get_status, NULL,
 	  "= show current WPS status" },
 #endif /* CONFIG_WPS */
-	{ "disassoc_imminent", hostapd_cli_cmd_disassoc_imminent, NULL, NULL },
-	{ "ess_disassoc", hostapd_cli_cmd_ess_disassoc, NULL, NULL },
-	{ "bss_tm_req", hostapd_cli_cmd_bss_tm_req, NULL, NULL },
+	{ "disassoc_imminent", hostapd_cli_cmd_disassoc_imminent, NULL,
+	  "= send Disassociation Imminent notification" },
+	{ "ess_disassoc", hostapd_cli_cmd_ess_disassoc, NULL,
+	  "= send ESS Dissassociation Imminent notification" },
+	{ "bss_tm_req", hostapd_cli_cmd_bss_tm_req, NULL,
+	  "= send BSS Transition Management Request" },
 	{ "get_config", hostapd_cli_cmd_get_config, NULL,
 	  "= show current configuration" },
 	{ "help", hostapd_cli_cmd_help, hostapd_cli_complete_help,
@@ -1403,35 +1441,64 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	{ "interface", hostapd_cli_cmd_interface, hostapd_complete_interface,
 	  "[ifname] = show interfaces/select interface" },
 #ifdef CONFIG_FST
-	{ "fst", hostapd_cli_cmd_fst, NULL, NULL },
+	{ "fst", hostapd_cli_cmd_fst, NULL,
+	  "<params...> = send FST-MANAGER control interface command" },
 #endif /* CONFIG_FST */
-	{ "raw", hostapd_cli_cmd_raw, NULL, NULL },
+	{ "raw", hostapd_cli_cmd_raw, NULL,
+	  "<params..> = send unprocessed command" },
 	{ "level", hostapd_cli_cmd_level, NULL,
 	  "<debug level> = change debug level" },
 	{ "license", hostapd_cli_cmd_license, NULL,
 	  "= show full hostapd_cli license" },
 	{ "quit", hostapd_cli_cmd_quit, NULL,
 	  "= exit hostapd_cli" },
-	{ "set", hostapd_cli_cmd_set, NULL, NULL },
-	{ "get", hostapd_cli_cmd_get, NULL, NULL },
-	{ "set_qos_map_set", hostapd_cli_cmd_set_qos_map_set, NULL, NULL },
-	{ "send_qos_map_conf", hostapd_cli_cmd_send_qos_map_conf, NULL, NULL },
-	{ "chan_switch", hostapd_cli_cmd_chan_switch, NULL, NULL },
-	{ "hs20_wnm_notif", hostapd_cli_cmd_hs20_wnm_notif, NULL, NULL },
-	{ "hs20_deauth_req", hostapd_cli_cmd_hs20_deauth_req, NULL, NULL },
-	{ "vendor", hostapd_cli_cmd_vendor, NULL, NULL },
-	{ "enable", hostapd_cli_cmd_enable, NULL, NULL },
-	{ "reload", hostapd_cli_cmd_reload, NULL, NULL },
-	{ "disable", hostapd_cli_cmd_disable, NULL, NULL },
-	{ "erp_flush", hostapd_cli_cmd_erp_flush, NULL, NULL },
-	{ "log_level", hostapd_cli_cmd_log_level, NULL, NULL },
-	{ "pmksa", hostapd_cli_cmd_pmksa, NULL, NULL },
-	{ "pmksa_flush", hostapd_cli_cmd_pmksa_flush, NULL, NULL },
-	{ "set_neighbor", hostapd_cli_cmd_set_neighbor, NULL, NULL },
-	{ "remove_neighbor", hostapd_cli_cmd_remove_neighbor, NULL, NULL },
-	{ "req_lci", hostapd_cli_cmd_req_lci, NULL, NULL },
-	{ "req_range", hostapd_cli_cmd_req_range, NULL, NULL },
-	{ "driver_flags", hostapd_cli_cmd_driver_flags, NULL, NULL },
+	{ "set", hostapd_cli_cmd_set, hostapd_complete_set,
+	  "<name> <value> = set runtime variables" },
+	{ "get", hostapd_cli_cmd_get, hostapd_complete_get,
+	  "<name> = get runtime info" },
+	{ "set_qos_map_set", hostapd_cli_cmd_set_qos_map_set, NULL,
+	  "<arg,arg,...> = set QoS Map set element" },
+	{ "send_qos_map_conf", hostapd_cli_cmd_send_qos_map_conf,
+	  hostapd_complete_stations,
+	  "<addr> = send QoS Map Configure frame" },
+	{ "chan_switch", hostapd_cli_cmd_chan_switch, NULL,
+	  "<cs_count> <freq> [sec_channel_offset=] [center_freq1=]\n"
+	  "  [center_freq2=] [bandwidth=] [blocktx] [ht|vht]\n"
+	  "  = initiate channel switch announcement" },
+	{ "hs20_wnm_notif", hostapd_cli_cmd_hs20_wnm_notif, NULL,
+	  "<addr> <url>\n"
+	  "  = send WNM-Notification Subscription Remediation Request" },
+	{ "hs20_deauth_req", hostapd_cli_cmd_hs20_deauth_req, NULL,
+	  "<addr> <code (0/1)> <Re-auth-Delay(sec)> [url]\n"
+	  "  = send WNM-Notification imminent deauthentication indication" },
+	{ "vendor", hostapd_cli_cmd_vendor, NULL,
+	  "<vendor id> <sub command id> [<hex formatted data>]\n"
+	  "  = send vendor driver command" },
+	{ "enable", hostapd_cli_cmd_enable, NULL,
+	  "= enable hostapd on current interface" },
+	{ "reload", hostapd_cli_cmd_reload, NULL,
+	  "= reload configuration for current interface" },
+	{ "disable", hostapd_cli_cmd_disable, NULL,
+	  "= disable hostapd on current interface" },
+	{ "erp_flush", hostapd_cli_cmd_erp_flush, NULL,
+	  "= drop all ERP keys"},
+	{ "log_level", hostapd_cli_cmd_log_level, NULL,
+	  "[level] = show/change log verbosity level" },
+	{ "pmksa", hostapd_cli_cmd_pmksa, NULL,
+	  " = show PMKSA cache entries" },
+	{ "pmksa_flush", hostapd_cli_cmd_pmksa_flush, NULL,
+	  " = flush PMKSA cache" },
+	{ "set_neighbor", hostapd_cli_cmd_set_neighbor, NULL,
+	  "<addr> <ssid=> <nr=> [lci=] [civic=] [stat]\n"
+	  "  = add AP to neighbor database" },
+	{ "remove_neighbor", hostapd_cli_cmd_remove_neighbor, NULL,
+	  "<addr> <ssid=> = remove AP from neighbor database" },
+	{ "req_lci", hostapd_cli_cmd_req_lci, hostapd_complete_stations,
+	  "<addr> = send LCI request to a station"},
+	{ "req_range", hostapd_cli_cmd_req_range, NULL,
+	  " = send FTM range request"},
+	{ "driver_flags", hostapd_cli_cmd_driver_flags, NULL,
+	  " = show supported driver flags"},
 	{ NULL, NULL, NULL, NULL }
 };
 

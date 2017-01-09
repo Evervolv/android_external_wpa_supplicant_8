@@ -25,7 +25,7 @@ struct wpa_sm_ctx {
 
 	void (*set_state)(void *ctx, enum wpa_states state);
 	enum wpa_states (*get_state)(void *ctx);
-	void (*deauthenticate)(void * ctx, int reason_code); 
+	void (*deauthenticate)(void * ctx, int reason_code);
 	int (*set_key)(void *ctx, enum wpa_alg alg,
 		       const u8 *addr, int key_idx, int set_tx,
 		       const u8 *seq, size_t seq_len,
@@ -38,8 +38,10 @@ struct wpa_sm_ctx {
 	void (*cancel_auth_timeout)(void *ctx);
 	u8 * (*alloc_eapol)(void *ctx, u8 type, const void *data, u16 data_len,
 			    size_t *msg_len, void **data_pos);
-	int (*add_pmkid)(void *ctx, const u8 *bssid, const u8 *pmkid);
-	int (*remove_pmkid)(void *ctx, const u8 *bssid, const u8 *pmkid);
+	int (*add_pmkid)(void *ctx, void *network_ctx, const u8 *bssid,
+			 const u8 *pmkid);
+	int (*remove_pmkid)(void *ctx, void *network_ctx, const u8 *bssid,
+			    const u8 *pmkid);
 	void (*set_config_blob)(void *ctx, struct wpa_config_blob *blob);
 	const struct wpa_config_blob * (*get_config_blob)(void *ctx,
 							  const char *name);
@@ -147,6 +149,10 @@ int wpa_sm_rx_eapol(struct wpa_sm *sm, const u8 *src_addr,
 		    const u8 *buf, size_t len);
 int wpa_sm_parse_own_wpa_ie(struct wpa_sm *sm, struct wpa_ie_data *data);
 int wpa_sm_pmksa_cache_list(struct wpa_sm *sm, char *buf, size_t len);
+struct rsn_pmksa_cache_entry * wpa_sm_pmksa_cache_head(struct wpa_sm *sm);
+struct rsn_pmksa_cache_entry *
+wpa_sm_pmksa_cache_add_entry(struct wpa_sm *sm,
+			     struct rsn_pmksa_cache_entry * entry);
 void wpa_sm_drop_sa(struct wpa_sm *sm);
 int wpa_sm_has_ptk(struct wpa_sm *sm);
 
