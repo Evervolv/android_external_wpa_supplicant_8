@@ -25,10 +25,8 @@ using android::hardware::IPCThreadState;
 using android::hardware::wifi::supplicant::V1_0::implementation::HidlManager;
 
 void wpas_hidl_sock_handler(
-    int /* sock */, void * /* eloop_ctx */, void *sock_ctx)
+    int /* sock */, void * /* eloop_ctx */, void * /* sock_ctx */)
 {
-	struct wpas_hidl_priv *priv = (wpas_hidl_priv *)sock_ctx;
-	wpa_printf(MSG_DEBUG, "Processing hidl events on FD %d", priv->hidl_fd);
 	IPCThreadState::self()->handlePolledCommands();
 }
 
