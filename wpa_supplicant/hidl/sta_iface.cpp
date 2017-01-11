@@ -9,6 +9,7 @@
 
 #include "hidl_manager.h"
 #include "hidl_return_util.h"
+#include "iface_config_utils.h"
 #include "sta_iface.h"
 
 extern "C" {
@@ -344,6 +345,62 @@ Return<void> StaIface::cancelWps(cancelWps_cb _hidl_cb)
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
 	    &StaIface::cancelWpsInternal, _hidl_cb);
+}
+
+Return<void> StaIface::setWpsDeviceName(
+    const hidl_string &name, setWpsDeviceName_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setWpsDeviceNameInternal, _hidl_cb, name);
+}
+
+Return<void> StaIface::setWpsManufacturer(
+    const hidl_string &manufacturer, setWpsManufacturer_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setWpsManufacturerInternal, _hidl_cb, manufacturer);
+}
+
+Return<void> StaIface::setWpsModelName(
+    const hidl_string &model_name, setWpsModelName_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setWpsModelNameInternal, _hidl_cb, model_name);
+}
+
+Return<void> StaIface::setWpsModelNumber(
+    const hidl_string &model_number, setWpsModelNumber_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setWpsModelNumberInternal, _hidl_cb, model_number);
+}
+
+Return<void> StaIface::setWpsSerialNumber(
+    const hidl_string &serial_number, setWpsSerialNumber_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setWpsSerialNumberInternal, _hidl_cb, serial_number);
+}
+
+Return<void> StaIface::setWpsConfigMethods(
+    uint16_t config_methods, setWpsConfigMethods_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setWpsConfigMethodsInternal, _hidl_cb, config_methods);
+}
+
+Return<void> StaIface::setExternalSim(
+    bool useExternalSim, setExternalSim_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::setExternalSimInternal, _hidl_cb, useExternalSim);
 }
 
 std::pair<SupplicantStatus, std::string> StaIface::getNameInternal()
@@ -736,6 +793,51 @@ SupplicantStatus StaIface::cancelWpsInternal()
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaIface::setWpsDeviceNameInternal(const std::string &name)
+{
+	return iface_config_utils::setWpsDeviceName(retrieveIfacePtr(), name);
+}
+
+SupplicantStatus StaIface::setWpsManufacturerInternal(
+    const std::string &manufacturer)
+{
+	return iface_config_utils::setWpsManufacturer(
+	    retrieveIfacePtr(), manufacturer);
+}
+
+SupplicantStatus StaIface::setWpsModelNameInternal(
+    const std::string &model_name)
+{
+	return iface_config_utils::setWpsModelName(
+	    retrieveIfacePtr(), model_name);
+}
+
+SupplicantStatus StaIface::setWpsModelNumberInternal(
+    const std::string &model_number)
+{
+	return iface_config_utils::setWpsModelNumber(
+	    retrieveIfacePtr(), model_number);
+}
+
+SupplicantStatus StaIface::setWpsSerialNumberInternal(
+    const std::string &serial_number)
+{
+	return iface_config_utils::setWpsSerialNumber(
+	    retrieveIfacePtr(), serial_number);
+}
+
+SupplicantStatus StaIface::setWpsConfigMethodsInternal(uint16_t config_methods)
+{
+	return iface_config_utils::setWpsConfigMethods(
+	    retrieveIfacePtr(), config_methods);
+}
+
+SupplicantStatus StaIface::setExternalSimInternal(bool useExternalSim)
+{
+	return iface_config_utils::setExternalSim(
+	    retrieveIfacePtr(), useExternalSim);
 }
 
 /**
