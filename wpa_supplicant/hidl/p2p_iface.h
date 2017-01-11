@@ -140,6 +140,17 @@ public:
 	Return<void> setMiracastMode(
 	    ISupplicantP2pIface::MiracastMode mode,
 	    setMiracastMode_cb _hidl_cb) override;
+	Return<void> startWpsPbc(
+	    const hidl_string& groupIfName, const hidl_array<uint8_t, 6>& bssid,
+	    startWpsPbc_cb _hidl_cb) override;
+	Return<void> startWpsPinKeypad(
+	    const hidl_string& groupIfName, const hidl_string& pin,
+	    startWpsPinKeypad_cb _hidl_cb) override;
+	Return<void> startWpsPinDisplay(
+	    const hidl_string& groupIfName, const hidl_array<uint8_t, 6>& bssid,
+	    startWpsPinDisplay_cb _hidl_cb) override;
+	Return<void> cancelWps(
+	    const hidl_string& groupIfName, cancelWps_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -212,6 +223,15 @@ private:
 	SupplicantStatus cancelServiceDiscoveryInternal(uint64_t identifier);
 	SupplicantStatus setMiracastModeInternal(
 	    ISupplicantP2pIface::MiracastMode mode);
+	SupplicantStatus startWpsPbcInternal(
+	    const std::string& group_ifname,
+	    const std::array<uint8_t, 6>& bssid);
+	SupplicantStatus startWpsPinKeypadInternal(
+	    const std::string& group_ifname, const std::string& pin);
+	std::pair<SupplicantStatus, std::string> startWpsPinDisplayInternal(
+	    const std::string& group_ifname,
+	    const std::array<uint8_t, 6>& bssid);
+	SupplicantStatus cancelWpsInternal(const std::string& group_ifname);
 
 	struct wpa_supplicant* retrieveIfacePtr();
 	struct wpa_supplicant* retrieveGroupIfacePtr(
