@@ -1321,22 +1321,17 @@ SupplicantStatus StaNetwork::sendNetworkEapSimGsmAuthResponseInternal(
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	// Convert the incoming parameters to a string to pass to
 	// wpa_supplicant.
-	std::string ctrl_rsp_param;
 	uint32_t kc_hex_len = params.kc.size() * 2 + 1;
-	char *kc_hex = (char *)malloc(kc_hex_len);
+	std::vector<char> kc_hex(kc_hex_len);
 	uint32_t sres_hex_len = params.sres.size() * 2 + 1;
-	char *sres_hex = (char *)malloc(sres_hex_len);
-	if (!kc_hex || !sres_hex) {
-		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
-	}
+	std::vector<char> sres_hex(sres_hex_len);
 	wpa_snprintf_hex(
-	    kc_hex, kc_hex_len, params.kc.data(), params.kc.size());
+	    kc_hex.data(), kc_hex.size(), params.kc.data(), params.kc.size());
 	wpa_snprintf_hex(
-	    sres_hex, sres_hex_len, params.sres.data(), params.sres.size());
-	ctrl_rsp_param += "kc:";
-	ctrl_rsp_param += kc_hex;
-	ctrl_rsp_param += " sres:";
-	ctrl_rsp_param += sres_hex;
+	    sres_hex.data(), sres_hex.size(), params.sres.data(),
+	    params.sres.size());
+	std::string ctrl_rsp_param = ":" + std::string(kc_hex.data()) + ":" +
+				     std::string(sres_hex.data());
 	enum wpa_ctrl_req_type rtype = WPA_CTRL_REQ_SIM;
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (wpa_supplicant_ctrl_rsp_handle(
@@ -1356,28 +1351,22 @@ SupplicantStatus StaNetwork::sendNetworkEapSimUmtsAuthResponseInternal(
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	// Convert the incoming parameters to a string to pass to
 	// wpa_supplicant.
-	std::string ctrl_rsp_param;
 	uint32_t ik_hex_len = params.ik.size() * 2 + 1;
-	char *ik_hex = (char *)malloc(ik_hex_len);
+	std::vector<char> ik_hex(ik_hex_len);
 	uint32_t ck_hex_len = params.ck.size() * 2 + 1;
-	char *ck_hex = (char *)malloc(ck_hex_len);
+	std::vector<char> ck_hex(ck_hex_len);
 	uint32_t res_hex_len = params.res.size() * 2 + 1;
-	char *res_hex = (char *)malloc(res_hex_len);
-	if (!ik_hex || !ck_hex || !res_hex) {
-		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
-	}
+	std::vector<char> res_hex(res_hex_len);
 	wpa_snprintf_hex(
-	    ik_hex, ik_hex_len, params.ik.data(), params.ik.size());
+	    ik_hex.data(), ik_hex.size(), params.ik.data(), params.ik.size());
 	wpa_snprintf_hex(
-	    ck_hex, ck_hex_len, params.ck.data(), params.ck.size());
+	    ck_hex.data(), ck_hex.size(), params.ck.data(), params.ck.size());
 	wpa_snprintf_hex(
-	    res_hex, res_hex_len, params.res.data(), params.res.size());
-	ctrl_rsp_param += "ik:";
-	ctrl_rsp_param += ik_hex;
-	ctrl_rsp_param += "ck:";
-	ctrl_rsp_param += ck_hex;
-	ctrl_rsp_param += " res:";
-	ctrl_rsp_param += res_hex;
+	    res_hex.data(), res_hex.size(), params.res.data(),
+	    params.res.size());
+	std::string ctrl_rsp_param = ":" + std::string(ik_hex.data()) + ":" +
+				     std::string(ck_hex.data()) + ":" +
+				     std::string(res_hex.data());
 	enum wpa_ctrl_req_type rtype = WPA_CTRL_REQ_SIM;
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (wpa_supplicant_ctrl_rsp_handle(
@@ -1398,14 +1387,11 @@ SupplicantStatus StaNetwork::sendNetworkEapIdentityResponseInternal(
 	// Convert the incoming parameters to a string to pass to
 	// wpa_supplicant.
 	uint32_t identity_hex_len = identity.size() * 2 + 1;
-	char *identity_hex = (char *)malloc(identity_hex_len);
-	std::string ctrl_rsp_param;
-	if (!identity_hex) {
-		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
-	}
+	std::vector<char> identity_hex(identity_hex_len);
 	wpa_snprintf_hex(
-	    identity_hex, identity_hex_len, identity.data(), identity.size());
-	ctrl_rsp_param = identity_hex;
+	    identity_hex.data(), identity_hex.size(), identity.data(),
+	    identity.size());
+	std::string ctrl_rsp_param = identity_hex.data();
 	enum wpa_ctrl_req_type rtype = WPA_CTRL_REQ_EAP_IDENTITY;
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (wpa_supplicant_ctrl_rsp_handle(
