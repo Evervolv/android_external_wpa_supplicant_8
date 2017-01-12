@@ -498,11 +498,7 @@ SupplicantStatus StaIface::initiateAnqpQueryInternal(
 	if (info_elements.size() > kMaxAnqpElems) {
 		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
 	}
-	uint16_t *info_elems_buf = static_cast<uint16_t *>(
-	    os_malloc(sizeof(uint16_t) * info_elements.size()));
-	if (!info_elems_buf) {
-		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
-	}
+	uint16_t info_elems_buf[kMaxAnqpElems];
 	uint32_t num_info_elems = 0;
 	for (const auto &info_element : info_elements) {
 		info_elems_buf[num_info_elems++] =
