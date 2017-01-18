@@ -15,6 +15,7 @@ extern "C" {
 #include "gas_query.h"
 #include "interworking.h"
 #include "hs20_supplicant.h"
+#include "wps_supplicant.h"
 }
 
 namespace {
@@ -303,6 +304,46 @@ Return<void> StaIface::setCountryCode(
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
 	    &StaIface::setCountryCodeInternal, _hidl_cb, code);
+}
+
+Return<void> StaIface::startWpsRegistrar(
+    const hidl_array<uint8_t, 6> &bssid, const hidl_string &pin,
+    startWpsRegistrar_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::startWpsRegistrarInternal, _hidl_cb, bssid, pin);
+}
+
+Return<void> StaIface::startWpsPbc(
+    const hidl_array<uint8_t, 6> &bssid, startWpsPbc_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::startWpsPbcInternal, _hidl_cb, bssid);
+}
+
+Return<void> StaIface::startWpsPinKeypad(
+    const hidl_string &pin, startWpsPinKeypad_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::startWpsPinKeypadInternal, _hidl_cb, pin);
+}
+
+Return<void> StaIface::startWpsPinDisplay(
+    const hidl_array<uint8_t, 6> &bssid, startWpsPinDisplay_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::startWpsPinDisplayInternal, _hidl_cb, bssid);
+}
+
+Return<void> StaIface::cancelWps(cancelWps_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::cancelWpsInternal, _hidl_cb);
 }
 
 std::pair<SupplicantStatus, std::string> StaIface::getNameInternal()
@@ -635,6 +676,64 @@ SupplicantStatus StaIface::setCountryCodeInternal(
 		country[1] = code[1];
 		country[2] = 0x04;
 		p2p_set_country(p2p, country);
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaIface::startWpsRegistrarInternal(
+    const std::array<uint8_t, 6> &bssid, const std::string &pin)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (wpas_wps_start_reg(wpa_s, bssid.data(), pin.c_str(), nullptr)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaIface::startWpsPbcInternal(
+    const std::array<uint8_t, 6> &bssid)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	const uint8_t *bssid_addr =
+	    is_zero_ether_addr(bssid.data()) ? nullptr : bssid.data();
+	if (wpas_wps_start_pbc(wpa_s, bssid_addr, 0)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaIface::startWpsPinKeypadInternal(const std::string &pin)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (wpas_wps_start_pin(
+		wpa_s, nullptr, pin.c_str(), 0, DEV_PW_DEFAULT)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+std::pair<SupplicantStatus, std::string> StaIface::startWpsPinDisplayInternal(
+    const std::array<uint8_t, 6> &bssid)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	const uint8_t *bssid_addr =
+	    is_zero_ether_addr(bssid.data()) ? nullptr : bssid.data();
+	int pin =
+	    wpas_wps_start_pin(wpa_s, bssid_addr, nullptr, 0, DEV_PW_DEFAULT);
+	if (pin < 0) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, ""};
+	}
+	std::string pin_str;
+	pin_str.reserve(9);
+	snprintf(&pin_str[0], pin_str.size(), "%08d", pin);
+	return {{SupplicantStatusCode::SUCCESS, ""}, pin_str};
+}
+
+SupplicantStatus StaIface::cancelWpsInternal()
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (wpas_wps_cancel(wpa_s)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
