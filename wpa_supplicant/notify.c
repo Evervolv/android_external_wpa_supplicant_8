@@ -299,6 +299,10 @@ void wpas_notify_wps_event_fail(struct wpa_supplicant *wpa_s,
 
 #ifdef CONFIG_WPS
 	wpas_dbus_signal_wps_event_fail(wpa_s, fail);
+
+	wpas_hidl_notify_wps_event_fail(wpa_s, fail->peer_macaddr,
+					fail->config_error,
+					fail->error_indication);
 #endif /* CONFIG_WPS */
 }
 
@@ -310,6 +314,8 @@ void wpas_notify_wps_event_success(struct wpa_supplicant *wpa_s)
 
 #ifdef CONFIG_WPS
 	wpas_dbus_signal_wps_event_success(wpa_s);
+
+	wpas_hidl_notify_wps_event_success(wpa_s);
 #endif /* CONFIG_WPS */
 }
 
@@ -320,6 +326,8 @@ void wpas_notify_wps_event_pbc_overlap(struct wpa_supplicant *wpa_s)
 
 #ifdef CONFIG_WPS
 	wpas_dbus_signal_wps_event_pbc_overlap(wpa_s);
+
+	wpas_hidl_notify_wps_event_pbc_overlap(wpa_s);
 #endif /* CONFIG_WPS */
 }
 

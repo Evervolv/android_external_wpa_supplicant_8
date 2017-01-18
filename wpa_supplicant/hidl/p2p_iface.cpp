@@ -11,6 +11,10 @@
 #include "hidl_return_util.h"
 #include "p2p_iface.h"
 
+extern "C" {
+#include "wps_supplicant.h"
+}
+
 namespace {
 const char kConfigMethodStrPbc[] = "pbc";
 const char kConfigMethodStrDisplay[] = "display";
@@ -346,6 +350,42 @@ Return<void> P2pIface::setMiracastMode(
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
 	    &P2pIface::setMiracastModeInternal, _hidl_cb, mode);
+}
+
+Return<void> P2pIface::startWpsPbc(
+    const hidl_string& group_ifname, const hidl_array<uint8_t, 6>& bssid,
+    startWpsPbc_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::startWpsPbcInternal, _hidl_cb, group_ifname, bssid);
+}
+
+Return<void> P2pIface::startWpsPinKeypad(
+    const hidl_string& group_ifname, const hidl_string& pin,
+    startWpsPinKeypad_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::startWpsPinKeypadInternal, _hidl_cb, group_ifname, pin);
+}
+
+Return<void> P2pIface::startWpsPinDisplay(
+    const hidl_string& group_ifname, const hidl_array<uint8_t, 6>& bssid,
+    startWpsPinDisplay_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::startWpsPinDisplayInternal, _hidl_cb, group_ifname,
+	    bssid);
+}
+
+Return<void> P2pIface::cancelWps(
+    const hidl_string& group_ifname, cancelWps_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::cancelWpsInternal, _hidl_cb, group_ifname);
 }
 
 std::pair<SupplicantStatus, std::string> P2pIface::getNameInternal()
@@ -876,6 +916,70 @@ SupplicantStatus P2pIface::setMiracastModeInternal(
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
+SupplicantStatus P2pIface::startWpsPbcInternal(
+    const std::string& group_ifname, const std::array<uint8_t, 6>& bssid)
+{
+	struct wpa_supplicant* wpa_group_s =
+	    retrieveGroupIfacePtr(group_ifname);
+	if (!wpa_group_s) {
+		return {SupplicantStatusCode::FAILURE_IFACE_UNKNOWN, ""};
+	}
+	const uint8_t* bssid_addr =
+	    is_zero_ether_addr(bssid.data()) ? nullptr : bssid.data();
+	if (wpas_wps_start_pbc(wpa_group_s, bssid_addr, 0)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus P2pIface::startWpsPinKeypadInternal(
+    const std::string& group_ifname, const std::string& pin)
+{
+	struct wpa_supplicant* wpa_group_s =
+	    retrieveGroupIfacePtr(group_ifname);
+	if (!wpa_group_s) {
+		return {SupplicantStatusCode::FAILURE_IFACE_UNKNOWN, ""};
+	}
+	if (wpas_wps_start_pin(
+		wpa_group_s, nullptr, pin.c_str(), 0, DEV_PW_DEFAULT)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+std::pair<SupplicantStatus, std::string> P2pIface::startWpsPinDisplayInternal(
+    const std::string& group_ifname, const std::array<uint8_t, 6>& bssid)
+{
+	struct wpa_supplicant* wpa_group_s =
+	    retrieveGroupIfacePtr(group_ifname);
+	if (!wpa_group_s) {
+		return {{SupplicantStatusCode::FAILURE_IFACE_UNKNOWN, ""}, ""};
+	}
+	const uint8_t* bssid_addr =
+	    is_zero_ether_addr(bssid.data()) ? nullptr : bssid.data();
+	int pin = wpas_wps_start_pin(
+	    wpa_group_s, bssid_addr, nullptr, 0, DEV_PW_DEFAULT);
+	if (pin < 0) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, ""};
+	}
+	std::string pin_str;
+	pin_str.reserve(9);
+	snprintf(&pin_str[0], pin_str.size(), "%08d", pin);
+	return {{SupplicantStatusCode::SUCCESS, ""}, pin_str};
+}
+
+SupplicantStatus P2pIface::cancelWpsInternal(const std::string& group_ifname)
+{
+	struct wpa_supplicant* wpa_group_s =
+	    retrieveGroupIfacePtr(group_ifname);
+	if (!wpa_group_s) {
+		return {SupplicantStatusCode::FAILURE_IFACE_UNKNOWN, ""};
+	}
+	if (wpas_wps_cancel(wpa_group_s)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
 /**
  * Retrieve the underlying |wpa_supplicant| struct
  * pointer for this iface.

@@ -76,6 +76,11 @@ public:
 	    const char *url);
 	void notifyDisconnectReason(struct wpa_supplicant *wpa_s);
 	void notifyAssocReject(struct wpa_supplicant *wpa_s);
+	void notifyWpsEventFail(
+	    struct wpa_supplicant *wpa_s, uint8_t *peer_macaddr,
+	    uint16_t config_error, uint16_t error_indication);
+	void notifyWpsEventSuccess(struct wpa_supplicant *wpa_s);
+	void notifyWpsEventPbcOverlap(struct wpa_supplicant *wpa_s);
 
 	// Methods called from hidl objects.
 	int getP2pIfaceHidlObjectByIfname(
@@ -373,6 +378,27 @@ static_assert(
 	ISupplicantStaIface::Hs20AnqpSubtypes::OSU_PROVIDERS_LIST) ==
 	HS20_STYPE_OSU_PROVIDERS_LIST,
     "HS Subtype value mismatch");
+
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantStaIfaceCallback::WpsConfigError::NO_ERROR) ==
+	WPS_CFG_NO_ERROR,
+    "Wps config error value mismatch");
+static_assert(
+    static_cast<uint16_t>(ISupplicantStaIfaceCallback::WpsConfigError::
+			      PUBLIC_KEY_HASH_MISMATCH) ==
+	WPS_CFG_PUBLIC_KEY_HASH_MISMATCH,
+    "Wps config error value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantStaIfaceCallback::WpsErrorIndication::NO_ERROR) ==
+	WPS_EI_NO_ERROR,
+    "Wps error indication value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantStaIfaceCallback::WpsErrorIndication::AUTH_FAILURE) ==
+	WPS_EI_AUTH_FAILURE,
+    "Wps error indication value mismatch");
 
 static_assert(
     static_cast<uint32_t>(
