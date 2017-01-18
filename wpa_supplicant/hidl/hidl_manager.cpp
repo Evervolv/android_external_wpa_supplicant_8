@@ -531,7 +531,7 @@ int HidlManager::notifyStateChange(struct wpa_supplicant *wpa_s)
 	// Invoke the |onStateChanged| method on all registered callbacks.
 	ISupplicantStaIfaceCallback::State hidl_state =
 	    static_cast<ISupplicantStaIfaceCallback::State>(wpa_s->wpa_state);
-	std::array<uint8_t, 6> hidl_bssid;
+	std::array<uint8_t, ETH_ALEN> hidl_bssid;
 	os_memcpy(hidl_bssid.data(), wpa_s->bssid, ETH_ALEN);
 	uint32_t hidl_network_id = UINT32_MAX;
 	std::vector<uint8_t> hidl_ssid;
@@ -621,7 +621,7 @@ void HidlManager::notifyAnqpQueryDone(
 		    convertWpaBufToVector(anqp->hs20_osu_providers_list);
 	}
 
-	std::array<uint8_t, 6> hidl_bssid;
+	std::array<uint8_t, ETH_ALEN> hidl_bssid;
 	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
 	callWithEachStaIfaceCallback(
 	    wpa_s->ifname, std::bind(
@@ -651,7 +651,7 @@ void HidlManager::notifyHs20IconQueryDone(
 		return;
 
 	std::vector<uint8_t> hidl_image(image, image + image_length);
-	std::array<uint8_t, 6> hidl_bssid;
+	std::array<uint8_t, ETH_ALEN> hidl_bssid;
 	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
 	callWithEachStaIfaceCallback(
 	    wpa_s->ifname,
@@ -739,7 +739,7 @@ void HidlManager::notifyDisconnectReason(struct wpa_supplicant *wpa_s)
 	if (is_zero_ether_addr(bssid)) {
 		bssid = wpa_s->pending_bssid;
 	}
-	std::array<uint8_t, 6> hidl_bssid;
+	std::array<uint8_t, ETH_ALEN> hidl_bssid;
 	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
 
 	callWithEachStaIfaceCallback(
@@ -770,7 +770,7 @@ void HidlManager::notifyAssocReject(struct wpa_supplicant *wpa_s)
 	if (is_zero_ether_addr(bssid)) {
 		bssid = wpa_s->pending_bssid;
 	}
-	std::array<uint8_t, 6> hidl_bssid;
+	std::array<uint8_t, ETH_ALEN> hidl_bssid;
 	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
 
 	callWithEachStaIfaceCallback(
@@ -778,6 +778,64 @@ void HidlManager::notifyAssocReject(struct wpa_supplicant *wpa_s)
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onAssociationRejected,
 		std::placeholders::_1, hidl_bssid, wpa_s->assoc_status_code));
+}
+
+void HidlManager::notifyWpsEventFail(
+    struct wpa_supplicant *wpa_s, uint8_t *peer_macaddr, uint16_t config_error,
+    uint16_t error_indication)
+{
+	if (!wpa_s || !peer_macaddr)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	std::array<uint8_t, ETH_ALEN> hidl_bssid;
+	os_memcpy(hidl_bssid.data(), peer_macaddr, ETH_ALEN);
+
+	ISupplicantStaIfaceCallback::WpsConfigError hidl_config_error =
+	    static_cast<ISupplicantStaIfaceCallback::WpsConfigError>(
+		config_error);
+	ISupplicantStaIfaceCallback::WpsErrorIndication hidl_error_indication =
+	    static_cast<ISupplicantStaIfaceCallback::WpsErrorIndication>(
+		error_indication);
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantStaIfaceCallback::onWpsEventFail,
+			       std::placeholders::_1, hidl_bssid,
+			       hidl_config_error, hidl_error_indication));
+}
+
+void HidlManager::notifyWpsEventSuccess(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantStaIfaceCallback::onWpsEventSuccess,
+			       std::placeholders::_1));
+}
+
+void HidlManager::notifyWpsEventPbcOverlap(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantStaIfaceCallback::onWpsEventPbcOverlap,
+			       std::placeholders::_1));
 }
 
 /**
