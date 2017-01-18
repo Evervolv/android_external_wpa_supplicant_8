@@ -115,6 +115,18 @@ public:
 	Return<void> setCountryCode(
 	    const hidl_array<int8_t, 2>& code,
 	    setCountryCode_cb _hidl_cb) override;
+	Return<void> startWpsRegistrar(
+	    const hidl_array<uint8_t, 6>& bssid, const hidl_string& pin,
+	    startWpsRegistrar_cb _hidl_cb) override;
+	Return<void> startWpsPbc(
+	    const hidl_array<uint8_t, 6>& bssid,
+	    startWpsPbc_cb _hidl_cb) override;
+	Return<void> startWpsPinKeypad(
+	    const hidl_string& pin, startWpsPinKeypad_cb _hidl_cb) override;
+	Return<void> startWpsPinDisplay(
+	    const hidl_array<uint8_t, 6>& bssid,
+	    startWpsPinDisplay_cb _hidl_cb) override;
+	Return<void> cancelWps(cancelWps_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -161,6 +173,14 @@ private:
 	SupplicantStatus setSuspendModeEnabledInternal(bool enable);
 	SupplicantStatus setCountryCodeInternal(
 	    const std::array<int8_t, 2>& code);
+	SupplicantStatus startWpsRegistrarInternal(
+	    const std::array<uint8_t, 6>& bssid, const std::string& pin);
+	SupplicantStatus startWpsPbcInternal(
+	    const std::array<uint8_t, 6>& bssid);
+	SupplicantStatus startWpsPinKeypadInternal(const std::string& pin);
+	std::pair<SupplicantStatus, std::string> startWpsPinDisplayInternal(
+	    const std::array<uint8_t, 6>& bssid);
+	SupplicantStatus cancelWpsInternal();
 
 	struct wpa_supplicant* retrieveIfacePtr();
 
