@@ -118,6 +118,8 @@ public:
 	Return<void> setEapDomainSuffixMatch(
 	    const hidl_string& match,
 	    setEapDomainSuffixMatch_cb _hidl_cb) override;
+	Return<void> setIdStr(
+	    const hidl_string& id_str, setIdStr_cb _hidl_cb) override;
 	Return<void> getSsid(getSsid_cb _hidl_cb) override;
 	Return<void> getBssid(getBssid_cb _hidl_cb) override;
 	Return<void> getScanSsid(getScanSsid_cb _hidl_cb) override;
@@ -150,6 +152,7 @@ public:
 	Return<void> getEapEngineID(getEapEngineID_cb _hidl_cb) override;
 	Return<void> getEapDomainSuffixMatch(
 	    getEapDomainSuffixMatch_cb _hidl_cb) override;
+	Return<void> getIdStr(getIdStr_cb _hidl_cb) override;
 	Return<void> enable(bool no_connect, enable_cb _hidl_cb) override;
 	Return<void> disable(disable_cb _hidl_cb) override;
 	Return<void> select(select_cb _hidl_cb) override;
@@ -207,6 +210,7 @@ private:
 	SupplicantStatus setEapEngineIDInternal(const std::string& id);
 	SupplicantStatus setEapDomainSuffixMatchInternal(
 	    const std::string& match);
+	SupplicantStatus setIdStrInternal(const std::string& id_str);
 	std::pair<SupplicantStatus, std::vector<uint8_t>> getSsidInternal();
 	std::pair<SupplicantStatus, std::array<uint8_t, 6>> getBssidInternal();
 	std::pair<SupplicantStatus, bool> getScanSsidInternal();
@@ -241,6 +245,7 @@ private:
 	std::pair<SupplicantStatus, std::string> getEapEngineIDInternal();
 	std::pair<SupplicantStatus, std::string>
 	getEapDomainSuffixMatchInternal();
+	std::pair<SupplicantStatus, std::string> getIdStrInternal();
 	SupplicantStatus enableInternal(bool no_connect);
 	SupplicantStatus disableInternal();
 	SupplicantStatus selectInternal();
