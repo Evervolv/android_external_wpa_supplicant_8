@@ -1667,6 +1667,7 @@ LOCAL_C_INCLUDES := $(INCLUDES)
 LOCAL_SRC_FILES := \
     hidl/hidl.cpp \
     hidl/hidl_manager.cpp \
+    hidl/iface_config_utils.cpp \
     hidl/p2p_iface.cpp \
     hidl/p2p_network.cpp \
     hidl/sta_iface.cpp \

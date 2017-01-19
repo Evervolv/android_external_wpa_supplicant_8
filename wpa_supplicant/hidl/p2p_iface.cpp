@@ -9,10 +9,12 @@
 
 #include "hidl_manager.h"
 #include "hidl_return_util.h"
+#include "iface_config_utils.h"
 #include "p2p_iface.h"
 
 extern "C" {
 #include "wps_supplicant.h"
+#include "wifi_display.h"
 }
 
 namespace {
@@ -20,6 +22,7 @@ const char kConfigMethodStrPbc[] = "pbc";
 const char kConfigMethodStrDisplay[] = "display";
 const char kConfigMethodStrKeypad[] = "keypad";
 constexpr char kSetMiracastMode[] = "MIRACAST ";
+constexpr uint8_t kWfdDeviceInfoSubelemId = 0;
 
 using android::hardware::wifi::supplicant::V1_0::ISupplicantP2pIface;
 uint8_t convertHidlMiracastModeToInternal(
@@ -386,6 +389,69 @@ Return<void> P2pIface::cancelWps(
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
 	    &P2pIface::cancelWpsInternal, _hidl_cb, group_ifname);
+}
+
+Return<void> P2pIface::setWpsDeviceName(
+    const hidl_string& name, setWpsDeviceName_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::setWpsDeviceNameInternal, _hidl_cb, name);
+}
+
+Return<void> P2pIface::setWpsManufacturer(
+    const hidl_string& manufacturer, setWpsManufacturer_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::setWpsManufacturerInternal, _hidl_cb, manufacturer);
+}
+
+Return<void> P2pIface::setWpsModelName(
+    const hidl_string& model_name, setWpsModelName_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::setWpsModelNameInternal, _hidl_cb, model_name);
+}
+
+Return<void> P2pIface::setWpsModelNumber(
+    const hidl_string& model_number, setWpsModelNumber_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::setWpsModelNumberInternal, _hidl_cb, model_number);
+}
+
+Return<void> P2pIface::setWpsSerialNumber(
+    const hidl_string& serial_number, setWpsSerialNumber_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::setWpsSerialNumberInternal, _hidl_cb, serial_number);
+}
+
+Return<void> P2pIface::setWpsConfigMethods(
+    uint16_t config_methods, setWpsConfigMethods_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::setWpsConfigMethodsInternal, _hidl_cb, config_methods);
+}
+
+Return<void> P2pIface::enableWfd(bool enable, enableWfd_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::enableWfdInternal, _hidl_cb, enable);
+}
+
+Return<void> P2pIface::setWfdDeviceInfo(
+    const hidl_array<uint8_t, 8>& info, setWfdDeviceInfo_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::setWfdDeviceInfoInternal, _hidl_cb, info);
 }
 
 std::pair<SupplicantStatus, std::string> P2pIface::getNameInternal()
@@ -980,6 +1046,76 @@ SupplicantStatus P2pIface::cancelWpsInternal(const std::string& group_ifname)
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
+
+SupplicantStatus P2pIface::setWpsDeviceNameInternal(const std::string& name)
+{
+	return iface_config_utils::setWpsDeviceName(retrieveIfacePtr(), name);
+}
+
+SupplicantStatus P2pIface::setWpsManufacturerInternal(
+    const std::string& manufacturer)
+{
+	return iface_config_utils::setWpsManufacturer(
+	    retrieveIfacePtr(), manufacturer);
+}
+
+SupplicantStatus P2pIface::setWpsModelNameInternal(
+    const std::string& model_name)
+{
+	return iface_config_utils::setWpsModelName(
+	    retrieveIfacePtr(), model_name);
+}
+
+SupplicantStatus P2pIface::setWpsModelNumberInternal(
+    const std::string& model_number)
+{
+	return iface_config_utils::setWpsModelNumber(
+	    retrieveIfacePtr(), model_number);
+}
+
+SupplicantStatus P2pIface::setWpsSerialNumberInternal(
+    const std::string& serial_number)
+{
+	return iface_config_utils::setWpsSerialNumber(
+	    retrieveIfacePtr(), serial_number);
+}
+
+SupplicantStatus P2pIface::setWpsConfigMethodsInternal(uint16_t config_methods)
+{
+	return iface_config_utils::setWpsConfigMethods(
+	    retrieveIfacePtr(), config_methods);
+}
+
+SupplicantStatus P2pIface::enableWfdInternal(bool enable)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	wifi_display_enable(wpa_s->global, enable);
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus P2pIface::setWfdDeviceInfoInternal(
+    const hidl_array<uint8_t, 8>& info)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	uint32_t wfd_device_info_hex_len = info.size() * 2 + 1;
+	std::vector<char> wfd_device_info_hex(wfd_device_info_hex_len);
+	wpa_snprintf_hex(
+	    wfd_device_info_hex.data(), wfd_device_info_hex.size(), info.data(),
+	    info.size());
+	std::string wfd_device_info_set_cmd_str =
+	    std::to_string(kWfdDeviceInfoSubelemId) + " " +
+	    wfd_device_info_hex.data();
+	std::vector<char> wfd_device_info_set_cmd(
+	    wfd_device_info_set_cmd_str.c_str(),
+	    wfd_device_info_set_cmd_str.c_str() +
+		wfd_device_info_set_cmd_str.size() + 1);
+	if (wifi_display_subelem_set(
+		wpa_s->global, wfd_device_info_set_cmd.data())) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
 /**
  * Retrieve the underlying |wpa_supplicant| struct
  * pointer for this iface.
