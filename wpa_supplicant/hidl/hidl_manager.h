@@ -271,6 +271,18 @@ static_assert(
 	WPA_KEY_MGMT_IEEE8021X_NO_WPA,
     "KeyMgmt value mismatch");
 static_assert(
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::FT_EAP) ==
+	WPA_KEY_MGMT_FT_IEEE8021X,
+    "KeyMgmt value mismatch");
+static_assert(
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::FT_PSK) ==
+	WPA_KEY_MGMT_FT_PSK,
+    "KeyMgmt value mismatch");
+static_assert(
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::OSEN) ==
+	WPA_KEY_MGMT_OSEN,
+    "KeyMgmt value mismatch");
+static_assert(
     static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::WPA) ==
 	WPA_PROTO_WPA,
     "Proto value mismatch");
@@ -309,6 +321,10 @@ static_assert(
 static_assert(
     static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::CCMP) ==
 	WPA_CIPHER_CCMP,
+    "GroupCipher value mismatch");
+static_assert(
+    static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::GTK_NOT_USED) ==
+	WPA_CIPHER_GTK_NOT_USED,
     "GroupCipher value mismatch");
 static_assert(
     static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::NONE) ==
@@ -401,40 +417,215 @@ static_assert(
     "Wps error indication value mismatch");
 
 static_assert(
-    static_cast<uint32_t>(
-	ISupplicantP2pIface::GroupCapabilityMask::GROUP_OWNER) ==
+    static_cast<uint32_t>(WpsConfigMethods::USBA) == WPS_CONFIG_USBA,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::ETHERNET) == WPS_CONFIG_ETHERNET,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::LABEL) == WPS_CONFIG_LABEL,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::DISPLAY) == WPS_CONFIG_DISPLAY,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::INT_NFC_TOKEN) ==
+	WPS_CONFIG_INT_NFC_TOKEN,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::EXT_NFC_TOKEN) ==
+	WPS_CONFIG_EXT_NFC_TOKEN,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::NFC_INTERFACE) ==
+	WPS_CONFIG_NFC_INTERFACE,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::PUSHBUTTON) ==
+	WPS_CONFIG_PUSHBUTTON,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::KEYPAD) == WPS_CONFIG_KEYPAD,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::VIRT_PUSHBUTTON) ==
+	WPS_CONFIG_VIRT_PUSHBUTTON,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::PHY_PUSHBUTTON) ==
+	WPS_CONFIG_PHY_PUSHBUTTON,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::P2PS) == WPS_CONFIG_P2PS,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::VIRT_DISPLAY) ==
+	WPS_CONFIG_VIRT_DISPLAY,
+    "Wps config value mismatch");
+static_assert(
+    static_cast<uint32_t>(WpsConfigMethods::PHY_DISPLAY) ==
+	WPS_CONFIG_PHY_DISPLAY,
+    "Wps config value mismatch");
+
+static_assert(
+    static_cast<uint32_t>(P2pGroupCapabilityMask::GROUP_OWNER) ==
 	P2P_GROUP_CAPAB_GROUP_OWNER,
     "P2P capability value mismatch");
 static_assert(
-    static_cast<uint32_t>(
-	ISupplicantP2pIface::GroupCapabilityMask::PERSISTENT_GROUP) ==
+    static_cast<uint32_t>(P2pGroupCapabilityMask::PERSISTENT_GROUP) ==
 	P2P_GROUP_CAPAB_PERSISTENT_GROUP,
     "P2P capability value mismatch");
 static_assert(
-    static_cast<uint32_t>(
-	ISupplicantP2pIface::GroupCapabilityMask::GROUP_LIMIT) ==
+    static_cast<uint32_t>(P2pGroupCapabilityMask::GROUP_LIMIT) ==
 	P2P_GROUP_CAPAB_GROUP_LIMIT,
     "P2P capability value mismatch");
 static_assert(
-    static_cast<uint32_t>(
-	ISupplicantP2pIface::GroupCapabilityMask::INTRA_BSS_DIST) ==
+    static_cast<uint32_t>(P2pGroupCapabilityMask::INTRA_BSS_DIST) ==
 	P2P_GROUP_CAPAB_INTRA_BSS_DIST,
     "P2P capability value mismatch");
 static_assert(
-    static_cast<uint32_t>(
-	ISupplicantP2pIface::GroupCapabilityMask::CROSS_CONN) ==
+    static_cast<uint32_t>(P2pGroupCapabilityMask::CROSS_CONN) ==
 	P2P_GROUP_CAPAB_CROSS_CONN,
     "P2P capability value mismatch");
 static_assert(
-    static_cast<uint32_t>(
-	ISupplicantP2pIface::GroupCapabilityMask::PERSISTENT_RECONN) ==
+    static_cast<uint32_t>(P2pGroupCapabilityMask::PERSISTENT_RECONN) ==
 	P2P_GROUP_CAPAB_PERSISTENT_RECONN,
     "P2P capability value mismatch");
 static_assert(
-    static_cast<uint32_t>(
-	ISupplicantP2pIface::GroupCapabilityMask::GROUP_FORMATION) ==
+    static_cast<uint32_t>(P2pGroupCapabilityMask::GROUP_FORMATION) ==
 	P2P_GROUP_CAPAB_GROUP_FORMATION,
     "P2P capability value mismatch");
+
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::WpsDevPasswordId::DEFAULT) ==
+	DEV_PW_DEFAULT,
+    "Wps dev password id value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::WpsDevPasswordId::USER_SPECIFIED) ==
+	DEV_PW_USER_SPECIFIED,
+    "Wps dev password id value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::WpsDevPasswordId::MACHINE_SPECIFIED) ==
+	DEV_PW_MACHINE_SPECIFIED,
+    "Wps dev password id value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::WpsDevPasswordId::REKEY) == DEV_PW_REKEY,
+    "Wps dev password id value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::WpsDevPasswordId::PUSHBUTTON) ==
+	DEV_PW_PUSHBUTTON,
+    "Wps dev password id value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::WpsDevPasswordId::REGISTRAR_SPECIFIED) ==
+	DEV_PW_REGISTRAR_SPECIFIED,
+    "Wps dev password id value mismatch");
+static_assert(
+    static_cast<uint16_t>(ISupplicantP2pIfaceCallback::WpsDevPasswordId::
+			      NFC_CONNECTION_HANDOVER) ==
+	DEV_PW_NFC_CONNECTION_HANDOVER,
+    "Wps dev password id value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::WpsDevPasswordId::P2PS_DEFAULT) ==
+	DEV_PW_P2PS_DEFAULT,
+    "Wps dev password id value mismatch");
+
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::SUCCESS) == P2P_SC_SUCCESS,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(ISupplicantP2pIfaceCallback::P2pStatusCode::
+			      FAIL_INFO_CURRENTLY_UNAVAILABLE) ==
+	P2P_SC_FAIL_INFO_CURRENTLY_UNAVAILABLE,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::FAIL_INCOMPATIBLE_PARAMS) ==
+	P2P_SC_FAIL_INCOMPATIBLE_PARAMS,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::FAIL_LIMIT_REACHED) ==
+	P2P_SC_FAIL_LIMIT_REACHED,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::FAIL_INVALID_PARAMS) ==
+	P2P_SC_FAIL_INVALID_PARAMS,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(ISupplicantP2pIfaceCallback::P2pStatusCode::
+			      FAIL_UNABLE_TO_ACCOMMODATE) ==
+	P2P_SC_FAIL_UNABLE_TO_ACCOMMODATE,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::FAIL_PREV_PROTOCOL_ERROR) ==
+	P2P_SC_FAIL_PREV_PROTOCOL_ERROR,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::FAIL_NO_COMMON_CHANNELS) ==
+	P2P_SC_FAIL_NO_COMMON_CHANNELS,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::FAIL_UNKNOWN_GROUP) ==
+	P2P_SC_FAIL_UNKNOWN_GROUP,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::FAIL_BOTH_GO_INTENT_15) ==
+	P2P_SC_FAIL_BOTH_GO_INTENT_15,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(ISupplicantP2pIfaceCallback::P2pStatusCode::
+			      FAIL_INCOMPATIBLE_PROV_METHOD) ==
+	P2P_SC_FAIL_INCOMPATIBLE_PROV_METHOD,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::FAIL_REJECTED_BY_USER) ==
+	P2P_SC_FAIL_REJECTED_BY_USER,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pStatusCode::SUCCESS_DEFERRED) ==
+	P2P_SC_SUCCESS_DEFERRED,
+    "P2P status code value mismatch");
+
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pProvDiscStatusCode::SUCCESS) ==
+	P2P_PROV_DISC_SUCCESS,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pProvDiscStatusCode::TIMEOUT) ==
+	P2P_PROV_DISC_TIMEOUT,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pProvDiscStatusCode::REJECTED) ==
+	P2P_PROV_DISC_REJECTED,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pProvDiscStatusCode::TIMEOUT_JOIN) ==
+	P2P_PROV_DISC_TIMEOUT_JOIN,
+    "P2P status code value mismatch");
+static_assert(
+    static_cast<uint16_t>(
+	ISupplicantP2pIfaceCallback::P2pProvDiscStatusCode::INFO_UNAVAILABLE) ==
+	P2P_PROV_DISC_INFO_UNAVAILABLE,
+    "P2P status code value mismatch");
 }  // namespace implementation
 }  // namespace V1_0
 }  // namespace wifi
