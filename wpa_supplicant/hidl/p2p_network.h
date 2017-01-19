@@ -18,12 +18,7 @@
 extern "C" {
 #include "utils/common.h"
 #include "utils/includes.h"
-#include "config.h"
 #include "wpa_supplicant_i.h"
-#include "notify.h"
-#include "eapol_supp/eapol_supp_sm.h"
-#include "eap_peer/eap.h"
-#include "rsn_supp/wpa.h"
 }
 
 namespace android {
@@ -55,6 +50,11 @@ public:
 	Return<void> registerCallback(
 	    const sp<ISupplicantP2pNetworkCallback>& callback,
 	    registerCallback_cb _hidl_cb) override;
+	Return<void> getSsid(getSsid_cb _hidl_cb) override;
+	Return<void> getBssid(getBssid_cb _hidl_cb) override;
+	Return<void> isCurrent(isCurrent_cb _hidl_cb) override;
+	Return<void> isPersistent(isPersistent_cb _hidl_cb) override;
+	Return<void> isGo(isGo_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -63,6 +63,11 @@ private:
 	std::pair<SupplicantStatus, IfaceType> getTypeInternal();
 	SupplicantStatus registerCallbackInternal(
 	    const sp<ISupplicantP2pNetworkCallback>& callback);
+	std::pair<SupplicantStatus, std::vector<uint8_t>> getSsidInternal();
+	std::pair<SupplicantStatus, std::array<uint8_t, 6>> getBssidInternal();
+	std::pair<SupplicantStatus, bool> isCurrentInternal();
+	std::pair<SupplicantStatus, bool> isPersistentInternal();
+	std::pair<SupplicantStatus, bool> isGoInternal();
 
 	struct wpa_ssid* retrieveNetworkPtr();
 	struct wpa_supplicant* retrieveIfacePtr();
