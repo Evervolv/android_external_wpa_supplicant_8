@@ -11,6 +11,10 @@
 #include "hidl_return_util.h"
 #include "p2p_network.h"
 
+extern "C" {
+#include "config_ssid.h"
+}
+
 namespace android {
 namespace hardware {
 namespace wifi {
@@ -64,6 +68,41 @@ Return<void> P2pNetwork::registerCallback(
 	    &P2pNetwork::registerCallbackInternal, _hidl_cb, callback);
 }
 
+Return<void> P2pNetwork::getSsid(getSsid_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &P2pNetwork::getSsidInternal, _hidl_cb);
+}
+
+Return<void> P2pNetwork::getBssid(getBssid_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &P2pNetwork::getBssidInternal, _hidl_cb);
+}
+
+Return<void> P2pNetwork::isCurrent(isCurrent_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &P2pNetwork::isCurrentInternal, _hidl_cb);
+}
+
+Return<void> P2pNetwork::isPersistent(isPersistent_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &P2pNetwork::isPersistentInternal, _hidl_cb);
+}
+
+Return<void> P2pNetwork::isGo(isGo_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &P2pNetwork::isGoInternal, _hidl_cb);
+}
+
 std::pair<SupplicantStatus, uint32_t> P2pNetwork::getIdInternal()
 {
 	return {{SupplicantStatusCode::SUCCESS, ""}, network_id_};
@@ -89,6 +128,45 @@ SupplicantStatus P2pNetwork::registerCallbackInternal(
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+std::pair<SupplicantStatus, std::vector<uint8_t>> P2pNetwork::getSsidInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		{wpa_ssid->ssid, wpa_ssid->ssid + wpa_ssid->ssid_len}};
+}
+
+std::pair<SupplicantStatus, std::array<uint8_t, 6>>
+P2pNetwork::getBssidInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	std::array<uint8_t, 6> bssid{};
+	if (wpa_ssid->bssid_set) {
+		os_memcpy(bssid.data(), wpa_ssid->bssid, ETH_ALEN);
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""}, bssid};
+}
+
+std::pair<SupplicantStatus, bool> P2pNetwork::isCurrentInternal()
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		(wpa_s->current_ssid == wpa_ssid)};
+}
+
+std::pair<SupplicantStatus, bool> P2pNetwork::isPersistentInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	return {{SupplicantStatusCode::SUCCESS, ""}, (wpa_ssid->disabled == 2)};
+}
+
+std::pair<SupplicantStatus, bool> P2pNetwork::isGoInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		(wpa_ssid->mode == wpa_ssid::wpas_mode::WPAS_MODE_P2P_GO)};
 }
 
 /**
