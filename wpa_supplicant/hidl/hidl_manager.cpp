@@ -306,7 +306,6 @@ namespace supplicant {
 namespace V1_0 {
 namespace implementation {
 
-const char HidlManager::kServiceName[] = "wpa_supplicant";
 HidlManager *HidlManager::instance_ = NULL;
 
 HidlManager *HidlManager::getInstance()
@@ -327,7 +326,7 @@ int HidlManager::registerHidlService(struct wpa_global *global)
 {
 	// Create the main hidl service object and register it.
 	supplicant_object_ = new Supplicant(global);
-	if (supplicant_object_->registerAsService(kServiceName) !=
+	if (supplicant_object_->registerAsService() !=
 	    android::NO_ERROR) {
 		return 1;
 	}
