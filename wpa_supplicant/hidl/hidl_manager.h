@@ -271,6 +271,18 @@ static_assert(
 	WPA_KEY_MGMT_IEEE8021X_NO_WPA,
     "KeyMgmt value mismatch");
 static_assert(
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::FT_EAP) ==
+	WPA_KEY_MGMT_FT_IEEE8021X,
+    "KeyMgmt value mismatch");
+static_assert(
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::FT_PSK) ==
+	WPA_KEY_MGMT_FT_PSK,
+    "KeyMgmt value mismatch");
+static_assert(
+    static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::OSEN) ==
+	WPA_KEY_MGMT_OSEN,
+    "KeyMgmt value mismatch");
+static_assert(
     static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::WPA) ==
 	WPA_PROTO_WPA,
     "Proto value mismatch");
@@ -309,6 +321,10 @@ static_assert(
 static_assert(
     static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::CCMP) ==
 	WPA_CIPHER_CCMP,
+    "GroupCipher value mismatch");
+static_assert(
+    static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::GTK_NOT_USED) ==
+	WPA_CIPHER_GTK_NOT_USED,
     "GroupCipher value mismatch");
 static_assert(
     static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::NONE) ==
