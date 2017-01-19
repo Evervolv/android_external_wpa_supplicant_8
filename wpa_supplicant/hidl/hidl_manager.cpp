@@ -833,9 +833,10 @@ void HidlManager::notifyWpsEventPbcOverlap(struct wpa_supplicant *wpa_s)
 		return;
 
 	callWithEachStaIfaceCallback(
-	    wpa_s->ifname, std::bind(
-			       &ISupplicantStaIfaceCallback::onWpsEventPbcOverlap,
-			       std::placeholders::_1));
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onWpsEventPbcOverlap,
+		std::placeholders::_1));
 }
 
 /**
