@@ -151,8 +151,6 @@ private:
 	    const std::function<android::hardware::Return<void>(
 		android::sp<ISupplicantStaNetworkCallback>)> &method);
 
-	// HIDL Service name.
-	static const char kServiceName[];
 	// Singleton instance of this class.
 	static HidlManager *instance_;
 	// The main hidl service object.
