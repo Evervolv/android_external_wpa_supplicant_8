@@ -399,6 +399,14 @@ Return<void> P2pIface::setWpsDeviceName(
 	    &P2pIface::setWpsDeviceNameInternal, _hidl_cb, name);
 }
 
+Return<void> P2pIface::setWpsDeviceType(
+    const hidl_array<uint8_t, 8>& type, setWpsDeviceType_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::setWpsDeviceTypeInternal, _hidl_cb, type);
+}
+
 Return<void> P2pIface::setWpsManufacturer(
     const hidl_string& manufacturer, setWpsManufacturer_cb _hidl_cb)
 {
@@ -1050,6 +1058,12 @@ SupplicantStatus P2pIface::cancelWpsInternal(const std::string& group_ifname)
 SupplicantStatus P2pIface::setWpsDeviceNameInternal(const std::string& name)
 {
 	return iface_config_utils::setWpsDeviceName(retrieveIfacePtr(), name);
+}
+
+SupplicantStatus P2pIface::setWpsDeviceTypeInternal(
+    const std::array<uint8_t, 8>& type)
+{
+	return iface_config_utils::setWpsDeviceType(retrieveIfacePtr(), type);
 }
 
 SupplicantStatus P2pIface::setWpsManufacturerInternal(

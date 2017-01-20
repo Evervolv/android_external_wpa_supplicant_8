@@ -20,10 +20,16 @@ constexpr uint32_t kMaxWpsModelNameSize = 32;
 constexpr uint32_t kMaxWpsModelNumberSize = 32;
 constexpr uint32_t kMaxWpsSerialNumberSize = 32;
 
+void processConfigUpdate(struct wpa_supplicant* wpa_s, uint32_t changed_param)
+{
+	wpa_s->conf->changed_parameters |= changed_param;
+	wpa_supplicant_update_config(wpa_s);
+}
+
 // Free any existing pointer stored in |dst| and store the provided string value
 // there.
 int freeAndSetStringConfigParam(
-    wpa_supplicant* wpa_s, const std::string& value, uint32_t max_size,
+    struct wpa_supplicant* wpa_s, const std::string& value, uint32_t max_size,
     uint32_t changed_param, char** dst)
 {
 	if (value.size() > max_size) {
@@ -32,8 +38,7 @@ int freeAndSetStringConfigParam(
 	WPA_ASSERT(dst);
 	os_free(static_cast<void*>(*dst));
 	*dst = os_strdup(value.c_str());
-	wpa_s->conf->changed_parameters |= changed_param;
-	wpa_supplicant_update_config(wpa_s);
+	processConfigUpdate(wpa_s, changed_param);
 	return 0;
 }
 
@@ -82,6 +87,16 @@ SupplicantStatus setWpsDeviceName(
 		&wpa_s->conf->device_name)) {
 		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
 	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus setWpsDeviceType(
+    struct wpa_supplicant* wpa_s, const std::array<uint8_t, 8>& type)
+{
+	WPA_ASSERT(wpa_s);
+	WPA_ASSERT(type.size() == WPS_DEV_TYPE_LEN);
+	os_memcpy(wpa_s->conf->device_type, type.data(), WPS_DEV_TYPE_LEN);
+	processConfigUpdate(wpa_s, CFG_CHANGED_DEVICE_TYPE);
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
