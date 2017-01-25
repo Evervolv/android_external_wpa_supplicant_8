@@ -2363,14 +2363,25 @@ static int tls_connection_client_cert(struct tls_connection *conn,
 		BIO *bio = BIO_from_keystore(&client_cert[11]);
 		X509 *x509 = NULL;
 		int ret = -1;
-		if (bio) {
+		if (bio)
 			x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
-			BIO_free(bio);
-		}
+
 		if (x509) {
 			if (SSL_use_certificate(conn->ssl, x509) == 1)
 				ret = 0;
 			X509_free(x509);
+		}
+
+		/* Read additional certificates into the chain. */
+		while (bio) {
+			x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+			if (x509) {
+				/* Takes ownership of x509 */
+				SSL_add0_chain_cert(conn->ssl, x509);
+			} else {
+				BIO_free(bio);
+				bio = NULL;
+			}
 		}
 		return ret;
 	}
