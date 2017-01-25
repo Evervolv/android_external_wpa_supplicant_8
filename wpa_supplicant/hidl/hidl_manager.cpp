@@ -326,8 +326,7 @@ int HidlManager::registerHidlService(struct wpa_global *global)
 {
 	// Create the main hidl service object and register it.
 	supplicant_object_ = new Supplicant(global);
-	if (supplicant_object_->registerAsService() !=
-	    android::NO_ERROR) {
+	if (supplicant_object_->registerAsService() != android::NO_ERROR) {
 		return 1;
 	}
 	return 0;
@@ -836,6 +835,40 @@ void HidlManager::notifyWpsEventPbcOverlap(struct wpa_supplicant *wpa_s)
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onWpsEventPbcOverlap,
 		std::placeholders::_1));
+}
+
+void HidlManager::notifyExtRadioWorkStart(
+    struct wpa_supplicant *wpa_s, uint32_t id)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onExtRadioWorkStart,
+		std::placeholders::_1, id));
+}
+
+void HidlManager::notifyExtRadioWorkTimeout(
+    struct wpa_supplicant *wpa_s, uint32_t id)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onExtRadioWorkTimeout,
+		std::placeholders::_1, id));
 }
 
 /**
