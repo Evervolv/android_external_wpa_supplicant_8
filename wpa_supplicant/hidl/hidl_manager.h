@@ -83,6 +83,10 @@ public:
 	void notifyWpsEventPbcOverlap(struct wpa_supplicant *wpa_s);
 
 	// Methods called from hidl objects.
+	void notifyExtRadioWorkStart(struct wpa_supplicant *wpa_s, uint32_t id);
+	void notifyExtRadioWorkTimeout(
+	    struct wpa_supplicant *wpa_s, uint32_t id);
+
 	int getP2pIfaceHidlObjectByIfname(
 	    const std::string &ifname,
 	    android::sp<ISupplicantP2pIface> *iface_object);
@@ -321,7 +325,8 @@ static_assert(
 	WPA_CIPHER_CCMP,
     "GroupCipher value mismatch");
 static_assert(
-    static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::GTK_NOT_USED) ==
+    static_cast<uint32_t>(
+	ISupplicantStaNetwork::GroupCipherMask::GTK_NOT_USED) ==
 	WPA_CIPHER_GTK_NOT_USED,
     "GroupCipher value mismatch");
 static_assert(

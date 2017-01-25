@@ -129,6 +129,9 @@ public:
 	Return<void> cancelWps(cancelWps_cb _hidl_cb) override;
 	Return<void> setWpsDeviceName(
 	    const hidl_string& name, setWpsDeviceName_cb _hidl_cb) override;
+	Return<void> setWpsDeviceType(
+	    const hidl_array<uint8_t, 8>& type,
+	    setWpsDeviceType_cb _hidl_cb) override;
 	Return<void> setWpsManufacturer(
 	    const hidl_string& manufacturer,
 	    setWpsManufacturer_cb _hidl_cb) override;
@@ -145,6 +148,11 @@ public:
 	    uint16_t config_methods, setWpsConfigMethods_cb _hidl_cb) override;
 	Return<void> setExternalSim(
 	    bool useExternalSim, setExternalSim_cb _hidl_cb) override;
+	Return<void> addExtRadioWork(
+	    const hidl_string& name, uint32_t freq_in_mhz,
+	    uint32_t timeout_in_sec, addExtRadioWork_cb _hidl_cb) override;
+	Return<void> removeExtRadioWork(
+	    uint32_t id, removeExtRadioWork_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -200,6 +208,8 @@ private:
 	    const std::array<uint8_t, 6>& bssid);
 	SupplicantStatus cancelWpsInternal();
 	SupplicantStatus setWpsDeviceNameInternal(const std::string& name);
+	SupplicantStatus setWpsDeviceTypeInternal(
+	    const std::array<uint8_t, 8>& type);
 	SupplicantStatus setWpsManufacturerInternal(
 	    const std::string& manufacturer);
 	SupplicantStatus setWpsModelNameInternal(const std::string& model_name);
@@ -209,6 +219,10 @@ private:
 	    const std::string& serial_number);
 	SupplicantStatus setWpsConfigMethodsInternal(uint16_t config_methods);
 	SupplicantStatus setExternalSimInternal(bool useExternalSim);
+	std::pair<SupplicantStatus, uint32_t> addExtRadioWorkInternal(
+	    const std::string& name, uint32_t freq_in_mhz,
+	    uint32_t timeout_in_sec);
+	SupplicantStatus removeExtRadioWorkInternal(uint32_t id);
 
 	struct wpa_supplicant* retrieveIfacePtr();
 
