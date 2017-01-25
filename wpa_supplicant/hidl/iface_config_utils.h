@@ -34,6 +34,8 @@ namespace implementation {
 namespace iface_config_utils {
 SupplicantStatus setWpsDeviceName(
     struct wpa_supplicant* wpa_s, const std::string& name);
+SupplicantStatus setWpsDeviceType(
+    struct wpa_supplicant* wpa_s, const std::array<uint8_t, 8>& type);
 SupplicantStatus setWpsManufacturer(
     struct wpa_supplicant* wpa_s, const std::string& manufacturer);
 SupplicantStatus setWpsModelName(
