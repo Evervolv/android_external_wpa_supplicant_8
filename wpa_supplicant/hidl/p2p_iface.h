@@ -153,6 +153,9 @@ public:
 	    const hidl_string& groupIfName, cancelWps_cb _hidl_cb) override;
 	Return<void> setWpsDeviceName(
 	    const hidl_string& name, setWpsDeviceName_cb _hidl_cb) override;
+	Return<void> setWpsDeviceType(
+	    const hidl_array<uint8_t, 8>& type,
+	    setWpsDeviceType_cb _hidl_cb) override;
 	Return<void> setWpsManufacturer(
 	    const hidl_string& manufacturer,
 	    setWpsManufacturer_cb _hidl_cb) override;
@@ -253,6 +256,8 @@ private:
 	    const std::array<uint8_t, 6>& bssid);
 	SupplicantStatus cancelWpsInternal(const std::string& group_ifname);
 	SupplicantStatus setWpsDeviceNameInternal(const std::string& name);
+	SupplicantStatus setWpsDeviceTypeInternal(
+	    const std::array<uint8_t, 8>& type);
 	SupplicantStatus setWpsManufacturerInternal(
 	    const std::string& manufacturer);
 	SupplicantStatus setWpsModelNameInternal(const std::string& model_name);
