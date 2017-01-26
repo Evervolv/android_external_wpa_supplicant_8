@@ -208,6 +208,7 @@ struct ieee802_1x_kay {
 	int mka_algindex;  /* MKA alg table index */
 
 	u32 dist_kn;
+	u32 rcvd_keys;
 	u8 dist_an;
 	time_t dist_time;
 
@@ -235,7 +236,7 @@ u64 mka_sci_u64(struct ieee802_1x_mka_sci *sci);
 
 struct ieee802_1x_kay *
 ieee802_1x_kay_init(struct ieee802_1x_kay_ctx *ctx, enum macsec_policy policy,
-		    u16 port, const char *ifname, const u8 *addr);
+		    u16 port, u8 priority, const char *ifname, const u8 *addr);
 void ieee802_1x_kay_deinit(struct ieee802_1x_kay *kay);
 
 struct ieee802_1x_mka_participant *
@@ -267,5 +268,7 @@ int ieee802_1x_kay_enable_tx_sas(struct ieee802_1x_kay *kay,
 int ieee802_1x_kay_enable_rx_sas(struct ieee802_1x_kay *kay,
 				 struct ieee802_1x_mka_ki *lki);
 int ieee802_1x_kay_enable_new_info(struct ieee802_1x_kay *kay);
+int ieee802_1x_kay_get_status(struct ieee802_1x_kay *kay, char *buf,
+			      size_t buflen);
 
 #endif /* IEEE802_1X_KAY_H */

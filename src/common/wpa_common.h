@@ -437,7 +437,7 @@ int wpa_ft_parse_ies(const u8 *ies, size_t ies_len, struct wpa_ft_ies *parse);
 
 int wpa_cipher_key_len(int cipher);
 int wpa_cipher_rsc_len(int cipher);
-int wpa_cipher_to_alg(int cipher);
+enum wpa_alg wpa_cipher_to_alg(int cipher);
 int wpa_cipher_valid_group(int cipher);
 int wpa_cipher_valid_pairwise(int cipher);
 int wpa_cipher_valid_mgmt_group(int cipher);
@@ -450,6 +450,6 @@ int wpa_parse_cipher(const char *value);
 int wpa_write_ciphers(char *start, char *end, int ciphers, const char *delim);
 int wpa_select_ap_group_cipher(int wpa, int wpa_pairwise, int rsn_pairwise);
 unsigned int wpa_mic_len(int akmp);
-u16 fils_domain_name_hash(const char *domain);
+int fils_domain_name_hash(const char *domain, u8 *hash);
 
 #endif /* WPA_COMMON_H */

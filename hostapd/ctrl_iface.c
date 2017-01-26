@@ -1017,14 +1017,16 @@ static int hostapd_ctrl_iface_bss_tm_req(struct hostapd_data *hapd,
 		if (ret != 3) {
 			wpa_printf(MSG_DEBUG,
 				   "MBO requires three arguments: mbo=<reason>:<reassoc_delay>:<cell_pref>");
-			return -1;
+			ret = -1;
+			goto fail;
 		}
 
 		if (mbo_reason > MBO_TRANSITION_REASON_PREMIUM_AP) {
 			wpa_printf(MSG_DEBUG,
 				   "Invalid MBO transition reason code %u",
 				   mbo_reason);
-			return -1;
+			ret = -1;
+			goto fail;
 		}
 
 		/* Valid values for Cellular preference are: 0, 1, 255 */
@@ -1032,7 +1034,8 @@ static int hostapd_ctrl_iface_bss_tm_req(struct hostapd_data *hapd,
 			wpa_printf(MSG_DEBUG,
 				   "Invalid MBO cellular capability %u",
 				   cell_pref);
-			return -1;
+			ret = -1;
+			goto fail;
 		}
 
 		if (reassoc_delay > 65535 ||
@@ -1040,7 +1043,8 @@ static int hostapd_ctrl_iface_bss_tm_req(struct hostapd_data *hapd,
 		     !(req_mode & WNM_BSS_TM_REQ_DISASSOC_IMMINENT))) {
 			wpa_printf(MSG_DEBUG,
 				   "MBO: Assoc retry delay is only valid in disassoc imminent mode");
-			return -1;
+			ret = -1;
+			goto fail;
 		}
 
 		*mbo_pos++ = MBO_ATTR_ID_TRANSITION_REASON;
@@ -1066,6 +1070,7 @@ static int hostapd_ctrl_iface_bss_tm_req(struct hostapd_data *hapd,
 				  nei_pos > nei_rep ? nei_rep : NULL,
 				  nei_pos - nei_rep, mbo_len ? mbo : NULL,
 				  mbo_len);
+fail:
 	os_free(url);
 	return ret;
 }
@@ -1347,14 +1352,6 @@ static int hostapd_ctrl_iface_set(struct hostapd_data *hapd, char *cmd)
 		wpa_printf(MSG_DEBUG, "WPS: Testing - wps_corrupt_pkhash=%d",
 			   wps_corrupt_pkhash);
 #endif /* CONFIG_WPS_TESTING */
-#ifdef CONFIG_INTERWORKING
-	} else if (os_strcasecmp(cmd, "gas_frag_limit") == 0) {
-		int val = atoi(value);
-		if (val <= 0)
-			ret = -1;
-		else
-			hapd->gas_frag_limit = val;
-#endif /* CONFIG_INTERWORKING */
 #ifdef CONFIG_TESTING_OPTIONS
 	} else if (os_strcasecmp(cmd, "ext_mgmt_frame_handling") == 0) {
 		hapd->ext_mgmt_frame_handling = atoi(value);
@@ -2239,6 +2236,46 @@ static int hostapd_ctrl_iface_req_range(struct hostapd_data *hapd, char *cmd)
 }
 
 
+static int hostapd_ctrl_iface_req_beacon(struct hostapd_data *hapd,
+					 const char *cmd, char *reply,
+					 size_t reply_size)
+{
+	u8 addr[ETH_ALEN];
+	const char *pos;
+	struct wpabuf *req;
+	int ret;
+	u8 req_mode = 0;
+
+	if (hwaddr_aton(cmd, addr))
+		return -1;
+	pos = os_strchr(cmd, ' ');
+	if (!pos)
+		return -1;
+	pos++;
+	if (os_strncmp(pos, "req_mode=", 9) == 0) {
+		int val = hex2byte(pos + 9);
+
+		if (val < 0)
+			return -1;
+		req_mode = val;
+		pos += 11;
+		pos = os_strchr(pos, ' ');
+		if (!pos)
+			return -1;
+		pos++;
+	}
+	req = wpabuf_parse_bin(pos);
+	if (!req)
+		return -1;
+
+	ret = hostapd_send_beacon_req(hapd, addr, req_mode, req);
+	wpabuf_free(req);
+	if (ret >= 0)
+		ret = os_snprintf(reply, reply_size, "%d", ret);
+	return ret;
+}
+
+
 static int hostapd_ctrl_iface_set_neighbor(struct hostapd_data *hapd, char *buf)
 {
 	struct wpa_ssid_value ssid;
@@ -2656,9 +2693,14 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 	} else if (os_strncmp(buf, "REQ_RANGE ", 10) == 0) {
 		if (hostapd_ctrl_iface_req_range(hapd, buf + 10))
 			reply_len = -1;
+	} else if (os_strncmp(buf, "REQ_BEACON ", 11) == 0) {
+		reply_len = hostapd_ctrl_iface_req_beacon(hapd, buf + 11,
+							  reply, reply_size);
 	} else if (os_strcmp(buf, "DRIVER_FLAGS") == 0) {
 		reply_len = hostapd_ctrl_driver_flags(hapd->iface, reply,
 						      reply_size);
+	} else if (os_strcmp(buf, "TERMINATE") == 0) {
+		eloop_terminate();
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;

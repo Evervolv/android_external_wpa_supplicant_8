@@ -1736,6 +1736,10 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 	if (sme_proc_obss_scan(wpa_s) > 0)
 		goto scan_work_done;
 
+	if (own_request &&
+	    wpas_beacon_rep_scan_process(wpa_s, scan_res, &data->scan_info) > 0)
+		goto scan_work_done;
+
 	if ((wpa_s->conf->ap_scan == 2 && !wpas_wps_searching(wpa_s)))
 		goto scan_work_done;
 
@@ -1965,6 +1969,8 @@ int wpa_supplicant_fast_associate(struct wpa_supplicant *wpa_s)
 	return -1;
 #else /* CONFIG_NO_SCAN_PROCESSING */
 	struct os_reltime now;
+
+	wpa_s->ignore_post_flush_scan_res = 0;
 
 	if (wpa_s->last_scan_res_used == 0)
 		return -1;

@@ -9,6 +9,7 @@
 #ifndef WPA_SUPPLICANT_I_H
 #define WPA_SUPPLICANT_I_H
 
+#include "utils/bitfield.h"
 #include "utils/list.h"
 #include "common/defs.h"
 #include "common/sae.h"
@@ -424,6 +425,9 @@ struct rrm_data {
 
 	/* next_neighbor_rep_token - Next request's dialog token */
 	u8 next_neighbor_rep_token;
+
+	/* token - Dialog token of the current radio measurement */
+	u8 token;
 };
 
 enum wpa_supplicant_test_failure {
@@ -445,6 +449,17 @@ struct wpa_bss_tmp_disallowed {
 	u8 bssid[ETH_ALEN];
 	struct os_reltime disallowed_until;
 };
+
+struct beacon_rep_data {
+	u8 token;
+	struct wpa_driver_scan_params scan_params;
+	u8 ssid[SSID_MAX_LEN];
+	size_t ssid_len;
+	u8 bssid[ETH_ALEN];
+	enum beacon_report_detail report_detail;
+	struct bitfield *eids;
+};
+
 
 /**
  * struct wpa_supplicant - Internal data for wpa_supplicant interface
@@ -987,6 +1002,7 @@ struct wpa_supplicant {
 	unsigned int wmm_ac_supported:1;
 	unsigned int ext_work_in_progress:1;
 	unsigned int own_disconnect_req:1;
+	unsigned int ignore_post_flush_scan_res:1;
 
 #define MAC_ADDR_RAND_SCAN       BIT(0)
 #define MAC_ADDR_RAND_SCHED_SCAN BIT(1)
@@ -1044,6 +1060,7 @@ struct wpa_supplicant {
 	u8 last_tspecs_count;
 
 	struct rrm_data rrm;
+	struct beacon_rep_data beacon_rep_data;
 
 #ifdef CONFIG_FST
 	struct fst_iface *fst;
@@ -1075,6 +1092,8 @@ struct wpa_supplicant {
 	 */
 	struct wpabuf *lci;
 	struct os_reltime lci_time;
+
+	struct os_reltime beacon_rep_scan;
 };
 
 
@@ -1195,6 +1214,10 @@ void wpas_rrm_handle_link_measurement_request(struct wpa_supplicant *wpa_s,
 					      const u8 *src,
 					      const u8 *frame, size_t len,
 					      int rssi);
+int wpas_beacon_rep_scan_process(struct wpa_supplicant *wpa_s,
+				 struct wpa_scan_results *scan_res,
+				 struct scan_info *info);
+void wpas_clear_beacon_rep_data(struct wpa_supplicant *wpa_s);
 
 
 /* MBO functions */
@@ -1203,8 +1226,6 @@ const u8 * wpas_mbo_get_bss_attr(struct wpa_bss *bss, enum mbo_attr_id attr);
 int wpas_mbo_update_non_pref_chan(struct wpa_supplicant *wpa_s,
 				  const char *non_pref_chan);
 void wpas_mbo_scan_ie(struct wpa_supplicant *wpa_s, struct wpabuf *ie);
-int wpas_mbo_supp_op_class_ie(struct wpa_supplicant *wpa_s, int freq, u8 *pos,
-			      size_t len);
 void wpas_mbo_ie_trans_req(struct wpa_supplicant *wpa_s, const u8 *ie,
 			   size_t len);
 size_t wpas_mbo_ie_bss_trans_reject(struct wpa_supplicant *wpa_s, u8 *pos,
@@ -1213,6 +1234,16 @@ size_t wpas_mbo_ie_bss_trans_reject(struct wpa_supplicant *wpa_s, u8 *pos,
 void wpas_mbo_update_cell_capa(struct wpa_supplicant *wpa_s, u8 mbo_cell_capa);
 struct wpabuf * mbo_build_anqp_buf(struct wpa_supplicant *wpa_s,
 				   struct wpa_bss *bss);
+
+/* op_classes.c */
+enum chan_allowed {
+	NOT_ALLOWED, NO_IR, ALLOWED
+};
+
+enum chan_allowed verify_channel(struct hostapd_hw_modes *mode, u8 channel,
+				 u8 bw);
+size_t wpas_supp_op_class_ie(struct wpa_supplicant *wpa_s, int freq, u8 *pos,
+			      size_t len);
 
 /**
  * wpa_supplicant_ctrl_iface_ctrl_rsp_handle - Handle a control response

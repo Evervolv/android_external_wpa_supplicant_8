@@ -10,6 +10,7 @@
 
 #include "common.h"
 #include "eapol_supp/eapol_supp_sm.h"
+#include "eap_peer/eap.h"
 #include "rsn_supp/wpa.h"
 #include "eloop.h"
 #include "config.h"
@@ -513,16 +514,44 @@ static int wpa_supplicant_mlme_setprotection(void *wpa_s, const u8 *addr,
 }
 
 
-static int wpa_supplicant_add_pmkid(void *wpa_s,
+static struct wpa_ssid * wpas_get_network_ctx(struct wpa_supplicant *wpa_s,
+					      void *network_ctx)
+{
+	struct wpa_ssid *ssid;
+
+	for (ssid = wpa_s->conf->ssid; ssid; ssid = ssid->next) {
+		if (network_ctx == ssid)
+			return ssid;
+	}
+
+	return NULL;
+}
+
+
+static int wpa_supplicant_add_pmkid(void *_wpa_s, void *network_ctx,
 				    const u8 *bssid, const u8 *pmkid)
 {
+	struct wpa_supplicant *wpa_s = _wpa_s;
+	struct wpa_ssid *ssid;
+
+	ssid = wpas_get_network_ctx(wpa_s, network_ctx);
+	if (ssid)
+		wpa_msg(wpa_s, MSG_INFO, PMKSA_CACHE_ADDED MACSTR " %d",
+			MAC2STR(bssid), ssid->id);
 	return wpa_drv_add_pmkid(wpa_s, bssid, pmkid);
 }
 
 
-static int wpa_supplicant_remove_pmkid(void *wpa_s,
+static int wpa_supplicant_remove_pmkid(void *_wpa_s, void *network_ctx,
 				       const u8 *bssid, const u8 *pmkid)
 {
+	struct wpa_supplicant *wpa_s = _wpa_s;
+	struct wpa_ssid *ssid;
+
+	ssid = wpas_get_network_ctx(wpa_s, network_ctx);
+	if (ssid)
+		wpa_msg(wpa_s, MSG_INFO, PMKSA_CACHE_REMOVED MACSTR " %d",
+			MAC2STR(bssid), ssid->id);
 	return wpa_drv_remove_pmkid(wpa_s, bssid, pmkid);
 }
 
@@ -865,6 +894,7 @@ static void wpa_supplicant_eap_param_needed(void *ctx,
 
 
 #ifdef CONFIG_EAP_PROXY
+
 static void wpa_supplicant_eap_proxy_cb(void *ctx)
 {
 	struct wpa_supplicant *wpa_s = ctx;
@@ -880,6 +910,52 @@ static void wpa_supplicant_eap_proxy_cb(void *ctx)
 		wpa_printf(MSG_DEBUG, "eap_proxy: IMSI not available");
 	}
 }
+
+
+static void wpa_sm_sim_state_error_handler(struct wpa_supplicant *wpa_s)
+{
+	int i;
+	struct wpa_ssid *ssid;
+	const struct eap_method_type *eap_methods;
+
+	if (!wpa_s->conf)
+		return;
+
+	for (ssid = wpa_s->conf->ssid; ssid; ssid = ssid->next)	{
+		eap_methods = ssid->eap.eap_methods;
+		if (!eap_methods)
+			continue;
+
+		for (i = 0; eap_methods[i].method != EAP_TYPE_NONE; i++) {
+			if (eap_methods[i].vendor == EAP_VENDOR_IETF &&
+			    (eap_methods[i].method == EAP_TYPE_SIM ||
+			     eap_methods[i].method == EAP_TYPE_AKA ||
+			     eap_methods[i].method == EAP_TYPE_AKA_PRIME)) {
+				wpa_sm_pmksa_cache_flush(wpa_s->wpa, ssid);
+				break;
+			}
+		}
+	}
+}
+
+
+static void
+wpa_supplicant_eap_proxy_notify_sim_status(void *ctx,
+					   enum eap_proxy_sim_state sim_state)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	wpa_printf(MSG_DEBUG, "eap_proxy: SIM card status %u", sim_state);
+	switch (sim_state) {
+	case SIM_STATE_ERROR:
+		wpa_sm_sim_state_error_handler(wpa_s);
+		break;
+	default:
+		wpa_printf(MSG_DEBUG, "eap_proxy: SIM card status unknown");
+		break;
+	}
+}
+
 #endif /* CONFIG_EAP_PROXY */
 
 
@@ -990,6 +1066,8 @@ int wpa_supplicant_init_eapol(struct wpa_supplicant *wpa_s)
 	ctx->eap_param_needed = wpa_supplicant_eap_param_needed;
 #ifdef CONFIG_EAP_PROXY
 	ctx->eap_proxy_cb = wpa_supplicant_eap_proxy_cb;
+	ctx->eap_proxy_notify_sim_status =
+		wpa_supplicant_eap_proxy_notify_sim_status;
 #endif /* CONFIG_EAP_PROXY */
 	ctx->port_cb = wpa_supplicant_port_cb;
 	ctx->cb = wpa_supplicant_eapol_cb;

@@ -93,6 +93,7 @@ static struct wpa_bss_anqp * wpa_bss_anqp_clone(struct wpa_bss_anqp *anqp)
 	ANQP_DUP(nai_realm);
 	ANQP_DUP(anqp_3gpp);
 	ANQP_DUP(domain_name);
+	ANQP_DUP(fils_realm_info);
 #endif /* CONFIG_INTERWORKING */
 #ifdef CONFIG_HS20
 	ANQP_DUP(hs20_capability_list);
@@ -168,6 +169,7 @@ static void wpa_bss_anqp_free(struct wpa_bss_anqp *anqp)
 	wpabuf_free(anqp->nai_realm);
 	wpabuf_free(anqp->anqp_3gpp);
 	wpabuf_free(anqp->domain_name);
+	wpabuf_free(anqp->fils_realm_info);
 
 	while ((elem = dl_list_first(&anqp->anqp_elems,
 				     struct wpa_bss_anqp_elem, list))) {
@@ -267,9 +269,9 @@ struct wpa_bss * wpa_bss_get(struct wpa_supplicant *wpa_s, const u8 *bssid,
 }
 
 
-static void calculate_update_time(const struct os_reltime *fetch_time,
-				  unsigned int age_ms,
-				  struct os_reltime *update_time)
+void calculate_update_time(const struct os_reltime *fetch_time,
+			   unsigned int age_ms,
+			   struct os_reltime *update_time)
 {
 	os_time_t usec;
 
