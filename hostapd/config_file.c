@@ -129,9 +129,6 @@ static int hostapd_config_read_maclist(const char *fname,
 	struct mac_acl_entry *newacl;
 	int vlan_id;
 
-	if (!fname)
-		return 0;
-
 	f = fopen(fname, "r");
 	if (!f) {
 		wpa_printf(MSG_ERROR, "MAC list file '%s' not found.", fname);
@@ -223,9 +220,6 @@ static int hostapd_config_read_eap_user(const char *fname,
 	char buf[512], *pos, *start, *pos2;
 	int line = 0, ret = 0, num_methods;
 	struct hostapd_eap_user *user = NULL, *tail = NULL, *new_user = NULL;
-
-	if (!fname)
-		return 0;
 
 	if (os_strncmp(fname, "sqlite:", 7) == 0) {
 #ifdef CONFIG_SQLITE
@@ -523,15 +517,10 @@ static int hostapd_config_read_eap_user(const char *fname,
 	fclose(f);
 
 	if (ret == 0) {
-		user = conf->eap_user;
-		while (user) {
-			struct hostapd_eap_user *prev;
-
-			prev = user;
-			user = user->next;
-			hostapd_config_free_eap_user(prev);
-		}
+		hostapd_config_free_eap_users(conf->eap_user);
 		conf->eap_user = new_user;
+	} else {
+		hostapd_config_free_eap_users(new_user);
 	}
 
 	return ret;
@@ -768,7 +757,25 @@ static int hostapd_config_read_wep(struct hostapd_wep_keys *wep, int keyidx,
 {
 	size_t len = os_strlen(val);
 
-	if (keyidx < 0 || keyidx > 3 || wep->key[keyidx] != NULL)
+	if (keyidx < 0 || keyidx > 3)
+		return -1;
+
+	if (len == 0) {
+		int i, set = 0;
+
+		bin_clear_free(wep->key[keyidx], wep->len[keyidx]);
+		wep->key[keyidx] = NULL;
+		wep->len[keyidx] = 0;
+		for (i = 0; i < NUM_WEP_KEYS; i++) {
+			if (wep->key[i])
+				set++;
+		}
+		if (!set)
+			wep->keys_set = 0;
+		return 0;
+	}
+
+	if (wep->key[keyidx] != NULL)
 		return -1;
 
 	if (val[0] == '"') {
@@ -1999,6 +2006,29 @@ static int parse_wpabuf_hex(int line, const char *name, struct wpabuf **buf,
 }
 
 
+#ifdef CONFIG_FILS
+static int parse_fils_realm(struct hostapd_bss_config *bss, const char *val)
+{
+	struct fils_realm *realm;
+	size_t len;
+
+	len = os_strlen(val);
+	realm = os_zalloc(sizeof(*realm) + len + 1);
+	if (!realm)
+		return -1;
+
+	os_memcpy(realm->realm, val, len);
+	if (fils_domain_name_hash(val, realm->hash) < 0) {
+		os_free(realm);
+		return -1;
+	}
+	dl_list_add_tail(&bss->fils_realms, &realm->list);
+
+	return 0;
+}
+#endif /* CONFIG_FILS */
+
+
 static int hostapd_config_fill(struct hostapd_config *conf,
 			       struct hostapd_bss_config *bss,
 			       const char *buf, char *pos, int line)
@@ -2014,20 +2044,21 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		os_strlcpy(bss->wds_bridge, pos, sizeof(bss->wds_bridge));
 	} else if (os_strcmp(buf, "driver") == 0) {
 		int j;
-		/* clear to get error below if setting is invalid */
-		conf->driver = NULL;
+		const struct wpa_driver_ops *driver = NULL;
+
 		for (j = 0; wpa_drivers[j]; j++) {
 			if (os_strcmp(pos, wpa_drivers[j]->name) == 0) {
-				conf->driver = wpa_drivers[j];
+				driver = wpa_drivers[j];
 				break;
 			}
 		}
-		if (conf->driver == NULL) {
+		if (!driver) {
 			wpa_printf(MSG_ERROR,
 				   "Line %d: invalid/unknown driver '%s'",
 				   line, pos);
 			return 1;
 		}
+		conf->driver = driver;
 	} else if (os_strcmp(buf, "driver_params") == 0) {
 		os_free(conf->driver_params);
 		conf->driver_params = os_strdup(pos);
@@ -2071,13 +2102,16 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "utf8_ssid") == 0) {
 		bss->ssid.utf8_ssid = atoi(pos) > 0;
 	} else if (os_strcmp(buf, "macaddr_acl") == 0) {
-		bss->macaddr_acl = atoi(pos);
-		if (bss->macaddr_acl != ACCEPT_UNLESS_DENIED &&
-		    bss->macaddr_acl != DENY_UNLESS_ACCEPTED &&
-		    bss->macaddr_acl != USE_EXTERNAL_RADIUS_AUTH) {
+		enum macaddr_acl acl = atoi(pos);
+
+		if (acl != ACCEPT_UNLESS_DENIED &&
+		    acl != DENY_UNLESS_ACCEPTED &&
+		    acl != USE_EXTERNAL_RADIUS_AUTH) {
 			wpa_printf(MSG_ERROR, "Line %d: unknown macaddr_acl %d",
-				   line, bss->macaddr_acl);
+				   line, acl);
+			return 1;
 		}
+		bss->macaddr_acl = acl;
 	} else if (os_strcmp(buf, "accept_mac_file") == 0) {
 		if (hostapd_config_read_maclist(pos, &bss->accept_mac,
 						&bss->num_accept_mac)) {
@@ -2113,13 +2147,15 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "ieee8021x") == 0) {
 		bss->ieee802_1x = atoi(pos);
 	} else if (os_strcmp(buf, "eapol_version") == 0) {
-		bss->eapol_version = atoi(pos);
-		if (bss->eapol_version < 1 || bss->eapol_version > 2) {
+		int eapol_version = atoi(pos);
+
+		if (eapol_version < 1 || eapol_version > 2) {
 			wpa_printf(MSG_ERROR,
 				   "Line %d: invalid EAPOL version (%d): '%s'.",
-				   line, bss->eapol_version, pos);
+				   line, eapol_version, pos);
 			return 1;
 		}
+		bss->eapol_version = eapol_version;
 		wpa_printf(MSG_DEBUG, "eapol_version=%d", bss->eapol_version);
 #ifdef EAP_SERVER
 	} else if (os_strcmp(buf, "eap_authenticator") == 0) {
@@ -2247,24 +2283,25 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		os_free(bss->erp_domain);
 		bss->erp_domain = os_strdup(pos);
 	} else if (os_strcmp(buf, "wep_key_len_broadcast") == 0) {
-		bss->default_wep_key_len = atoi(pos);
-		if (bss->default_wep_key_len > 13) {
-			wpa_printf(MSG_ERROR, "Line %d: invalid WEP key len %lu (= %lu bits)",
-				   line,
-				   (unsigned long) bss->default_wep_key_len,
-				   (unsigned long)
-				   bss->default_wep_key_len * 8);
+		int val = atoi(pos);
+
+		if (val < 0 || val > 13) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: invalid WEP key len %d (= %d bits)",
+				   line, val, val * 8);
 			return 1;
 		}
+		bss->default_wep_key_len = val;
 	} else if (os_strcmp(buf, "wep_key_len_unicast") == 0) {
-		bss->individual_wep_key_len = atoi(pos);
-		if (bss->individual_wep_key_len < 0 ||
-		    bss->individual_wep_key_len > 13) {
-			wpa_printf(MSG_ERROR, "Line %d: invalid WEP key len %d (= %d bits)",
-				   line, bss->individual_wep_key_len,
-				   bss->individual_wep_key_len * 8);
+		int val = atoi(pos);
+
+		if (val < 0 || val > 13) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: invalid WEP key len %d (= %d bits)",
+				   line, val, val * 8);
 			return 1;
 		}
+		bss->individual_wep_key_len = val;
 	} else if (os_strcmp(buf, "wep_rekey_period") == 0) {
 		bss->wep_rekeying_period = atoi(pos);
 		if (bss->wep_rekeying_period < 0) {
@@ -2702,12 +2739,14 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		}
 #endif /* CONFIG_ACS */
 	} else if (os_strcmp(buf, "dtim_period") == 0) {
-		bss->dtim_period = atoi(pos);
-		if (bss->dtim_period < 1 || bss->dtim_period > 255) {
+		int val = atoi(pos);
+
+		if (val < 1 || val > 255) {
 			wpa_printf(MSG_ERROR, "Line %d: invalid dtim_period %d",
-				   line, bss->dtim_period);
+				   line, val);
 			return 1;
 		}
+		bss->dtim_period = val;
 	} else if (os_strcmp(buf, "bss_load_update_period") == 0) {
 		bss->bss_load_update_period = atoi(pos);
 		if (bss->bss_load_update_period < 0 ||
@@ -3259,7 +3298,15 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		if (parse_anqp_elem(bss, pos, line) < 0)
 			return 1;
 	} else if (os_strcmp(buf, "gas_frag_limit") == 0) {
-		bss->gas_frag_limit = atoi(pos);
+		int val = atoi(pos);
+
+		if (val <= 0) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: Invalid gas_frag_limit '%s'",
+				   line, pos);
+			return 1;
+		}
+		bss->gas_frag_limit = val;
 	} else if (os_strcmp(buf, "gas_comeback_delay") == 0) {
 		bss->gas_comeback_delay = atoi(pos);
 	} else if (os_strcmp(buf, "qos_map_set") == 0) {
@@ -3542,6 +3589,12 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		if (atoi(pos))
 			bss->radio_measurements[0] |=
 				WLAN_RRM_CAPS_NEIGHBOR_REPORT;
+	} else if (os_strcmp(buf, "rrm_beacon_report") == 0) {
+		if (atoi(pos))
+			bss->radio_measurements[0] |=
+				WLAN_RRM_CAPS_BEACON_REPORT_PASSIVE |
+				WLAN_RRM_CAPS_BEACON_REPORT_ACTIVE |
+				WLAN_RRM_CAPS_BEACON_REPORT_TABLE;
 	} else if (os_strcmp(buf, "gas_address3") == 0) {
 		bss->gas_address3 = atoi(pos);
 	} else if (os_strcmp(buf, "stationary_ap") == 0) {
@@ -3559,6 +3612,9 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 			return 1;
 		}
 		bss->fils_cache_id_set = 1;
+	} else if (os_strcmp(buf, "fils_realm") == 0) {
+		if (parse_fils_realm(bss, pos) < 0)
+			return 1;
 #endif /* CONFIG_FILS */
 	} else if (os_strcmp(buf, "multicast_to_unicast") == 0) {
 		bss->multicast_to_unicast = atoi(pos);

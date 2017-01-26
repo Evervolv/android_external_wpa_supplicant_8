@@ -261,10 +261,13 @@ static void anqp_add_capab_list(struct hostapd_data *hapd,
 		wpabuf_put_le16(buf, ANQP_EMERGENCY_NAI);
 	if (get_anqp_elem(hapd, ANQP_NEIGHBOR_REPORT))
 		wpabuf_put_le16(buf, ANQP_NEIGHBOR_REPORT);
-	for (id = 273; id < 277; id++) {
-		if (get_anqp_elem(hapd, id))
-			wpabuf_put_le16(buf, id);
-	}
+#ifdef CONFIG_FILS
+	if (!dl_list_empty(&hapd->conf->fils_realms) ||
+	    get_anqp_elem(hapd, ANQP_FILS_REALM_INFO))
+		wpabuf_put_le16(buf, ANQP_FILS_REALM_INFO);
+#endif /* CONFIG_FILS */
+	if (get_anqp_elem(hapd, ANQP_CAG))
+		wpabuf_put_le16(buf, ANQP_CAG);
 	if (get_anqp_elem(hapd, ANQP_VENUE_URL))
 		wpabuf_put_le16(buf, ANQP_VENUE_URL);
 	if (get_anqp_elem(hapd, ANQP_ADVICE_OF_CHARGE))
@@ -554,6 +557,36 @@ static void anqp_add_domain_name(struct hostapd_data *hapd, struct wpabuf *buf)
 }
 
 
+#ifdef CONFIG_FILS
+static void anqp_add_fils_realm_info(struct hostapd_data *hapd,
+				     struct wpabuf *buf)
+{
+	size_t count;
+
+	if (anqp_add_override(hapd, buf, ANQP_FILS_REALM_INFO))
+		return;
+
+	count = dl_list_len(&hapd->conf->fils_realms);
+	if (count > 10000)
+		count = 10000;
+	if (count) {
+		struct fils_realm *realm;
+
+		wpabuf_put_le16(buf, ANQP_FILS_REALM_INFO);
+		wpabuf_put_le16(buf, 2 * count);
+
+		dl_list_for_each(realm, &hapd->conf->fils_realms,
+				 struct fils_realm, list) {
+			if (count == 0)
+				break;
+			wpabuf_put_data(buf, realm->hash, 2);
+			count--;
+		}
+	}
+}
+#endif /* CONFIG_FILS */
+
+
 #ifdef CONFIG_HS20
 
 static void anqp_add_operator_friendly_name(struct hostapd_data *hapd,
@@ -827,6 +860,10 @@ gas_serv_build_gas_resp_payload(struct hostapd_data *hapd,
 		len += 1000;
 	if (request & ANQP_REQ_ICON_REQUEST)
 		len += 65536;
+#ifdef CONFIG_FILS
+	if (request & ANQP_FILS_REALM_INFO)
+		len += 2 * dl_list_len(&hapd->conf->fils_realms);
+#endif /* CONFIG_FILS */
 	len += anqp_get_required_len(hapd, extra_req, num_extra_req);
 
 	buf = wpabuf_alloc(len);
@@ -866,8 +903,15 @@ gas_serv_build_gas_resp_payload(struct hostapd_data *hapd,
 	if (request & ANQP_REQ_EMERGENCY_NAI)
 		anqp_add_elem(hapd, buf, ANQP_EMERGENCY_NAI);
 
-	for (i = 0; i < num_extra_req; i++)
+	for (i = 0; i < num_extra_req; i++) {
+#ifdef CONFIG_FILS
+		if (extra_req[i] == ANQP_FILS_REALM_INFO) {
+			anqp_add_fils_realm_info(hapd, buf);
+			continue;
+		}
+#endif /* CONFIG_FILS */
 		anqp_add_elem(hapd, buf, extra_req[i]);
+	}
 
 #ifdef CONFIG_HS20
 	if (request & ANQP_REQ_HS_CAPABILITY_LIST)
@@ -990,6 +1034,13 @@ static void rx_anqp_query_list_id(struct hostapd_data *hapd, u16 info_id,
 			     get_anqp_elem(hapd, info_id) != NULL, qi);
 		break;
 	default:
+#ifdef CONFIG_FILS
+		if (info_id == ANQP_FILS_REALM_INFO &&
+		    !dl_list_empty(&hapd->conf->fils_realms)) {
+			wpa_printf(MSG_DEBUG,
+				   "ANQP: FILS Realm Information (local)");
+		} else
+#endif /* CONFIG_FILS */
 		if (!get_anqp_elem(hapd, info_id)) {
 			wpa_printf(MSG_DEBUG, "ANQP: Unsupported Info Id %u",
 				   info_id);
@@ -1195,7 +1246,7 @@ static void gas_serv_req_local_processing(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_P2P */
 
-	if (wpabuf_len(buf) > hapd->gas_frag_limit ||
+	if (wpabuf_len(buf) > hapd->conf->gas_frag_limit ||
 	    hapd->conf->gas_comeback_delay) {
 		struct gas_dialog_info *di;
 		u16 comeback_delay = 1;
@@ -1399,8 +1450,8 @@ static void gas_serv_rx_gas_comeback_req(struct hostapd_data *hapd,
 	}
 
 	frag_len = wpabuf_len(dialog->sd_resp) - dialog->sd_resp_pos;
-	if (frag_len > hapd->gas_frag_limit) {
-		frag_len = hapd->gas_frag_limit;
+	if (frag_len > hapd->conf->gas_frag_limit) {
+		frag_len = hapd->conf->gas_frag_limit;
 		more = 1;
 	}
 	wpa_msg(hapd->msg_ctx, MSG_DEBUG, "GAS: resp frag_len %u",
@@ -1501,9 +1552,6 @@ int gas_serv_init(struct hostapd_data *hapd)
 {
 	hapd->public_action_cb2 = gas_serv_rx_public_action;
 	hapd->public_action_cb2_ctx = hapd;
-	hapd->gas_frag_limit = 1400;
-	if (hapd->conf->gas_frag_limit > 0)
-		hapd->gas_frag_limit = hapd->conf->gas_frag_limit;
 	return 0;
 }
 
