@@ -79,7 +79,9 @@ int wpa_eapol_key_send(struct wpa_sm *sm, struct wpa_ptk *ptk,
 				ver, sm->key_mgmt);
 			goto out;
 		}
-		wpa_hexdump_key(MSG_DEBUG, "WPA: KCK", ptk->kck, ptk->kck_len);
+		if (ptk)
+			wpa_hexdump_key(MSG_DEBUG, "WPA: KCK",
+					ptk->kck, ptk->kck_len);
 		wpa_hexdump(MSG_DEBUG, "WPA: Derived Key MIC",
 			    key_mic, mic_len);
 	} else {
@@ -2185,8 +2187,8 @@ int wpa_sm_rx_eapol(struct wpa_sm *sm, const u8 *src_addr,
 		}
 	} else if (key_info & WPA_KEY_INFO_SMK_MESSAGE) {
 		/* PeerKey SMK Handshake */
-		peerkey_rx_eapol_smk(sm, src_addr, key, key_data_len, key_info,
-				     ver);
+		peerkey_rx_eapol_smk(sm, src_addr, key, key_data, key_data_len,
+				     key_info, ver);
 	} else {
 		if ((mic_len && (key_info & WPA_KEY_INFO_MIC)) ||
 		    (!mic_len && (key_info & WPA_KEY_INFO_ENCR_KEY_DATA))) {
@@ -3025,6 +3027,20 @@ int wpa_sm_parse_own_wpa_ie(struct wpa_sm *sm, struct wpa_ie_data *data)
 int wpa_sm_pmksa_cache_list(struct wpa_sm *sm, char *buf, size_t len)
 {
 	return pmksa_cache_list(sm->pmksa, buf, len);
+}
+
+
+struct rsn_pmksa_cache_entry * wpa_sm_pmksa_cache_head(struct wpa_sm *sm)
+{
+	return pmksa_cache_head(sm->pmksa);
+}
+
+
+struct rsn_pmksa_cache_entry *
+wpa_sm_pmksa_cache_add_entry(struct wpa_sm *sm,
+			     struct rsn_pmksa_cache_entry * entry)
+{
+	return pmksa_cache_add_entry(sm->pmksa, entry);
 }
 
 

@@ -260,9 +260,6 @@ struct hostapd_data {
 	int noa_start;
 	int noa_duration;
 #endif /* CONFIG_P2P */
-#ifdef CONFIG_INTERWORKING
-	size_t gas_frag_limit;
-#endif /* CONFIG_INTERWORKING */
 #ifdef CONFIG_PROXYARP
 	struct l2_packet_data *sock_dhcp;
 	struct l2_packet_data *sock_ndisc;
@@ -301,6 +298,7 @@ struct hostapd_data {
 
 	struct dl_list nr_db;
 
+	u8 beacon_req_token;
 	u8 lci_req_token;
 	u8 range_req_token;
 	unsigned int lci_req_active:1;

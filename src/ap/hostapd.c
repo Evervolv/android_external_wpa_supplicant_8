@@ -75,6 +75,9 @@ static void hostapd_reload_bss(struct hostapd_data *hapd)
 {
 	struct hostapd_ssid *ssid;
 
+	if (!hapd->started)
+		return;
+
 #ifndef CONFIG_NO_RADIUS
 	radius_client_reconfig(hapd->radius, hapd->conf->radius);
 #endif /* CONFIG_NO_RADIUS */
@@ -210,7 +213,7 @@ static void hostapd_broadcast_key_clear_iface(struct hostapd_data *hapd,
 {
 	int i;
 
-	if (!ifname)
+	if (!ifname || !hapd->drv_priv)
 		return;
 	for (i = 0; i < NUM_WEP_KEYS; i++) {
 		if (hostapd_drv_set_key(ifname, hapd, WPA_ALG_NONE, NULL, i,
@@ -357,8 +360,10 @@ static void hostapd_cleanup(struct hostapd_data *hapd)
 	wpa_printf(MSG_DEBUG, "%s(hapd=%p (%s))", __func__, hapd,
 		   hapd->conf->iface);
 	if (hapd->iface->interfaces &&
-	    hapd->iface->interfaces->ctrl_iface_deinit)
+	    hapd->iface->interfaces->ctrl_iface_deinit) {
+		wpa_msg(hapd->msg_ctx, MSG_INFO, WPA_EVENT_TERMINATING);
 		hapd->iface->interfaces->ctrl_iface_deinit(hapd);
+	}
 	hostapd_free_hapd_data(hapd);
 }
 
@@ -1598,10 +1603,12 @@ static void hostapd_set_own_neighbor_report(struct hostapd_data *hapd)
 
 	/* TODO: Set NEI_REP_BSSID_INFO_MOBILITY_DOMAIN if MDE is set */
 
-	ieee80211_freq_to_channel_ext(hapd->iface->freq,
-				      hapd->iconf->secondary_channel,
-				      hapd->iconf->vht_oper_chwidth,
-				      &op_class, &channel);
+	if (ieee80211_freq_to_channel_ext(hapd->iface->freq,
+					  hapd->iconf->secondary_channel,
+					  hapd->iconf->vht_oper_chwidth,
+					  &op_class, &channel) ==
+	    NUM_HOSTAPD_MODES)
+		return;
 	width = hostapd_get_nr_chan_width(hapd, ht, vht);
 	if (vht) {
 		center_freq1_idx = hapd->iconf->vht_oper_centr_freq_seg0_idx;
