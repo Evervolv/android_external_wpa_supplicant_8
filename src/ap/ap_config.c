@@ -95,6 +95,12 @@ void hostapd_config_defaults_bss(struct hostapd_bss_config *bss)
 	bss->radius_das_time_window = 300;
 
 	bss->sae_anti_clogging_threshold = 5;
+
+	bss->gas_frag_limit = 1400;
+
+#ifdef CONFIG_FILS
+	dl_list_init(&bss->fils_realms);
+#endif /* CONFIG_FILS */
 }
 
 
@@ -329,13 +335,7 @@ int hostapd_setup_wpa_psk(struct hostapd_bss_config *conf)
 		ssid->wpa_psk->group = 1;
 	}
 
-	if (ssid->wpa_psk_file) {
-		if (hostapd_config_read_wpa_psk(ssid->wpa_psk_file,
-						&conf->ssid))
-			return -1;
-	}
-
-	return 0;
+	return hostapd_config_read_wpa_psk(ssid->wpa_psk_file, &conf->ssid);
 }
 
 
@@ -384,6 +384,18 @@ void hostapd_config_free_eap_user(struct hostapd_eap_user *user)
 }
 
 
+void hostapd_config_free_eap_users(struct hostapd_eap_user *user)
+{
+	struct hostapd_eap_user *prev_user;
+
+	while (user) {
+		prev_user = user;
+		user = user->next;
+		hostapd_config_free_eap_user(prev_user);
+	}
+}
+
+
 static void hostapd_config_free_wep(struct hostapd_wep_keys *keys)
 {
 	int i;
@@ -420,10 +432,22 @@ static void hostapd_config_free_anqp_elem(struct hostapd_bss_config *conf)
 }
 
 
+static void hostapd_config_free_fils_realms(struct hostapd_bss_config *conf)
+{
+#ifdef CONFIG_FILS
+	struct fils_realm *realm;
+
+	while ((realm = dl_list_first(&conf->fils_realms, struct fils_realm,
+				      list))) {
+		dl_list_del(&realm->list);
+		os_free(realm);
+	}
+#endif /* CONFIG_FILS */
+}
+
+
 void hostapd_config_free_bss(struct hostapd_bss_config *conf)
 {
-	struct hostapd_eap_user *user, *prev_user;
-
 	if (conf == NULL)
 		return;
 
@@ -436,12 +460,7 @@ void hostapd_config_free_bss(struct hostapd_bss_config *conf)
 	os_free(conf->ssid.vlan_tagged_interface);
 #endif /* CONFIG_FULL_DYNAMIC_VLAN */
 
-	user = conf->eap_user;
-	while (user) {
-		prev_user = user;
-		user = user->next;
-		hostapd_config_free_eap_user(prev_user);
-	}
+	hostapd_config_free_eap_users(conf->eap_user);
 	os_free(conf->eap_user_sqlite);
 
 	os_free(conf->eap_req_id_text);
@@ -581,6 +600,8 @@ void hostapd_config_free_bss(struct hostapd_bss_config *conf)
 
 	os_free(conf->no_probe_resp_if_seen_on);
 	os_free(conf->no_auth_if_seen_on);
+
+	hostapd_config_free_fils_realms(conf);
 
 	os_free(conf);
 }

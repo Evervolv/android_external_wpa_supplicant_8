@@ -43,6 +43,10 @@ dbus_bool_t wpas_dbus_simple_array_array_property_getter(DBusMessageIter *iter,
 							 size_t array_len,
 							 DBusError *error);
 
+dbus_bool_t wpas_dbus_string_property_getter(DBusMessageIter *iter,
+					     const void *val,
+					     DBusError *error);
+
 DBusMessage * wpas_dbus_handler_create_interface(DBusMessage *message,
 						 struct wpa_global *global);
 
@@ -186,6 +190,18 @@ DECLARE_ACCESSOR(wpas_dbus_getter_process_credentials);
 DECLARE_ACCESSOR(wpas_dbus_setter_process_credentials);
 DECLARE_ACCESSOR(wpas_dbus_getter_config_methods);
 DECLARE_ACCESSOR(wpas_dbus_setter_config_methods);
+DECLARE_ACCESSOR(wpas_dbus_getter_wps_device_name);
+DECLARE_ACCESSOR(wpas_dbus_setter_wps_device_name);
+DECLARE_ACCESSOR(wpas_dbus_getter_wps_manufacturer);
+DECLARE_ACCESSOR(wpas_dbus_setter_wps_manufacturer);
+DECLARE_ACCESSOR(wpas_dbus_getter_wps_device_model_name);
+DECLARE_ACCESSOR(wpas_dbus_setter_wps_device_model_name);
+DECLARE_ACCESSOR(wpas_dbus_getter_wps_device_model_number);
+DECLARE_ACCESSOR(wpas_dbus_setter_wps_device_model_number);
+DECLARE_ACCESSOR(wpas_dbus_getter_wps_device_serial_number);
+DECLARE_ACCESSOR(wpas_dbus_setter_wps_device_serial_number);
+DECLARE_ACCESSOR(wpas_dbus_getter_wps_device_device_type);
+DECLARE_ACCESSOR(wpas_dbus_setter_wps_device_device_type);
 
 DBusMessage * wpas_dbus_handler_tdls_discover(DBusMessage *message,
 					      struct wpa_supplicant *wpa_s);

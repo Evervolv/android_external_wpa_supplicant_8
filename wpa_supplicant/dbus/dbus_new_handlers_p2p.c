@@ -90,6 +90,7 @@ DBusMessage * wpas_dbus_handler_p2p_find(DBusMessage *message,
 	int num_req_dev_types = 0;
 	unsigned int i;
 	u8 *req_dev_types = NULL;
+	unsigned int freq = 0;
 
 	dbus_message_iter_init(message, &iter);
 	entry.key = NULL;
@@ -134,6 +135,10 @@ DBusMessage * wpas_dbus_handler_p2p_find(DBusMessage *message,
 				type = P2P_FIND_PROGRESSIVE;
 			else
 				goto error_clear;
+		} else if (os_strcmp(entry.key, "freq") == 0 &&
+			   (entry.type == DBUS_TYPE_INT32 ||
+			    entry.type == DBUS_TYPE_UINT32)) {
+			freq = entry.uint32_value;
 		} else
 			goto error_clear;
 		wpa_dbus_dict_entry_clear(&entry);
@@ -142,7 +147,7 @@ DBusMessage * wpas_dbus_handler_p2p_find(DBusMessage *message,
 	wpa_s = wpa_s->global->p2p_init_wpa_s;
 
 	wpas_p2p_find(wpa_s, timeout, type, num_req_dev_types, req_dev_types,
-		      NULL, 0, 0, NULL, 0);
+		      NULL, 0, 0, NULL, freq);
 	os_free(req_dev_types);
 	return reply;
 
@@ -2347,19 +2352,12 @@ dbus_bool_t wpas_dbus_getter_p2p_group_passphrase(
 	DBusMessageIter *iter, DBusError *error, void *user_data)
 {
 	struct wpa_supplicant *wpa_s = user_data;
-	char *p_pass;
 	struct wpa_ssid *ssid = wpa_s->current_ssid;
 
 	if (ssid == NULL)
 		return FALSE;
 
-	p_pass = ssid->passphrase;
-	if (!p_pass)
-		p_pass = "";
-
-	return wpas_dbus_simple_property_getter(iter, DBUS_TYPE_STRING,
-						&p_pass, error);
-
+	return wpas_dbus_string_property_getter(iter, ssid->passphrase, error);
 }
 
 

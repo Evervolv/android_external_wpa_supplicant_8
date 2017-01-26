@@ -224,6 +224,12 @@ struct anqp_element {
 	struct wpabuf *payload;
 };
 
+struct fils_realm {
+	struct dl_list list;
+	u8 hash[2];
+	char realm[];
+};
+
 
 /**
  * struct hostapd_bss_config - Per-BSS configuration
@@ -287,7 +293,7 @@ struct hostapd_bss_config {
 	char iapp_iface[IFNAMSIZ + 1]; /* interface used with IAPP broadcast
 					* frames */
 
-	enum {
+	enum macaddr_acl {
 		ACCEPT_UNLESS_DENIED = 0,
 		DENY_UNLESS_ACCEPTED = 1,
 		USE_EXTERNAL_RADIUS_AUTH = 2
@@ -509,7 +515,7 @@ struct hostapd_bss_config {
 	struct dl_list anqp_elem; /* list of struct anqp_element */
 
 	u16 gas_comeback_delay;
-	int gas_frag_limit;
+	size_t gas_frag_limit;
 	int gas_address3;
 
 	u8 qos_map_set[16 + 2 * 21];
@@ -600,6 +606,7 @@ struct hostapd_bss_config {
 #ifdef CONFIG_FILS
 	u8 fils_cache_id[FILS_CACHE_ID_LEN];
 	int fils_cache_id_set;
+	struct dl_list fils_realms; /* list of struct fils_realm */
 #endif /* CONFIG_FILS */
 
 	int multicast_to_unicast;
@@ -725,6 +732,7 @@ int hostapd_mac_comp(const void *a, const void *b);
 struct hostapd_config * hostapd_config_defaults(void);
 void hostapd_config_defaults_bss(struct hostapd_bss_config *bss);
 void hostapd_config_free_eap_user(struct hostapd_eap_user *user);
+void hostapd_config_free_eap_users(struct hostapd_eap_user *user);
 void hostapd_config_clear_wpa_psk(struct hostapd_wpa_psk **p);
 void hostapd_config_free_bss(struct hostapd_bss_config *conf);
 void hostapd_config_free(struct hostapd_config *conf);
