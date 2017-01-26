@@ -187,6 +187,10 @@ static void sme_auth_handle_rrm(struct wpa_supplicant *wpa_s,
 	if (wpa_s->drv_rrm_flags & WPA_DRIVER_FLAGS_TX_POWER_INSERTION)
 		*pos |= WLAN_RRM_CAPS_LINK_MEASUREMENT;
 
+	*pos |= WLAN_RRM_CAPS_BEACON_REPORT_PASSIVE |
+		WLAN_RRM_CAPS_BEACON_REPORT_ACTIVE |
+		WLAN_RRM_CAPS_BEACON_REPORT_TABLE;
+
 	if (wpa_s->lci)
 		pos[1] |= WLAN_RRM_CAPS_LCI_MEASUREMENT;
 
@@ -212,9 +216,6 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	u8 ext_capab[18];
 	int ext_capab_len;
 	int skip_auth;
-#ifdef CONFIG_MBO
-	const u8 *mbo;
-#endif /* CONFIG_MBO */
 
 	if (bss == NULL) {
 		wpa_msg(wpa_s, MSG_ERROR, "SME: No scan result available for "
@@ -440,20 +441,10 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 
 	sme_auth_handle_rrm(wpa_s, bss);
 
-#ifdef CONFIG_MBO
-	mbo = wpa_bss_get_vendor_ie(bss, MBO_IE_VENDOR_TYPE);
-	if (mbo) {
-		int len;
-
-		len = wpas_mbo_supp_op_class_ie(
-			wpa_s, bss->freq,
-			wpa_s->sme.assoc_req_ie + wpa_s->sme.assoc_req_ie_len,
-			sizeof(wpa_s->sme.assoc_req_ie) -
-			wpa_s->sme.assoc_req_ie_len);
-		if (len > 0)
-			wpa_s->sme.assoc_req_ie_len += len;
-	}
-#endif /* CONFIG_MBO */
+	wpa_s->sme.assoc_req_ie_len += wpas_supp_op_class_ie(
+		wpa_s, bss->freq,
+		wpa_s->sme.assoc_req_ie + wpa_s->sme.assoc_req_ie_len,
+		sizeof(wpa_s->sme.assoc_req_ie) - wpa_s->sme.assoc_req_ie_len);
 
 	if (params.p2p)
 		wpa_drv_get_ext_capa(wpa_s, WPA_IF_P2P_CLIENT);
@@ -511,7 +502,7 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	}
 
 #ifdef CONFIG_MBO
-	if (mbo) {
+	if (wpa_bss_get_vendor_ie(bss, MBO_IE_VENDOR_TYPE)) {
 		int len;
 
 		len = wpas_mbo_ie(wpa_s, wpa_s->sme.assoc_req_ie +

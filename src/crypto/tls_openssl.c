@@ -972,6 +972,14 @@ void * tls_init(const struct tls_config *conf)
 	SSL_CTX_set_options(ssl, SSL_OP_NO_SSLv2);
 	SSL_CTX_set_options(ssl, SSL_OP_NO_SSLv3);
 
+#ifdef SSL_MODE_NO_AUTO_CHAIN
+	/* Number of deployed use cases assume the default OpenSSL behavior of
+	 * auto chaining the local certificate is in use. BoringSSL removed this
+	 * functionality by default, so we need to restore it here to avoid
+	 * breaking existing use cases. */
+	SSL_CTX_clear_mode(ssl, SSL_MODE_NO_AUTO_CHAIN);
+#endif /* SSL_MODE_NO_AUTO_CHAIN */
+
 	SSL_CTX_set_info_callback(ssl, ssl_info_cb);
 	SSL_CTX_set_app_data(ssl, context);
 	if (data->tls_session_lifetime > 0) {
@@ -2254,10 +2262,8 @@ static void tls_set_conn_flags(SSL *ssl, unsigned int flags)
 #ifdef SSL_OP_NO_TICKET
 	if (flags & TLS_CONN_DISABLE_SESSION_TICKET)
 		SSL_set_options(ssl, SSL_OP_NO_TICKET);
-#ifdef SSL_clear_options
 	else
 		SSL_clear_options(ssl, SSL_OP_NO_TICKET);
-#endif /* SSL_clear_options */
 #endif /* SSL_OP_NO_TICKET */
 
 #ifdef SSL_OP_NO_TLSv1
@@ -4120,10 +4126,8 @@ int tls_global_set_params(void *tls_ctx,
 #ifdef SSL_OP_NO_TICKET
 	if (params->flags & TLS_CONN_DISABLE_SESSION_TICKET)
 		SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_TICKET);
-#ifdef SSL_CTX_clear_options
 	else
 		SSL_CTX_clear_options(ssl_ctx, SSL_OP_NO_TICKET);
-#endif /* SSL_clear_options */
 #endif /*  SSL_OP_NO_TICKET */
 
 #ifdef HAVE_OCSP

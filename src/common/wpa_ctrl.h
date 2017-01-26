@@ -1,6 +1,6 @@
 /*
  * wpa_supplicant/hostapd control interface library
- * Copyright (c) 2004-2006, Jouni Malinen <j@w1.fi>
+ * Copyright (c) 2004-2017, Jouni Malinen <j@w1.fi>
  *
  * This software may be distributed under the terms of the BSD license.
  * See README for more details.
@@ -288,6 +288,16 @@ extern "C" {
 /* BSS Transition Management Request received with MBO transition reason */
 #define MBO_TRANSITION_REASON "MBO-TRANSITION-REASON "
 
+/* parameters: <STA address> <dialog token> <ack=0/1> */
+#define BEACON_REQ_TX_STATUS "BEACON-REQ-TX-STATUS "
+/* parameters: <STA address> <dialog token> <report mode> <beacon report> */
+#define BEACON_RESP_RX "BEACON-RESP-RX "
+
+/* PMKSA cache entry added; parameters: <BSSID> <network_id> */
+#define PMKSA_CACHE_ADDED "PMKSA-CACHE-ADDED "
+/* PMKSA cache entry removed; parameters: <BSSID> <network_id> */
+#define PMKSA_CACHE_REMOVED "PMKSA-CACHE-REMOVED "
+
 /* BSS command information masks */
 
 #define WPA_BSS_MASK_ALL		0xFFFDFFFF
@@ -313,6 +323,9 @@ extern "C" {
 #define WPA_BSS_MASK_SNR		BIT(19)
 #define WPA_BSS_MASK_EST_THROUGHPUT	BIT(20)
 #define WPA_BSS_MASK_FST		BIT(21)
+#define WPA_BSS_MASK_UPDATE_IDX		BIT(22)
+#define WPA_BSS_MASK_BEACON_IE		BIT(23)
+#define WPA_BSS_MASK_FILS_INDICATION	BIT(24)
 
 
 /* VENDOR_ELEM_* frame id values */

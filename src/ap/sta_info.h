@@ -115,6 +115,7 @@ struct sta_info {
 	unsigned int radius_das_match:1;
 	unsigned int ecsa_supported:1;
 	unsigned int added_unassoc:1;
+	unsigned int pending_wds_enable:1;
 
 	u16 auth_alg;
 
@@ -296,5 +297,9 @@ void ap_sta_clear_disconnect_timeouts(struct hostapd_data *hapd,
 				      struct sta_info *sta);
 
 int ap_sta_flags_txt(u32 flags, char *buf, size_t buflen);
+void ap_sta_delayed_1x_auth_fail_disconnect(struct hostapd_data *hapd,
+					    struct sta_info *sta);
+int ap_sta_pending_delayed_1x_auth_fail_disconnect(struct hostapd_data *hapd,
+						   struct sta_info *sta);
 
 #endif /* STA_INFO_H */
