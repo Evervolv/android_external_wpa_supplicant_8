@@ -76,6 +76,7 @@ public:
 	    const char *url);
 	void notifyDisconnectReason(struct wpa_supplicant *wpa_s);
 	void notifyAssocReject(struct wpa_supplicant *wpa_s);
+	void notifyAuthTimeout(struct wpa_supplicant *wpa_s);
 	void notifyWpsEventFail(
 	    struct wpa_supplicant *wpa_s, uint8_t *peer_macaddr,
 	    uint16_t config_error, uint16_t error_indication);
