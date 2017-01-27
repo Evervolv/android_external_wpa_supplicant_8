@@ -8,11 +8,27 @@
  */
 
 #include <algorithm>
+#include <regex>
 
 #include "hidl_manager.h"
 
+extern "C" {
+#include "src/eap_common/eap_sim_common.h"
+}
+
 namespace {
+using android::hardware::hidl_array;
+
 constexpr uint8_t kWfdDeviceInfoLen = 8;
+// GSM-AUTH:<RAND1>:<RAND2>[:<RAND3>]
+constexpr char kGsmAuthRegex2[] = "GSM-AUTH:([0-9a-f]+):([0-9a-f]+)";
+constexpr char kGsmAuthRegex3[] =
+    "GSM-AUTH:([0-9a-f]+):([0-9a-f]+):([0-9a-f]+)";
+// UMTS-AUTH:<RAND>:<AUTN>
+constexpr char kUmtsAuthRegex[] = "UMTS-AUTH:([0-9a-f]+):([0-9a-f]+)";
+constexpr size_t kGsmRandLenBytes = GSM_RAND_LEN;
+constexpr size_t kUmtsRandLenBytes = EAP_AKA_RAND_LEN;
+constexpr size_t kUmtsAutnLenBytes = EAP_AKA_AUTN_LEN;
 
 /**
  * Check if the provided |wpa_supplicant| structure represents a P2P iface or
@@ -299,6 +315,56 @@ std::vector<uint8_t> convertWpaBufToVector(const struct wpabuf *buf)
 		return std::vector<uint8_t>();
 	}
 }
+
+int parseGsmAuthNetworkRequest(
+    const std::string &params_str,
+    std::vector<hidl_array<uint8_t, kGsmRandLenBytes>> *out_rands)
+{
+	std::smatch matches;
+	std::regex params_gsm_regex2(kGsmAuthRegex2);
+	std::regex params_gsm_regex3(kGsmAuthRegex3);
+	if (!std::regex_match(params_str, matches, params_gsm_regex3) &&
+	    !std::regex_match(params_str, matches, params_gsm_regex2)) {
+		return 1;
+	}
+	for (uint32_t i = 1; i < matches.size(); i++) {
+		hidl_array<uint8_t, kGsmRandLenBytes> rand;
+		const auto &match = matches[i];
+		WPA_ASSERT(match.size() >= 2 * rand.size());
+		if (hexstr2bin(match.str().c_str(), rand.data(), rand.size())) {
+			wpa_printf(
+			    MSG_ERROR, "Failed to parse GSM auth params");
+			return 1;
+		}
+		out_rands->push_back(rand);
+	}
+	return 0;
+}
+
+int parseUmtsAuthNetworkRequest(
+    const std::string &params_str,
+    hidl_array<uint8_t, kUmtsRandLenBytes> *out_rand,
+    hidl_array<uint8_t, kUmtsAutnLenBytes> *out_autn)
+{
+	std::smatch matches;
+	std::regex params_umts_regex(kUmtsAuthRegex);
+	if (!std::regex_match(params_str, matches, params_umts_regex)) {
+		return 1;
+	}
+	WPA_ASSERT(matches[1].size() >= 2 * out_rand->size());
+	if (hexstr2bin(
+		matches[1].str().c_str(), out_rand->data(), out_rand->size())) {
+		wpa_printf(MSG_ERROR, "Failed to parse UMTS auth params");
+		return 1;
+	}
+	WPA_ASSERT(matches[2].size() >= 2 * out_autn->size());
+	if (hexstr2bin(
+		matches[2].str().c_str(), out_autn->data(), out_autn->size())) {
+		wpa_printf(MSG_ERROR, "Failed to parse UMTS auth params");
+		return 1;
+	}
+	return 0;
+}
 }  // namespace
 
 namespace android {
@@ -568,9 +634,47 @@ int HidlManager::notifyNetworkRequest(
 	    sta_network_object_map_.end())
 		return 1;
 
-	// TODO(b/31646740): Parse the param string to find the appropriate
-	// callback.
-	return 0;
+	if (type == WPA_CTRL_REQ_EAP_IDENTITY) {
+		callWithEachStaNetworkCallback(
+		    wpa_s->ifname, ssid->id,
+		    std::bind(
+			&ISupplicantStaNetworkCallback::
+			    onNetworkEapIdentityRequest,
+			std::placeholders::_1));
+		return 0;
+	}
+	if (type == WPA_CTRL_REQ_SIM) {
+		std::vector<hidl_array<uint8_t, 16>> gsm_rands;
+		hidl_array<uint8_t, 16> umts_rand;
+		hidl_array<uint8_t, 16> umts_autn;
+		if (!parseGsmAuthNetworkRequest(param, &gsm_rands)) {
+			ISupplicantStaNetworkCallback::
+			    NetworkRequestEapSimGsmAuthParams hidl_params;
+			hidl_params.rands = gsm_rands;
+			callWithEachStaNetworkCallback(
+			    wpa_s->ifname, ssid->id,
+			    std::bind(
+				&ISupplicantStaNetworkCallback::
+				    onNetworkEapSimGsmAuthRequest,
+				std::placeholders::_1, hidl_params));
+			return 0;
+		}
+		if (!parseUmtsAuthNetworkRequest(
+			param, &umts_rand, &umts_autn)) {
+			ISupplicantStaNetworkCallback::
+			    NetworkRequestEapSimUmtsAuthParams hidl_params;
+			hidl_params.rand = umts_rand;
+			hidl_params.autn = umts_autn;
+			callWithEachStaNetworkCallback(
+			    wpa_s->ifname, ssid->id,
+			    std::bind(
+				&ISupplicantStaNetworkCallback::
+				    onNetworkEapSimUmtsAuthRequest,
+				std::placeholders::_1, hidl_params));
+			return 0;
+		}
+	}
+	return 1;
 }
 
 /**
