@@ -289,6 +289,20 @@ void wpas_hidl_notify_assoc_reject(struct wpa_supplicant *wpa_s)
 	hidl_manager->notifyAssocReject(wpa_s);
 }
 
+void wpas_hidl_notify_auth_timeout(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	wpa_printf(MSG_DEBUG, "Notifying auth timeout to hidl control");
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyAuthTimeout(wpa_s);
+}
+
 void wpas_hidl_notify_wps_event_fail(
     struct wpa_supplicant *wpa_s, uint8_t *peer_macaddr, uint16_t config_error,
     uint16_t error_indication)
@@ -335,4 +349,262 @@ void wpas_hidl_notify_wps_event_pbc_overlap(struct wpa_supplicant *wpa_s)
 		return;
 
 	hidl_manager->notifyWpsEventPbcOverlap(wpa_s);
+}
+
+void wpas_hidl_notify_p2p_device_found(
+    struct wpa_supplicant *wpa_s, const u8 *addr,
+    const struct p2p_peer_info *info, const u8 *peer_wfd_device_info,
+    u8 peer_wfd_device_info_len)
+{
+	if (!wpa_s || !addr || !info || !peer_wfd_device_info)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG, "Notifying P2P device found to hidl control " MACSTR,
+	    MAC2STR(info->p2p_device_addr));
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pDeviceFound(
+	    wpa_s, addr, info, peer_wfd_device_info, peer_wfd_device_info_len);
+}
+
+void wpas_hidl_notify_p2p_device_lost(
+    struct wpa_supplicant *wpa_s, const u8 *p2p_device_addr)
+{
+	if (!wpa_s || !p2p_device_addr)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG, "Notifying P2P device lost to hidl control " MACSTR,
+	    MAC2STR(p2p_device_addr));
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pDeviceLost(wpa_s, p2p_device_addr);
+}
+
+void wpas_hidl_notify_p2p_find_stopped(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	wpa_printf(MSG_DEBUG, "Notifying P2P find stop to hidl control");
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pFindStopped(wpa_s);
+}
+
+void wpas_hidl_notify_p2p_go_neg_req(
+    struct wpa_supplicant *wpa_s, const u8 *src_addr, u16 dev_passwd_id,
+    u8 go_intent)
+{
+	if (!wpa_s || !src_addr)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying P2P GO negotiation request to hidl control " MACSTR,
+	    MAC2STR(src_addr));
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pGoNegReq(
+	    wpa_s, src_addr, dev_passwd_id, go_intent);
+}
+
+void wpas_hidl_notify_p2p_go_neg_completed(
+    struct wpa_supplicant *wpa_s, const struct p2p_go_neg_results *res)
+{
+	if (!wpa_s || !res)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying P2P GO negotiation completed to hidl control: %d",
+	    res->status);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pGoNegCompleted(wpa_s, res);
+}
+
+void wpas_hidl_notify_p2p_group_formation_failure(
+    struct wpa_supplicant *wpa_s, const char *reason)
+{
+	if (!wpa_s || !reason)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying P2P Group formation failure to hidl control: %s",
+	    reason);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pGroupFormationFailure(wpa_s, reason);
+}
+
+void wpas_hidl_notify_p2p_group_started(
+    struct wpa_supplicant *wpa_s, const struct wpa_ssid *ssid, int persistent,
+    int client, const u8 *ip)
+{
+	if (!wpa_s || !ssid || !ip)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG, "Notifying P2P Group start to hidl control: %d",
+	    ssid->id);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pGroupStarted(
+	    wpa_s, ssid, persistent, client, ip);
+}
+
+void wpas_hidl_notify_p2p_group_removed(
+    struct wpa_supplicant *wpa_s, const struct wpa_ssid *ssid, const char *role)
+{
+	if (!wpa_s || !ssid || !role)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG, "Notifying P2P Group removed to hidl control: %d",
+	    ssid->id);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pGroupRemoved(wpa_s, ssid, role);
+}
+
+void wpas_hidl_notify_p2p_invitation_received(
+    struct wpa_supplicant *wpa_s, const u8 *sa, const u8 *go_dev_addr,
+    const u8 *bssid, int id, int op_freq)
+{
+	if (!wpa_s || !sa || !go_dev_addr || !bssid)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying P2P invitation received to hidl control: %d " MACSTR, id,
+	    MAC2STR(bssid));
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pInvitationReceived(
+	    wpa_s, sa, go_dev_addr, bssid, id, op_freq);
+}
+
+void wpas_hidl_notify_p2p_invitation_result(
+    struct wpa_supplicant *wpa_s, int status, const u8 *bssid)
+{
+	if (!wpa_s || !bssid)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying P2P invitation result to hidl control: " MACSTR,
+	    MAC2STR(bssid));
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pInvitationResult(wpa_s, status, bssid);
+}
+
+void wpas_hidl_notify_p2p_provision_discovery(
+    struct wpa_supplicant *wpa_s, const u8 *dev_addr, int request,
+    enum p2p_prov_disc_status status, u16 config_methods,
+    unsigned int generated_pin)
+{
+	if (!wpa_s || !dev_addr)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying P2P provision discovery to hidl control " MACSTR,
+	    MAC2STR(dev_addr));
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pProvisionDiscovery(
+	    wpa_s, dev_addr, request, status, config_methods, generated_pin);
+}
+
+void wpas_hidl_notify_p2p_sd_response(
+    struct wpa_supplicant *wpa_s, const u8 *sa, u16 update_indic,
+    const u8 *tlvs, size_t tlvs_len)
+{
+	if (!wpa_s || !sa || !tlvs)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying P2P service discovery response to hidl control " MACSTR,
+	    MAC2STR(sa));
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyP2pSdResponse(
+	    wpa_s, sa, update_indic, tlvs, tlvs_len);
+}
+
+void wpas_hidl_notify_ap_sta_authorized(
+    struct wpa_supplicant *wpa_s, const u8 *sta, const u8 *p2p_dev_addr)
+{
+	if (!wpa_s || !sta || !p2p_dev_addr)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying P2P AP STA authorized to hidl control " MACSTR,
+	    MAC2STR(sta));
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyApStaAuthorized(wpa_s, sta, p2p_dev_addr);
+}
+
+void wpas_hidl_notify_ap_sta_deauthorized(
+    struct wpa_supplicant *wpa_s, const u8 *sta, const u8 *p2p_dev_addr)
+{
+	if (!wpa_s || !sta || !p2p_dev_addr)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+	    "Notifying P2P AP STA deauthorized to hidl control " MACSTR,
+	    MAC2STR(sta));
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyApStaDeauthorized(wpa_s, sta, p2p_dev_addr);
 }

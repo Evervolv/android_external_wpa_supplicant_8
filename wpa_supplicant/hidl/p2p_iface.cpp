@@ -664,7 +664,7 @@ std::pair<SupplicantStatus, std::string> P2pIface::connectInternal(
 	if (provision_method == WpsProvisionMethod::DISPLAY &&
 	    pre_selected_pin.empty()) {
 		pin_ret.reserve(9);
-		snprintf(&pin_ret[0], pin_ret.size(), "%08d", new_pin);
+		os_snprintf(&pin_ret[0], pin_ret.size(), "%08d", new_pin);
 	}
 	return {{SupplicantStatusCode::SUCCESS, ""}, pin_ret};
 }

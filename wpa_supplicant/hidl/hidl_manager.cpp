@@ -8,10 +8,28 @@
  */
 
 #include <algorithm>
+#include <regex>
 
 #include "hidl_manager.h"
 
+extern "C" {
+#include "src/eap_common/eap_sim_common.h"
+}
+
 namespace {
+using android::hardware::hidl_array;
+
+constexpr uint8_t kWfdDeviceInfoLen = 8;
+// GSM-AUTH:<RAND1>:<RAND2>[:<RAND3>]
+constexpr char kGsmAuthRegex2[] = "GSM-AUTH:([0-9a-f]+):([0-9a-f]+)";
+constexpr char kGsmAuthRegex3[] =
+    "GSM-AUTH:([0-9a-f]+):([0-9a-f]+):([0-9a-f]+)";
+// UMTS-AUTH:<RAND>:<AUTN>
+constexpr char kUmtsAuthRegex[] = "UMTS-AUTH:([0-9a-f]+):([0-9a-f]+)";
+constexpr size_t kGsmRandLenBytes = GSM_RAND_LEN;
+constexpr size_t kUmtsRandLenBytes = EAP_AKA_RAND_LEN;
+constexpr size_t kUmtsAutnLenBytes = EAP_AKA_AUTN_LEN;
+
 /**
  * Check if the provided |wpa_supplicant| structure represents a P2P iface or
  * not.
@@ -297,6 +315,56 @@ std::vector<uint8_t> convertWpaBufToVector(const struct wpabuf *buf)
 		return std::vector<uint8_t>();
 	}
 }
+
+int parseGsmAuthNetworkRequest(
+    const std::string &params_str,
+    std::vector<hidl_array<uint8_t, kGsmRandLenBytes>> *out_rands)
+{
+	std::smatch matches;
+	std::regex params_gsm_regex2(kGsmAuthRegex2);
+	std::regex params_gsm_regex3(kGsmAuthRegex3);
+	if (!std::regex_match(params_str, matches, params_gsm_regex3) &&
+	    !std::regex_match(params_str, matches, params_gsm_regex2)) {
+		return 1;
+	}
+	for (uint32_t i = 1; i < matches.size(); i++) {
+		hidl_array<uint8_t, kGsmRandLenBytes> rand;
+		const auto &match = matches[i];
+		WPA_ASSERT(match.size() >= 2 * rand.size());
+		if (hexstr2bin(match.str().c_str(), rand.data(), rand.size())) {
+			wpa_printf(
+			    MSG_ERROR, "Failed to parse GSM auth params");
+			return 1;
+		}
+		out_rands->push_back(rand);
+	}
+	return 0;
+}
+
+int parseUmtsAuthNetworkRequest(
+    const std::string &params_str,
+    hidl_array<uint8_t, kUmtsRandLenBytes> *out_rand,
+    hidl_array<uint8_t, kUmtsAutnLenBytes> *out_autn)
+{
+	std::smatch matches;
+	std::regex params_umts_regex(kUmtsAuthRegex);
+	if (!std::regex_match(params_str, matches, params_umts_regex)) {
+		return 1;
+	}
+	WPA_ASSERT(matches[1].size() >= 2 * out_rand->size());
+	if (hexstr2bin(
+		matches[1].str().c_str(), out_rand->data(), out_rand->size())) {
+		wpa_printf(MSG_ERROR, "Failed to parse UMTS auth params");
+		return 1;
+	}
+	WPA_ASSERT(matches[2].size() >= 2 * out_autn->size());
+	if (hexstr2bin(
+		matches[2].str().c_str(), out_autn->data(), out_autn->size())) {
+		wpa_printf(MSG_ERROR, "Failed to parse UMTS auth params");
+		return 1;
+	}
+	return 0;
+}
 }  // namespace
 
 namespace android {
@@ -344,29 +412,28 @@ int HidlManager::registerInterface(struct wpa_supplicant *wpa_s)
 	if (!wpa_s)
 		return 1;
 
-	// Using the corresponding ifname as key to our object map.
-	const std::string ifname(wpa_s->ifname);
-
 	if (isP2pIface(wpa_s)) {
 		if (addHidlObjectToMap<P2pIface>(
-			ifname, new P2pIface(wpa_s->global, wpa_s->ifname),
+			wpa_s->ifname,
+			new P2pIface(wpa_s->global, wpa_s->ifname),
 			p2p_iface_object_map_))
 			return 1;
-		p2p_iface_callbacks_map_[ifname] =
+		p2p_iface_callbacks_map_[wpa_s->ifname] =
 		    std::vector<android::sp<ISupplicantP2pIfaceCallback>>();
 	} else {
 		if (addHidlObjectToMap<StaIface>(
-			ifname, new StaIface(wpa_s->global, wpa_s->ifname),
+			wpa_s->ifname,
+			new StaIface(wpa_s->global, wpa_s->ifname),
 			sta_iface_object_map_))
 			return 1;
-		sta_iface_callbacks_map_[ifname] =
+		sta_iface_callbacks_map_[wpa_s->ifname] =
 		    std::vector<android::sp<ISupplicantStaIfaceCallback>>();
 	}
 
 	// Invoke the |onInterfaceCreated| method on all registered callbacks.
 	callWithEachSupplicantCallback(std::bind(
 	    &ISupplicantCallback::onInterfaceCreated, std::placeholders::_1,
-	    ifname));
+	    wpa_s->ifname));
 	return 0;
 }
 
@@ -382,20 +449,20 @@ int HidlManager::unregisterInterface(struct wpa_supplicant *wpa_s)
 	if (!wpa_s)
 		return 1;
 
-	const std::string ifname(wpa_s->ifname);
-
 	if (isP2pIface(wpa_s)) {
-		if (removeHidlObjectFromMap(ifname, p2p_iface_object_map_))
+		if (removeHidlObjectFromMap(
+			wpa_s->ifname, p2p_iface_object_map_))
 			return 1;
 		if (removeAllIfaceCallbackHidlObjectsFromMap(
-			ifname, p2p_iface_callbacks_map_)) {
+			wpa_s->ifname, p2p_iface_callbacks_map_)) {
 			return 1;
 		}
 	} else {
-		if (removeHidlObjectFromMap(ifname, sta_iface_object_map_))
+		if (removeHidlObjectFromMap(
+			wpa_s->ifname, sta_iface_object_map_))
 			return 1;
 		if (removeAllIfaceCallbackHidlObjectsFromMap(
-			ifname, sta_iface_callbacks_map_)) {
+			wpa_s->ifname, sta_iface_callbacks_map_)) {
 			return 1;
 		}
 	}
@@ -403,7 +470,7 @@ int HidlManager::unregisterInterface(struct wpa_supplicant *wpa_s)
 	// Invoke the |onInterfaceRemoved| method on all registered callbacks.
 	callWithEachSupplicantCallback(std::bind(
 	    &ISupplicantCallback::onInterfaceRemoved, std::placeholders::_1,
-	    ifname));
+	    wpa_s->ifname));
 	return 0;
 }
 
@@ -522,15 +589,11 @@ int HidlManager::notifyStateChange(struct wpa_supplicant *wpa_s)
 	if (!wpa_s)
 		return 1;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return 1;
 
 	// Invoke the |onStateChanged| method on all registered callbacks.
-	ISupplicantStaIfaceCallback::State hidl_state =
-	    static_cast<ISupplicantStaIfaceCallback::State>(wpa_s->wpa_state);
-	std::array<uint8_t, ETH_ALEN> hidl_bssid;
-	os_memcpy(hidl_bssid.data(), wpa_s->bssid, ETH_ALEN);
 	uint32_t hidl_network_id = UINT32_MAX;
 	std::vector<uint8_t> hidl_ssid;
 	if (wpa_s->current_ssid) {
@@ -542,8 +605,10 @@ int HidlManager::notifyStateChange(struct wpa_supplicant *wpa_s)
 	callWithEachStaIfaceCallback(
 	    wpa_s->ifname, std::bind(
 			       &ISupplicantStaIfaceCallback::onStateChanged,
-			       std::placeholders::_1, hidl_state, hidl_bssid,
-			       hidl_network_id, hidl_ssid));
+			       std::placeholders::_1,
+			       static_cast<ISupplicantStaIfaceCallback::State>(
+				   wpa_s->wpa_state),
+			       wpa_s->bssid, hidl_network_id, hidl_ssid));
 	return 0;
 }
 
@@ -569,9 +634,47 @@ int HidlManager::notifyNetworkRequest(
 	    sta_network_object_map_.end())
 		return 1;
 
-	// TODO(b/31646740): Parse the param string to find the appropriate
-	// callback.
-	return 0;
+	if (type == WPA_CTRL_REQ_EAP_IDENTITY) {
+		callWithEachStaNetworkCallback(
+		    wpa_s->ifname, ssid->id,
+		    std::bind(
+			&ISupplicantStaNetworkCallback::
+			    onNetworkEapIdentityRequest,
+			std::placeholders::_1));
+		return 0;
+	}
+	if (type == WPA_CTRL_REQ_SIM) {
+		std::vector<hidl_array<uint8_t, 16>> gsm_rands;
+		hidl_array<uint8_t, 16> umts_rand;
+		hidl_array<uint8_t, 16> umts_autn;
+		if (!parseGsmAuthNetworkRequest(param, &gsm_rands)) {
+			ISupplicantStaNetworkCallback::
+			    NetworkRequestEapSimGsmAuthParams hidl_params;
+			hidl_params.rands = gsm_rands;
+			callWithEachStaNetworkCallback(
+			    wpa_s->ifname, ssid->id,
+			    std::bind(
+				&ISupplicantStaNetworkCallback::
+				    onNetworkEapSimGsmAuthRequest,
+				std::placeholders::_1, hidl_params));
+			return 0;
+		}
+		if (!parseUmtsAuthNetworkRequest(
+			param, &umts_rand, &umts_autn)) {
+			ISupplicantStaNetworkCallback::
+			    NetworkRequestEapSimUmtsAuthParams hidl_params;
+			hidl_params.rand = umts_rand;
+			hidl_params.autn = umts_autn;
+			callWithEachStaNetworkCallback(
+			    wpa_s->ifname, ssid->id,
+			    std::bind(
+				&ISupplicantStaNetworkCallback::
+				    onNetworkEapSimUmtsAuthRequest,
+				std::placeholders::_1, hidl_params));
+			return 0;
+		}
+	}
+	return 1;
 }
 
 /**
@@ -589,8 +692,8 @@ void HidlManager::notifyAnqpQueryDone(
 	if (!wpa_s || !bssid || !result || !anqp)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
 	ISupplicantStaIfaceCallback::AnqpData hidl_anqp_data;
@@ -619,13 +722,11 @@ void HidlManager::notifyAnqpQueryDone(
 		    convertWpaBufToVector(anqp->hs20_osu_providers_list);
 	}
 
-	std::array<uint8_t, ETH_ALEN> hidl_bssid;
-	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
 	callWithEachStaIfaceCallback(
 	    wpa_s->ifname, std::bind(
 			       &ISupplicantStaIfaceCallback::onAnqpQueryDone,
-			       std::placeholders::_1, hidl_bssid,
-			       hidl_anqp_data, hidl_hs20_anqp_data));
+			       std::placeholders::_1, bssid, hidl_anqp_data,
+			       hidl_hs20_anqp_data));
 }
 
 /**
@@ -644,18 +745,16 @@ void HidlManager::notifyHs20IconQueryDone(
 	if (!wpa_s || !bssid || !file_name || !image)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
-	std::vector<uint8_t> hidl_image(image, image + image_length);
-	std::array<uint8_t, ETH_ALEN> hidl_bssid;
-	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
 	callWithEachStaIfaceCallback(
 	    wpa_s->ifname,
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onHs20IconQueryDone,
-		std::placeholders::_1, hidl_bssid, file_name, hidl_image));
+		std::placeholders::_1, bssid, file_name,
+		std::vector<uint8_t>(image, image + image_length)));
 }
 
 /**
@@ -672,8 +771,8 @@ void HidlManager::notifyHs20RxSubscriptionRemediation(
 	if (!wpa_s || !url)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
 	ISupplicantStaIfaceCallback::OsuMethod hidl_osu_method = {};
@@ -706,8 +805,8 @@ void HidlManager::notifyHs20RxDeauthImminentNotice(
 	if (!wpa_s || !url)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
 	callWithEachStaIfaceCallback(
@@ -729,22 +828,20 @@ void HidlManager::notifyDisconnectReason(struct wpa_supplicant *wpa_s)
 	if (!wpa_s)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
 	const u8 *bssid = wpa_s->bssid;
 	if (is_zero_ether_addr(bssid)) {
 		bssid = wpa_s->pending_bssid;
 	}
-	std::array<uint8_t, ETH_ALEN> hidl_bssid;
-	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
 
 	callWithEachStaIfaceCallback(
 	    wpa_s->ifname,
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onDisconnected,
-		std::placeholders::_1, hidl_bssid, wpa_s->disconnect_reason < 0,
+		std::placeholders::_1, bssid, wpa_s->disconnect_reason < 0,
 		wpa_s->disconnect_reason));
 }
 
@@ -760,6 +857,27 @@ void HidlManager::notifyAssocReject(struct wpa_supplicant *wpa_s)
 	if (!wpa_s)
 		return;
 
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
+		return;
+
+	const u8 *bssid = wpa_s->bssid;
+	if (is_zero_ether_addr(bssid)) {
+		bssid = wpa_s->pending_bssid;
+	}
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onAssociationRejected,
+		std::placeholders::_1, bssid, wpa_s->assoc_status_code));
+}
+
+void HidlManager::notifyAuthTimeout(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
 	const std::string ifname(wpa_s->ifname);
 	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
 		return;
@@ -774,8 +892,8 @@ void HidlManager::notifyAssocReject(struct wpa_supplicant *wpa_s)
 	callWithEachStaIfaceCallback(
 	    wpa_s->ifname,
 	    std::bind(
-		&ISupplicantStaIfaceCallback::onAssociationRejected,
-		std::placeholders::_1, hidl_bssid, wpa_s->assoc_status_code));
+		&ISupplicantStaIfaceCallback::onAuthenticationTimeout,
+		std::placeholders::_1, hidl_bssid));
 }
 
 void HidlManager::notifyWpsEventFail(
@@ -785,25 +903,19 @@ void HidlManager::notifyWpsEventFail(
 	if (!wpa_s || !peer_macaddr)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
-	std::array<uint8_t, ETH_ALEN> hidl_bssid;
-	os_memcpy(hidl_bssid.data(), peer_macaddr, ETH_ALEN);
-
-	ISupplicantStaIfaceCallback::WpsConfigError hidl_config_error =
-	    static_cast<ISupplicantStaIfaceCallback::WpsConfigError>(
-		config_error);
-	ISupplicantStaIfaceCallback::WpsErrorIndication hidl_error_indication =
-	    static_cast<ISupplicantStaIfaceCallback::WpsErrorIndication>(
-		error_indication);
-
 	callWithEachStaIfaceCallback(
-	    wpa_s->ifname, std::bind(
-			       &ISupplicantStaIfaceCallback::onWpsEventFail,
-			       std::placeholders::_1, hidl_bssid,
-			       hidl_config_error, hidl_error_indication));
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onWpsEventFail,
+		std::placeholders::_1, peer_macaddr,
+		static_cast<ISupplicantStaIfaceCallback::WpsConfigError>(
+		    config_error),
+		static_cast<ISupplicantStaIfaceCallback::WpsErrorIndication>(
+		    error_indication)));
 }
 
 void HidlManager::notifyWpsEventSuccess(struct wpa_supplicant *wpa_s)
@@ -811,8 +923,8 @@ void HidlManager::notifyWpsEventSuccess(struct wpa_supplicant *wpa_s)
 	if (!wpa_s)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
 	callWithEachStaIfaceCallback(
@@ -826,8 +938,8 @@ void HidlManager::notifyWpsEventPbcOverlap(struct wpa_supplicant *wpa_s)
 	if (!wpa_s)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
 	callWithEachStaIfaceCallback(
@@ -837,14 +949,309 @@ void HidlManager::notifyWpsEventPbcOverlap(struct wpa_supplicant *wpa_s)
 		std::placeholders::_1));
 }
 
+void HidlManager::notifyP2pDeviceFound(
+    struct wpa_supplicant *wpa_s, const u8 *addr,
+    const struct p2p_peer_info *info, const u8 *peer_wfd_device_info,
+    u8 peer_wfd_device_info_len)
+{
+	if (!wpa_s || !addr || !info || !peer_wfd_device_info)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	if (peer_wfd_device_info_len != kWfdDeviceInfoLen) {
+		wpa_printf(
+		    MSG_ERROR, "Unexpected WFD device info len: %d",
+		    peer_wfd_device_info_len);
+	}
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onDeviceFound,
+		std::placeholders::_1, addr, info->p2p_device_addr,
+		info->pri_dev_type, info->device_name, info->config_methods,
+		info->dev_capab, info->group_capab, peer_wfd_device_info));
+}
+
+void HidlManager::notifyP2pDeviceLost(
+    struct wpa_supplicant *wpa_s, const u8 *p2p_device_addr)
+{
+	if (!wpa_s || !p2p_device_addr)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantP2pIfaceCallback::onDeviceLost,
+			       std::placeholders::_1, p2p_device_addr));
+}
+
+void HidlManager::notifyP2pFindStopped(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantP2pIfaceCallback::onFindStopped,
+			       std::placeholders::_1));
+}
+
+void HidlManager::notifyP2pGoNegReq(
+    struct wpa_supplicant *wpa_s, const u8 *src_addr, u16 dev_passwd_id,
+    u8 /* go_intent */)
+{
+	if (!wpa_s || !src_addr)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onGoNegotiationRequest,
+		std::placeholders::_1, src_addr,
+		static_cast<ISupplicantP2pIfaceCallback::WpsDevPasswordId>(
+		    dev_passwd_id)));
+}
+
+void HidlManager::notifyP2pGoNegCompleted(
+    struct wpa_supplicant *wpa_s, const struct p2p_go_neg_results *res)
+{
+	if (!wpa_s || !res)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onGoNegotiationCompleted,
+		std::placeholders::_1,
+		static_cast<ISupplicantP2pIfaceCallback::P2pStatusCode>(
+		    res->status)));
+}
+
+void HidlManager::notifyP2pGroupFormationFailure(
+    struct wpa_supplicant *wpa_s, const char *reason)
+{
+	if (!wpa_s || !reason)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onGroupFormationFailure,
+		std::placeholders::_1, reason));
+}
+
+void HidlManager::notifyP2pGroupStarted(
+    struct wpa_supplicant *wpa_group_s, const struct wpa_ssid *ssid,
+    int persistent, int client, const u8 *ip)
+{
+	if (!wpa_group_s || !wpa_group_s->parent || !ssid || !ip)
+		return;
+
+	// For group notifications, need to use the parent iface for callbacks.
+	struct wpa_supplicant *wpa_s = wpa_group_s->parent;
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	uint32_t hidl_freq = wpa_group_s->current_bss
+				 ? wpa_group_s->current_bss->freq
+				 : wpa_group_s->assoc_freq;
+	std::array<uint8_t, 32> hidl_psk;
+	if (ssid->psk_set) {
+		os_memcpy(hidl_psk.data(), ssid->psk, 32);
+	}
+	bool hidl_is_go = (client == 0 ? true : false);
+	bool hidl_is_persistent = (persistent == 1 ? true : false);
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onGroupStarted,
+		std::placeholders::_1, wpa_group_s->ifname, hidl_is_go,
+		std::vector<uint8_t>{ssid->ssid, ssid->ssid + ssid->ssid_len},
+		hidl_freq, hidl_psk, ssid->passphrase, wpa_group_s->go_dev_addr,
+		hidl_is_persistent));
+}
+
+void HidlManager::notifyP2pGroupRemoved(
+    struct wpa_supplicant *wpa_group_s, const struct wpa_ssid *ssid,
+    const char *role)
+{
+	if (!wpa_group_s || !wpa_group_s->parent || !ssid || !role)
+		return;
+
+	// For group notifications, need to use the parent iface for callbacks.
+	struct wpa_supplicant *wpa_s = wpa_group_s->parent;
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	bool hidl_is_go = (std::string(role) == "GO");
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onGroupRemoved,
+		std::placeholders::_1, wpa_group_s->ifname, hidl_is_go));
+}
+
+void HidlManager::notifyP2pInvitationReceived(
+    struct wpa_supplicant *wpa_s, const u8 *sa, const u8 *go_dev_addr,
+    const u8 *bssid, int id, int op_freq)
+{
+	if (!wpa_s || !sa || !go_dev_addr || !bssid)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	SupplicantNetworkId hidl_network_id;
+	if (id < 0) {
+		hidl_network_id = UINT32_MAX;
+	}
+	hidl_network_id = id;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onInvitationReceived,
+		std::placeholders::_1, sa, go_dev_addr, bssid, hidl_network_id,
+		op_freq));
+}
+
+void HidlManager::notifyP2pInvitationResult(
+    struct wpa_supplicant *wpa_s, int status, const u8 *bssid)
+{
+	if (!wpa_s || !bssid)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onInvitationResult,
+		std::placeholders::_1, bssid,
+		static_cast<ISupplicantP2pIfaceCallback::P2pStatusCode>(
+		    status)));
+}
+
+void HidlManager::notifyP2pProvisionDiscovery(
+    struct wpa_supplicant *wpa_s, const u8 *dev_addr, int request,
+    enum p2p_prov_disc_status status, u16 config_methods,
+    unsigned int generated_pin)
+{
+	if (!wpa_s || !dev_addr)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	std::string hidl_generated_pin;
+	if (generated_pin > 0) {
+		hidl_generated_pin.reserve(9);
+		os_snprintf(
+		    &hidl_generated_pin[0], hidl_generated_pin.size(), "%08d",
+		    generated_pin);
+	}
+	bool hidl_is_request = (request == 1 ? true : false);
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onProvisionDiscoveryCompleted,
+		std::placeholders::_1, dev_addr, hidl_is_request,
+		static_cast<ISupplicantP2pIfaceCallback::P2pProvDiscStatusCode>(
+		    status),
+		config_methods, hidl_generated_pin));
+}
+
+void HidlManager::notifyP2pSdResponse(
+    struct wpa_supplicant *wpa_s, const u8 *sa, u16 update_indic,
+    const u8 *tlvs, size_t tlvs_len)
+{
+	if (!wpa_s || !sa || !tlvs)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantP2pIfaceCallback::onServiceDiscoveryResponse,
+		std::placeholders::_1, sa, update_indic,
+		std::vector<uint8_t>{tlvs, tlvs + tlvs_len}));
+}
+
+void HidlManager::notifyApStaAuthorized(
+    struct wpa_supplicant *wpa_s, const u8 *sta, const u8 *p2p_dev_addr)
+{
+	if (!wpa_s || !sta || !p2p_dev_addr)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantP2pIfaceCallback::onStaAuthorized,
+			       std::placeholders::_1, sta, p2p_dev_addr));
+}
+
+void HidlManager::notifyApStaDeauthorized(
+    struct wpa_supplicant *wpa_s, const u8 *sta, const u8 *p2p_dev_addr)
+{
+	if (!wpa_s || !sta || !p2p_dev_addr)
+		return;
+
+	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
+	    p2p_iface_object_map_.end())
+		return;
+
+	callWithEachP2pIfaceCallback(
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantP2pIfaceCallback::onStaDeauthorized,
+			       std::placeholders::_1, sta, p2p_dev_addr));
+}
+
 void HidlManager::notifyExtRadioWorkStart(
     struct wpa_supplicant *wpa_s, uint32_t id)
 {
 	if (!wpa_s)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
 	callWithEachStaIfaceCallback(
@@ -860,8 +1267,8 @@ void HidlManager::notifyExtRadioWorkTimeout(
 	if (!wpa_s)
 		return;
 
-	const std::string ifname(wpa_s->ifname);
-	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+	if (sta_iface_object_map_.find(wpa_s->ifname) ==
+	    sta_iface_object_map_.end())
 		return;
 
 	callWithEachStaIfaceCallback(

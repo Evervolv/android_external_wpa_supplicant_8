@@ -76,11 +76,50 @@ public:
 	    const char *url);
 	void notifyDisconnectReason(struct wpa_supplicant *wpa_s);
 	void notifyAssocReject(struct wpa_supplicant *wpa_s);
+	void notifyAuthTimeout(struct wpa_supplicant *wpa_s);
 	void notifyWpsEventFail(
 	    struct wpa_supplicant *wpa_s, uint8_t *peer_macaddr,
 	    uint16_t config_error, uint16_t error_indication);
 	void notifyWpsEventSuccess(struct wpa_supplicant *wpa_s);
 	void notifyWpsEventPbcOverlap(struct wpa_supplicant *wpa_s);
+	void notifyP2pDeviceFound(
+	    struct wpa_supplicant *wpa_s, const u8 *addr,
+	    const struct p2p_peer_info *info, const u8 *peer_wfd_device_info,
+	    u8 peer_wfd_device_info_len);
+	void notifyP2pDeviceLost(
+	    struct wpa_supplicant *wpa_s, const u8 *p2p_device_addr);
+	void notifyP2pFindStopped(struct wpa_supplicant *wpa_s);
+	void notifyP2pGoNegReq(
+	    struct wpa_supplicant *wpa_s, const u8 *src_addr, u16 dev_passwd_id,
+	    u8 go_intent);
+	void notifyP2pGoNegCompleted(
+	    struct wpa_supplicant *wpa_s, const struct p2p_go_neg_results *res);
+	void notifyP2pGroupFormationFailure(
+	    struct wpa_supplicant *wpa_s, const char *reason);
+	void notifyP2pGroupStarted(
+	    struct wpa_supplicant *wpa_group_s, const struct wpa_ssid *ssid,
+	    int persistent, int client, const u8 *ip);
+	void notifyP2pGroupRemoved(
+	    struct wpa_supplicant *wpa_group_s, const struct wpa_ssid *ssid,
+	    const char *role);
+	void notifyP2pInvitationReceived(
+	    struct wpa_supplicant *wpa_s, const u8 *sa, const u8 *go_dev_addr,
+	    const u8 *bssid, int id, int op_freq);
+	void notifyP2pInvitationResult(
+	    struct wpa_supplicant *wpa_s, int status, const u8 *bssid);
+	void notifyP2pProvisionDiscovery(
+	    struct wpa_supplicant *wpa_s, const u8 *dev_addr, int request,
+	    enum p2p_prov_disc_status status, u16 config_methods,
+	    unsigned int generated_pin);
+	void notifyP2pSdResponse(
+	    struct wpa_supplicant *wpa_s, const u8 *sa, u16 update_indic,
+	    const u8 *tlvs, size_t tlvs_len);
+	void notifyApStaAuthorized(
+	    struct wpa_supplicant *wpa_s, const u8 *sta,
+	    const u8 *p2p_dev_addr);
+	void notifyApStaDeauthorized(
+	    struct wpa_supplicant *wpa_s, const u8 *sta,
+	    const u8 *p2p_dev_addr);
 
 	// Methods called from hidl objects.
 	void notifyExtRadioWorkStart(struct wpa_supplicant *wpa_s, uint32_t id);
