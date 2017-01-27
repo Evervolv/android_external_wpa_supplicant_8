@@ -89,7 +89,9 @@ void wpas_notify_sta_authorized(struct wpa_supplicant *wpa_s,
 				const u8 *p2p_dev_addr);
 void wpas_notify_p2p_find_stopped(struct wpa_supplicant *wpa_s);
 void wpas_notify_p2p_device_found(struct wpa_supplicant *wpa_s,
-				  const u8 *dev_addr, int new_device);
+				 const u8 *addr, const struct p2p_peer_info *info,
+				 const u8* peer_wfd_device_info, u8 peer_wfd_device_info_len,
+				 int new_device);
 void wpas_notify_p2p_device_lost(struct wpa_supplicant *wpa_s,
 				 const u8 *dev_addr);
 void wpas_notify_p2p_group_removed(struct wpa_supplicant *wpa_s,
