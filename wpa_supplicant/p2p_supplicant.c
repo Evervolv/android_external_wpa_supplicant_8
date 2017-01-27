@@ -2289,6 +2289,8 @@ static void wpas_dev_found(void *ctx, const u8 *addr,
 			   const struct p2p_peer_info *info,
 			   int new_device)
 {
+	u8 *wfd_dev_info = NULL;
+	u8 wfd_dev_info_len = 0;
 #ifndef CONFIG_NO_STDOUT_DEBUG
 	struct wpa_supplicant *wpa_s = ctx;
 	char devtype[WPS_DEV_TYPE_BUFSIZE];
@@ -2297,6 +2299,12 @@ static void wpas_dev_found(void *ctx, const u8 *addr,
 #ifdef CONFIG_WIFI_DISPLAY
 	wfd_dev_info_hex = wifi_display_subelem_hex(info->wfd_subelems,
 						    WFD_SUBELEM_DEVICE_INFO);
+	if (wfd_dev_info_hex) {
+		wfd_dev_info_len = strlen(wfd_dev_info_hex) / 2;
+		wfd_dev_info = os_zalloc(wfd_dev_info_len);
+		// Only used for notification, so not handling error.
+		hexstr2bin(wfd_dev_info_hex, wfd_dev_info, wfd_dev_info_len);
+	}
 #endif /* CONFIG_WIFI_DISPLAY */
 
 	if (info->p2ps_instance) {
@@ -2363,7 +2371,9 @@ done:
 	os_free(wfd_dev_info_hex);
 #endif /* CONFIG_NO_STDOUT_DEBUG */
 
-	wpas_notify_p2p_device_found(ctx, info->p2p_device_addr, new_device);
+	wpas_notify_p2p_device_found(ctx, addr, info, wfd_dev_info,
+				     wfd_dev_info_len, new_device);
+	os_free(wfd_dev_info);
 }
 
 
