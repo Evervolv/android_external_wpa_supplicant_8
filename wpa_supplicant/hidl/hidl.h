@@ -48,6 +48,7 @@ void wpas_hidl_notify_hs20_rx_deauth_imminent_notice(
     struct wpa_supplicant *wpa_s, u8 code, u16 reauth_delay, const char *url);
 void wpas_hidl_notify_disconnect_reason(struct wpa_supplicant *wpa_s);
 void wpas_hidl_notify_assoc_reject(struct wpa_supplicant *wpa_s);
+void wpas_hidl_notify_auth_timeout(struct wpa_supplicant *wpa_s);
 void wpas_hidl_notify_wps_event_fail(
     struct wpa_supplicant *wpa_s, uint8_t *peer_macaddr, uint16_t config_error,
     uint16_t error_indication);
@@ -138,6 +139,7 @@ static void wpas_hidl_notify_hs20_rx_deauth_imminent_notice(
 }
 static void wpas_hidl_notify_disconnect_reason(struct wpa_supplicant *wpa_s) {}
 static void wpas_hidl_notify_assoc_reject(struct wpa_supplicant *wpa_s) {}
+static void wpas_hidl_notify_auth_timeout(struct wpa_supplicant *wpa_s) {}
 static void wpas_hidl_notify_wps_event_fail(
     struct wpa_supplicant *wpa_s, uint8_t *peer_macaddr, uint16_t config_error,
     uint16_t error_indication)

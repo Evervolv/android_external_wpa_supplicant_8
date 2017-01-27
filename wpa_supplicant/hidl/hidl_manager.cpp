@@ -769,6 +769,29 @@ void HidlManager::notifyAssocReject(struct wpa_supplicant *wpa_s)
 		std::placeholders::_1, bssid, wpa_s->assoc_status_code));
 }
 
+void HidlManager::notifyAuthTimeout(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	const u8 *bssid = wpa_s->bssid;
+	if (is_zero_ether_addr(bssid)) {
+		bssid = wpa_s->pending_bssid;
+	}
+	std::array<uint8_t, ETH_ALEN> hidl_bssid;
+	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname,
+	    std::bind(
+		&ISupplicantStaIfaceCallback::onAuthenticationTimeout,
+		std::placeholders::_1, hidl_bssid));
+}
+
 void HidlManager::notifyWpsEventFail(
     struct wpa_supplicant *wpa_s, uint8_t *peer_macaddr, uint16_t config_error,
     uint16_t error_indication)

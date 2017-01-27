@@ -159,6 +159,12 @@ void wpas_notify_assoc_status_code(struct wpa_supplicant *wpa_s)
 	wpas_hidl_notify_assoc_reject(wpa_s);
 }
 
+void wpas_notify_auth_timeout(struct wpa_supplicant *wpa_s) {
+	if (wpa_s->p2p_mgmt)
+		return;
+
+	wpas_hidl_notify_auth_timeout(wpa_s);
+}
 
 void wpas_notify_network_changed(struct wpa_supplicant *wpa_s)
 {

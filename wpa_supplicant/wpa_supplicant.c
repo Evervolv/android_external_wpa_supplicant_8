@@ -202,6 +202,7 @@ static void wpa_supplicant_timeout(void *eloop_ctx, void *timeout_ctx)
 	wpa_sm_notify_disassoc(wpa_s->wpa);
 	wpa_supplicant_deauthenticate(wpa_s, WLAN_REASON_DEAUTH_LEAVING);
 	wpa_s->reassociate = 1;
+	wpas_notify_auth_timeout(wpa_s);
 
 	/*
 	 * If we timed out, the AP or the local radio may be busy.
