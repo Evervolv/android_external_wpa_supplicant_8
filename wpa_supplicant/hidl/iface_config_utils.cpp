@@ -15,10 +15,10 @@
 
 namespace {
 constexpr uint32_t kMaxWpsDeviceNameSize = WPS_DEV_NAME_MAX_LEN;
-constexpr uint32_t kMaxWpsManufacturerSize = 64;
-constexpr uint32_t kMaxWpsModelNameSize = 32;
-constexpr uint32_t kMaxWpsModelNumberSize = 32;
-constexpr uint32_t kMaxWpsSerialNumberSize = 32;
+constexpr uint32_t kMaxWpsManufacturerSize = WPS_MANUFACTURER_MAX_LEN;
+constexpr uint32_t kMaxWpsModelNameSize = WPS_MODEL_NAME_MAX_LEN;
+constexpr uint32_t kMaxWpsModelNumberSize = WPS_MODEL_NUMBER_MAX_LEN;
+constexpr uint32_t kMaxWpsSerialNumberSize = WPS_SERIAL_NUMBER_MAX_LEN;
 
 void processConfigUpdate(struct wpa_supplicant* wpa_s, uint32_t changed_param)
 {
