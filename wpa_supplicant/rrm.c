@@ -160,12 +160,6 @@ int wpas_rrm_send_neighbor_rep_request(struct wpa_supplicant *wpa_s,
 		return -EOPNOTSUPP;
 	}
 
-	if (!cb) {
-		wpa_printf(MSG_DEBUG,
-			   "RRM: Neighbor Report request must provide a callback.");
-		return -EINVAL;
-	}
-
 	/* Refuse if there's a live request */
 	if (wpa_s->rrm.notify_neighbor_rep) {
 		wpa_printf(MSG_DEBUG,
@@ -284,20 +278,20 @@ int wpas_rrm_send_neighbor_rep_request(struct wpa_supplicant *wpa_s,
 }
 
 
-static int wpas_rrm_report_elem(struct wpabuf *buf, u8 token, u8 mode, u8 type,
+static int wpas_rrm_report_elem(struct wpabuf **buf, u8 token, u8 mode, u8 type,
 				const u8 *data, size_t data_len)
 {
-	if (wpabuf_tailroom(buf) < 5 + data_len)
+	if (wpabuf_resize(buf, 5 + data_len))
 		return -1;
 
-	wpabuf_put_u8(buf, WLAN_EID_MEASURE_REPORT);
-	wpabuf_put_u8(buf, 3 + data_len);
-	wpabuf_put_u8(buf, token);
-	wpabuf_put_u8(buf, mode);
-	wpabuf_put_u8(buf, type);
+	wpabuf_put_u8(*buf, WLAN_EID_MEASURE_REPORT);
+	wpabuf_put_u8(*buf, 3 + data_len);
+	wpabuf_put_u8(*buf, token);
+	wpabuf_put_u8(*buf, mode);
+	wpabuf_put_u8(*buf, type);
 
 	if (data_len)
-		wpabuf_put_data(buf, data, data_len);
+		wpabuf_put_data(*buf, data, data_len);
 
 	return 0;
 }
@@ -350,10 +344,7 @@ wpas_rrm_build_lci_report(struct wpa_supplicant *wpa_s,
 	if (max_age != 0xffff && max_age < diff_l)
 		goto reject;
 
-	if (wpabuf_resize(buf, 5 + wpabuf_len(wpa_s->lci)))
-		return -1;
-
-	if (wpas_rrm_report_elem(*buf, req->token,
+	if (wpas_rrm_report_elem(buf, req->token,
 				 MEASUREMENT_REPORT_MODE_ACCEPT, req->type,
 				 wpabuf_head_u8(wpa_s->lci),
 				 wpabuf_len(wpa_s->lci)) < 0) {
@@ -364,12 +355,7 @@ wpas_rrm_build_lci_report(struct wpa_supplicant *wpa_s,
 	return 0;
 
 reject:
-	if (wpabuf_resize(buf, sizeof(struct rrm_measurement_report_element))) {
-		wpa_printf(MSG_DEBUG, "RRM: Memory allocation failed");
-		return -1;
-	}
-
-	if (wpas_rrm_report_elem(*buf, req->token,
+	if (wpas_rrm_report_elem(buf, req->token,
 				 MEASUREMENT_REPORT_MODE_REJECT_INCAPABLE,
 				 req->type, NULL, 0) < 0) {
 		wpa_printf(MSG_DEBUG, "RRM: Failed to add report element");
@@ -438,6 +424,12 @@ static int wpas_add_channel(u8 op_class, u8 chan, u8 num_primary_channels,
 		u8 primary_chan = chan - (2 * num_primary_channels - 2) + i * 4;
 
 		freqs[i] = ieee80211_chan_to_freq(NULL, op_class, primary_chan);
+		/* ieee80211_chan_to_freq() is not really meant for this
+		 * conversion of 20 MHz primary channel numbers for wider VHT
+		 * channels, so handle those as special cases here for now. */
+		if (freqs[i] < 0 &&
+		    (op_class == 128 || op_class == 129 || op_class == 130))
+			freqs[i] = 5000 + 5 * primary_chan;
 		if (freqs[i] < 0) {
 			wpa_printf(MSG_DEBUG,
 				   "Beacon Report: Invalid channel %u",
@@ -641,8 +633,8 @@ static int * wpas_beacon_request_freqs(struct wpa_supplicant *wpa_s,
 }
 
 
-int wpas_get_op_chan_phy(int freq, const u8 *ies, size_t ies_len,
-			 u8 *op_class, u8 *chan, u8 *phy_type)
+static int wpas_get_op_chan_phy(int freq, const u8 *ies, size_t ies_len,
+				u8 *op_class, u8 *chan, u8 *phy_type)
 {
 	const u8 *ie;
 	int sec_chan = 0, vht = 0;
@@ -832,14 +824,7 @@ static int wpas_add_beacon_rep(struct wpa_supplicant *wpa_s,
 	if (ret < 0)
 		return -1;
 
-	if (wpabuf_resize(wpa_buf,
-			  sizeof(struct rrm_measurement_report_element) +
-			  sizeof(*rep) + ret)) {
-		wpa_printf(MSG_ERROR, "RRM: Memory allocation failed");
-		return -1;
-	}
-
-	return wpas_rrm_report_elem(*wpa_buf, wpa_s->beacon_rep_data.token,
+	return wpas_rrm_report_elem(wpa_buf, wpa_s->beacon_rep_data.token,
 				    MEASUREMENT_REPORT_MODE_ACCEPT,
 				    MEASURE_TYPE_BEACON, buf,
 				    ret + sizeof(*rep));
@@ -849,12 +834,7 @@ static int wpas_add_beacon_rep(struct wpa_supplicant *wpa_s,
 static int wpas_beacon_rep_no_results(struct wpa_supplicant *wpa_s,
 				      struct wpabuf **buf)
 {
-	if (wpabuf_resize(buf, 5)) {
-		wpa_printf(MSG_DEBUG, "RRM: Memory allocation failed");
-		return -1;
-	}
-
-	return wpas_rrm_report_elem(*buf, wpa_s->beacon_rep_data.token,
+	return wpas_rrm_report_elem(buf, wpa_s->beacon_rep_data.token,
 				    MEASUREMENT_REPORT_MODE_ACCEPT,
 				    MEASURE_TYPE_BEACON, NULL, 0);
 }
@@ -880,11 +860,9 @@ static void wpas_beacon_rep_table(struct wpa_supplicant *wpa_s,
 
 static void wpas_rrm_refuse_request(struct wpa_supplicant *wpa_s)
 {
-	struct wpabuf *buf;
+	struct wpabuf *buf = NULL;
 
-	buf = wpabuf_alloc(sizeof(struct rrm_measurement_beacon_report));
-	if (!buf ||
-	    wpas_rrm_report_elem(buf, wpa_s->beacon_rep_data.token,
+	if (wpas_rrm_report_elem(&buf, wpa_s->beacon_rep_data.token,
 				 MEASUREMENT_REPORT_MODE_REJECT_REFUSED,
 				 MEASURE_TYPE_BEACON, NULL, 0)) {
 		wpa_printf(MSG_ERROR, "RRM: Memory allocation failed");
@@ -1174,12 +1152,7 @@ wpas_rrm_handle_msr_req_element(
 	}
 
 reject:
-	if (wpabuf_resize(buf, sizeof(struct rrm_measurement_report_element))) {
-		wpa_printf(MSG_DEBUG, "RRM: Memory allocation failed");
-		return -1;
-	}
-
-	if (wpas_rrm_report_elem(*buf, req->token,
+	if (wpas_rrm_report_elem(buf, req->token,
 				 MEASUREMENT_REPORT_MODE_REJECT_INCAPABLE,
 				 req->type, NULL, 0) < 0) {
 		wpa_printf(MSG_DEBUG, "RRM: Failed to add report element");
@@ -1311,10 +1284,14 @@ void wpas_rrm_handle_link_measurement_request(struct wpa_supplicant *wpa_s,
 	}
 
 	os_memset(&report, 0, sizeof(report));
+	report.dialog_token = req->dialog_token;
 	report.tpc.eid = WLAN_EID_TPC_REPORT;
 	report.tpc.len = 2;
+	/* Note: The driver is expected to update report.tpc.tx_power and
+	 * report.tpc.link_margin subfields when sending out this frame.
+	 * Similarly, the driver would need to update report.rx_ant_id and
+	 * report.tx_ant_id subfields. */
 	report.rsni = 255; /* 255 indicates that RSNI is not available */
-	report.dialog_token = req->dialog_token;
 	report.rcpi = rssi_to_rcpi(rssi);
 
 	/* action_category + action_code */
@@ -1328,8 +1305,7 @@ void wpas_rrm_handle_link_measurement_request(struct wpa_supplicant *wpa_s,
 	wpabuf_put_u8(buf, WLAN_ACTION_RADIO_MEASUREMENT);
 	wpabuf_put_u8(buf, WLAN_RRM_LINK_MEASUREMENT_REPORT);
 	wpabuf_put_data(buf, &report, sizeof(report));
-	wpa_hexdump(MSG_DEBUG, "RRM: Link measurement report:",
-		    wpabuf_head(buf), wpabuf_len(buf));
+	wpa_hexdump_buf(MSG_DEBUG, "RRM: Link measurement report", buf);
 
 	if (wpa_drv_send_action(wpa_s, wpa_s->assoc_freq, 0, src,
 				wpa_s->own_addr, wpa_s->bssid,

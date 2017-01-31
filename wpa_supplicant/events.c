@@ -1,6 +1,6 @@
 /*
  * WPA Supplicant - Driver event processing
- * Copyright (c) 2003-2015, Jouni Malinen <j@w1.fi>
+ * Copyright (c) 2003-2017, Jouni Malinen <j@w1.fi>
  *
  * This software may be distributed under the terms of the BSD license.
  * See README for more details.
@@ -2585,7 +2585,7 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 		struct os_reltime now, age;
 		os_get_reltime(&now);
 		os_reltime_sub(&now, &wpa_s->pending_eapol_rx_time, &age);
-		if (age.sec == 0 && age.usec < 100000 &&
+		if (age.sec == 0 && age.usec < 200000 &&
 		    os_memcmp(wpa_s->pending_eapol_rx_src, bssid, ETH_ALEN) ==
 		    0) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "Process pending EAPOL "
@@ -4319,12 +4319,14 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 #endif /* CONFIG_AP */
 		break;
 	case EVENT_ACS_CHANNEL_SELECTED:
+#ifdef CONFIG_AP
 #ifdef CONFIG_ACS
 		if (!wpa_s->ap_iface)
 			break;
 		hostapd_acs_channel_selected(wpa_s->ap_iface->bss[0],
 					     &data->acs_selected_channels);
 #endif /* CONFIG_ACS */
+#endif /* CONFIG_AP */
 		break;
 	case EVENT_P2P_LO_STOP:
 #ifdef CONFIG_P2P
@@ -4333,6 +4335,12 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			P2P_LISTEN_OFFLOAD_STOP_REASON "reason=%d",
 			data->p2p_lo_stop.reason_code);
 #endif /* CONFIG_P2P */
+		break;
+	case EVENT_BEACON_LOSS:
+		if (!wpa_s->current_bss || !wpa_s->current_ssid)
+			break;
+		wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_BEACON_LOSS);
+		bgscan_notify_beacon_loss(wpa_s);
 		break;
 	default:
 		wpa_msg(wpa_s, MSG_INFO, "Unknown event %d", event);
