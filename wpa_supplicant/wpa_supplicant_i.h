@@ -461,17 +461,6 @@ struct beacon_rep_data {
 };
 
 
-struct external_pmksa_cache {
-	struct dl_list list;
-	void *pmksa_cache;
-};
-
-struct fils_hlp_req {
-	struct dl_list list;
-	u8 dst[ETH_ALEN];
-	struct wpabuf *pkt;
-};
-
 /**
  * struct wpa_supplicant - Internal data for wpa_supplicant interface
  *
@@ -753,7 +742,7 @@ struct wpa_supplicant {
 		u8 ssid[SSID_MAX_LEN];
 		size_t ssid_len;
 		int freq;
-		u8 assoc_req_ie[1500];
+		u8 assoc_req_ie[300];
 		size_t assoc_req_ie_len;
 		int mfp;
 		int ft_used;
@@ -802,10 +791,6 @@ struct wpa_supplicant {
 	unsigned int mesh_if_created:1;
 	unsigned int mesh_ht_enabled:1;
 	unsigned int mesh_vht_enabled:1;
-#ifdef CONFIG_PMKSA_CACHE_EXTERNAL
-	/* struct external_pmksa_cache::list */
-	struct dl_list mesh_external_pmksa_cache;
-#endif /* CONFIG_PMKSA_CACHE_EXTERNAL */
 #endif /* CONFIG_MESH */
 
 	unsigned int off_channel_freq;
@@ -1109,9 +1094,6 @@ struct wpa_supplicant {
 	struct os_reltime lci_time;
 
 	struct os_reltime beacon_rep_scan;
-
-	/* FILS HLP requests (struct fils_hlp_req) */
-	struct dl_list fils_hlp_req;
 };
 
 
@@ -1236,7 +1218,6 @@ int wpas_beacon_rep_scan_process(struct wpa_supplicant *wpa_s,
 				 struct wpa_scan_results *scan_res,
 				 struct scan_info *info);
 void wpas_clear_beacon_rep_data(struct wpa_supplicant *wpa_s);
-void wpas_flush_fils_hlp_req(struct wpa_supplicant *wpa_s);
 
 
 /* MBO functions */
