@@ -13,7 +13,7 @@
 #ifdef CONFIG_DEBUG_SYSLOG
 #include <syslog.h>
 
-int wpa_debug_syslog = 0;
+static int wpa_debug_syslog = 0;
 #endif /* CONFIG_DEBUG_SYSLOG */
 
 #ifdef CONFIG_DEBUG_LINUX_TRACING
