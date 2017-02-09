@@ -279,7 +279,10 @@ void callWithEachIfaceCallback(
 		return;
 	const auto &iface_callback_list = iface_callback_map_iter->second;
 	for (const auto &callback : iface_callback_list) {
-		method(callback);
+		if (!method(callback).isOk()) {
+			wpa_printf(
+			    MSG_ERROR, "Failed to invoke HIDL iface callback");
+		}
 	}
 }
 
@@ -302,7 +305,11 @@ void callWithEachNetworkCallback(
 		return;
 	const auto &network_callback_list = network_callback_map_iter->second;
 	for (const auto &callback : network_callback_list) {
-		method(callback);
+		if (!method(callback).isOk()) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Failed to invoke HIDL network callback");
+		}
 	}
 }
 
@@ -1583,7 +1590,9 @@ void HidlManager::callWithEachSupplicantCallback(
     const std::function<Return<void>(android::sp<ISupplicantCallback>)> &method)
 {
 	for (const auto &callback : supplicant_callbacks_) {
-		method(callback);
+		if (!method(callback).isOk()) {
+			wpa_printf(MSG_ERROR, "Failed to invoke HIDL callback");
+		}
 	}
 }
 
