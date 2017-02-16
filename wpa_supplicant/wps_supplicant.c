@@ -2210,7 +2210,7 @@ void wpas_wps_update_config(struct wpa_supplicant *wpa_s)
 #ifdef CONFIG_WPS_NFC
 
 #ifdef CONFIG_WPS_ER
-static struct wpabuf *
+struct wpabuf *
 wpas_wps_network_config_token(struct wpa_supplicant *wpa_s, int ndef,
 			      struct wpa_ssid *ssid)
 {
