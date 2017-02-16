@@ -10,6 +10,7 @@
 #include "hidl_manager.h"
 #include "hidl_return_util.h"
 #include "iface_config_utils.h"
+#include "misc_utils.h"
 #include "p2p_iface.h"
 
 extern "C" {
@@ -462,6 +463,38 @@ Return<void> P2pIface::setWfdDeviceInfo(
 	    &P2pIface::setWfdDeviceInfoInternal, _hidl_cb, info);
 }
 
+Return<void> P2pIface::createNfcHandoverRequestMessage(
+    createNfcHandoverRequestMessage_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::createNfcHandoverRequestMessageInternal, _hidl_cb);
+}
+
+Return<void> P2pIface::createNfcHandoverSelectMessage(
+    createNfcHandoverSelectMessage_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::createNfcHandoverSelectMessageInternal, _hidl_cb);
+}
+
+Return<void> P2pIface::reportNfcHandoverResponse(
+    const hidl_vec<uint8_t>& request, reportNfcHandoverResponse_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::reportNfcHandoverResponseInternal, _hidl_cb, request);
+}
+
+Return<void> P2pIface::reportNfcHandoverInitiation(
+    const hidl_vec<uint8_t>& select, reportNfcHandoverInitiation_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::reportNfcHandoverInitiationInternal, _hidl_cb, select);
+}
+
 std::pair<SupplicantStatus, std::string> P2pIface::getNameInternal()
 {
 	return {{SupplicantStatusCode::SUCCESS, ""}, ifname_};
@@ -878,24 +911,19 @@ SupplicantStatus P2pIface::addBonjourServiceInternal(
     const std::vector<uint8_t>& query, const std::vector<uint8_t>& response)
 {
 	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
-	struct wpabuf* query_buf = wpabuf_alloc(query.size());
-	if (!query_buf) {
+	auto query_buf = misc_utils::convertVectorToWpaBuf(query);
+	auto response_buf = misc_utils::convertVectorToWpaBuf(response);
+	if (!query_buf || !response_buf) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
-	wpabuf_put_data(query_buf, query.data(), query.size());
-
-	struct wpabuf* response_buf = wpabuf_alloc(response.size());
-	if (!query_buf) {
-		wpabuf_free(query_buf);
+	if (wpas_p2p_service_add_bonjour(
+		wpa_s, query_buf.get(), response_buf.get())) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
-	wpabuf_put_data(response_buf, response.data(), response.size());
-
-	if (wpas_p2p_service_add_bonjour(wpa_s, query_buf, response_buf)) {
-		wpabuf_free(query_buf);
-		wpabuf_free(response_buf);
-		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
-	}
+	// If successful, the wpabuf is referenced internally and hence should
+	// not be freed.
+	query_buf.release();
+	response_buf.release();
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
@@ -903,15 +931,11 @@ SupplicantStatus P2pIface::removeBonjourServiceInternal(
     const std::vector<uint8_t>& query)
 {
 	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
-	struct wpabuf* query_buf = wpabuf_alloc(query.size());
+	auto query_buf = misc_utils::convertVectorToWpaBuf(query);
 	if (!query_buf) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
-	wpabuf_put_data(query_buf, query.data(), query.size());
-
-	int ret = wpas_p2p_service_del_bonjour(wpa_s, query_buf);
-	wpabuf_free(query_buf);
-	if (ret) {
+	if (wpas_p2p_service_del_bonjour(wpa_s, query_buf.get())) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
@@ -949,14 +973,12 @@ std::pair<SupplicantStatus, uint64_t> P2pIface::requestServiceDiscoveryInternal(
     const std::vector<uint8_t>& query)
 {
 	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
-	struct wpabuf* query_buf = wpabuf_alloc(query.size());
+	auto query_buf = misc_utils::convertVectorToWpaBuf(query);
 	if (!query_buf) {
 		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
 	}
-	wpabuf_put_data(query_buf, query.data(), query.size());
 	uint64_t identifier =
-	    wpas_p2p_sd_request(wpa_s, peer_address.data(), query_buf);
-	wpabuf_free(query_buf);
+	    wpas_p2p_sd_request(wpa_s, peer_address.data(), query_buf.get());
 	if (identifier == 0) {
 		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
 	}
@@ -1108,7 +1130,7 @@ SupplicantStatus P2pIface::enableWfdInternal(bool enable)
 }
 
 SupplicantStatus P2pIface::setWfdDeviceInfoInternal(
-    const hidl_array<uint8_t, 8>& info)
+    const std::array<uint8_t, 8>& info)
 {
 	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
 	uint32_t wfd_device_info_hex_len = info.size() * 2 + 1;
@@ -1125,6 +1147,64 @@ SupplicantStatus P2pIface::setWfdDeviceInfoInternal(
 		wfd_device_info_set_cmd_str.size() + 1);
 	if (wifi_display_subelem_set(
 		wpa_s->global, wfd_device_info_set_cmd.data())) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+std::pair<SupplicantStatus, std::vector<uint8_t>>
+P2pIface::createNfcHandoverRequestMessageInternal()
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	auto buf = misc_utils::createWpaBufUniquePtr(
+	    wpas_p2p_nfc_handover_req(wpa_s, 1));
+	if (!buf) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		misc_utils::convertWpaBufToVector(buf.get())};
+}
+
+std::pair<SupplicantStatus, std::vector<uint8_t>>
+P2pIface::createNfcHandoverSelectMessageInternal()
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	auto buf = misc_utils::createWpaBufUniquePtr(
+	    wpas_p2p_nfc_handover_sel(wpa_s, 1, 0));
+	if (!buf) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		misc_utils::convertWpaBufToVector(buf.get())};
+}
+
+SupplicantStatus P2pIface::reportNfcHandoverResponseInternal(
+    const std::vector<uint8_t>& request)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	auto req = misc_utils::convertVectorToWpaBuf(request);
+	auto sel = misc_utils::convertVectorToWpaBuf(std::vector<uint8_t>{0});
+	if (!req || !sel) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+
+	if (wpas_p2p_nfc_report_handover(wpa_s, 0, req.get(), sel.get(), 0)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus P2pIface::reportNfcHandoverInitiationInternal(
+    const std::vector<uint8_t>& select)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	auto req = misc_utils::convertVectorToWpaBuf(std::vector<uint8_t>{0});
+	auto sel = misc_utils::convertVectorToWpaBuf(select);
+	if (!req || !sel) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+
+	if (wpas_p2p_nfc_report_handover(wpa_s, 1, req.get(), sel.get(), 0)) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};

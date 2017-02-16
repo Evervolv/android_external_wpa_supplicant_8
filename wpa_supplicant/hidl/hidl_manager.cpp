@@ -11,6 +11,7 @@
 #include <regex>
 
 #include "hidl_manager.h"
+#include "misc_utils.h"
 
 extern "C" {
 #include "src/eap_common/eap_sim_common.h"
@@ -310,16 +311,6 @@ void callWithEachNetworkCallback(
 			    MSG_ERROR,
 			    "Failed to invoke HIDL network callback");
 		}
-	}
-}
-
-std::vector<uint8_t> convertWpaBufToVector(const struct wpabuf *buf)
-{
-	if (buf) {
-		return std::vector<uint8_t>(
-		    wpabuf_head_u8(buf), wpabuf_head_u8(buf) + wpabuf_len(buf));
-	} else {
-		return std::vector<uint8_t>();
 	}
 }
 
@@ -707,26 +698,30 @@ void HidlManager::notifyAnqpQueryDone(
 	ISupplicantStaIfaceCallback::Hs20AnqpData hidl_hs20_anqp_data;
 	if (std::string(result) == "SUCCESS") {
 		hidl_anqp_data.venueName =
-		    convertWpaBufToVector(anqp->venue_name);
+		    misc_utils::convertWpaBufToVector(anqp->venue_name);
 		hidl_anqp_data.roamingConsortium =
-		    convertWpaBufToVector(anqp->roaming_consortium);
+		    misc_utils::convertWpaBufToVector(anqp->roaming_consortium);
 		hidl_anqp_data.ipAddrTypeAvailability =
-		    convertWpaBufToVector(anqp->ip_addr_type_availability);
+		    misc_utils::convertWpaBufToVector(
+			anqp->ip_addr_type_availability);
 		hidl_anqp_data.naiRealm =
-		    convertWpaBufToVector(anqp->nai_realm);
+		    misc_utils::convertWpaBufToVector(anqp->nai_realm);
 		hidl_anqp_data.anqp3gppCellularNetwork =
-		    convertWpaBufToVector(anqp->anqp_3gpp);
+		    misc_utils::convertWpaBufToVector(anqp->anqp_3gpp);
 		hidl_anqp_data.domainName =
-		    convertWpaBufToVector(anqp->domain_name);
+		    misc_utils::convertWpaBufToVector(anqp->domain_name);
 
 		hidl_hs20_anqp_data.operatorFriendlyName =
-		    convertWpaBufToVector(anqp->hs20_operator_friendly_name);
+		    misc_utils::convertWpaBufToVector(
+			anqp->hs20_operator_friendly_name);
 		hidl_hs20_anqp_data.wanMetrics =
-		    convertWpaBufToVector(anqp->hs20_wan_metrics);
+		    misc_utils::convertWpaBufToVector(anqp->hs20_wan_metrics);
 		hidl_hs20_anqp_data.connectionCapability =
-		    convertWpaBufToVector(anqp->hs20_connection_capability);
+		    misc_utils::convertWpaBufToVector(
+			anqp->hs20_connection_capability);
 		hidl_hs20_anqp_data.osuProvidersList =
-		    convertWpaBufToVector(anqp->hs20_osu_providers_list);
+		    misc_utils::convertWpaBufToVector(
+			anqp->hs20_osu_providers_list);
 	}
 
 	callWithEachStaIfaceCallback(

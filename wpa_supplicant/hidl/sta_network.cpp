@@ -9,7 +9,12 @@
 
 #include "hidl_manager.h"
 #include "hidl_return_util.h"
+#include "misc_utils.h"
 #include "sta_network.h"
+
+extern "C" {
+#include "wps_supplicant.h"
+}
 
 namespace {
 using android::hardware::wifi::supplicant::V1_0::ISupplicantStaNetwork;
@@ -50,9 +55,10 @@ constexpr uint32_t kEapMethodMax =
 constexpr char const *kEapMethodStrings[kEapMethodMax] = {
     "PEAP", "TLS", "TTLS", "PWD", "SIM", "AKA", "AKA'", "WFA-UNAUTH-TLS"};
 constexpr uint32_t kEapPhase2MethodMax =
-    static_cast<uint32_t>(ISupplicantStaNetwork::EapPhase2Method::GTC) + 1;
+    static_cast<uint32_t>(ISupplicantStaNetwork::EapPhase2Method::AKA_PRIME) +
+    1;
 constexpr char const *kEapPhase2MethodStrings[kEapPhase2MethodMax] = {
-    "NULL", "PAP", "MSCHAP", "MSCHAPV2", "GTC"};
+    "NULL", "PAP", "MSCHAP", "MSCHAPV2", "GTC", "SIM", "AKA", "AKA'"};
 constexpr char kEapPhase2AuthPrefix[] = "auth=";
 constexpr char kEapPhase2AuthEapPrefix[] = "autheap=";
 constexpr char kNetworkEapSimGsmAuthResponse[] = "GSM-AUTH";
@@ -536,6 +542,14 @@ Return<void> StaNetwork::getIdStr(getIdStr_cb _hidl_cb)
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
 	    &StaNetwork::getIdStrInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getWpsNfcConfigurationToken(
+    getWpsNfcConfigurationToken_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getWpsNfcConfigurationTokenInternal, _hidl_cb);
 }
 
 Return<void> StaNetwork::enable(bool no_connect, enable_cb _hidl_cb)
@@ -1377,6 +1391,20 @@ std::pair<SupplicantStatus, std::string> StaNetwork::getIdStrInternal()
 		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
 	}
 	return {{SupplicantStatusCode::SUCCESS, ""}, {wpa_ssid->id_str}};
+}
+
+std::pair<SupplicantStatus, std::vector<uint8_t>>
+StaNetwork::getWpsNfcConfigurationTokenInternal()
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	auto token_buf = misc_utils::createWpaBufUniquePtr(
+	    wpas_wps_network_config_token(wpa_s, 0, wpa_ssid));
+	if (!token_buf) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		misc_utils::convertWpaBufToVector(token_buf.get())};
 }
 
 SupplicantStatus StaNetwork::enableInternal(bool no_connect)

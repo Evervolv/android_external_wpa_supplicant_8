@@ -157,6 +157,8 @@ public:
 	Return<void> getEapDomainSuffixMatch(
 	    getEapDomainSuffixMatch_cb _hidl_cb) override;
 	Return<void> getIdStr(getIdStr_cb _hidl_cb) override;
+	Return<void> getWpsNfcConfigurationToken(
+	    getWpsNfcConfigurationToken_cb _hidl_cb) override;
 	Return<void> enable(bool no_connect, enable_cb _hidl_cb) override;
 	Return<void> disable(disable_cb _hidl_cb) override;
 	Return<void> select(select_cb _hidl_cb) override;
@@ -260,6 +262,8 @@ private:
 	std::pair<SupplicantStatus, std::string>
 	getEapDomainSuffixMatchInternal();
 	std::pair<SupplicantStatus, std::string> getIdStrInternal();
+	std::pair<SupplicantStatus, std::vector<uint8_t>>
+	getWpsNfcConfigurationTokenInternal();
 	SupplicantStatus enableInternal(bool no_connect);
 	SupplicantStatus disableInternal();
 	SupplicantStatus selectInternal();
