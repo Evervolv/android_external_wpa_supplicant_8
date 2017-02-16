@@ -174,6 +174,16 @@ public:
 	Return<void> setWfdDeviceInfo(
 	    const hidl_array<uint8_t, 8>& info,
 	    setWfdDeviceInfo_cb _hidl_cb) override;
+	Return<void> createNfcHandoverRequestMessage(
+	    createNfcHandoverRequestMessage_cb _hidl_cb) override;
+	Return<void> createNfcHandoverSelectMessage(
+	    createNfcHandoverSelectMessage_cb _hidl_cb) override;
+	Return<void> reportNfcHandoverResponse(
+	    const hidl_vec<uint8_t>& request,
+	    reportNfcHandoverResponse_cb _hidl_cb) override;
+	Return<void> reportNfcHandoverInitiation(
+	    const hidl_vec<uint8_t>& select,
+	    reportNfcHandoverInitiation_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -268,7 +278,15 @@ private:
 	SupplicantStatus setWpsConfigMethodsInternal(uint16_t config_methods);
 	SupplicantStatus enableWfdInternal(bool enable);
 	SupplicantStatus setWfdDeviceInfoInternal(
-	    const hidl_array<uint8_t, 8>& info);
+	    const std::array<uint8_t, 8>& info);
+	std::pair<SupplicantStatus, std::vector<uint8_t>>
+	createNfcHandoverRequestMessageInternal();
+	std::pair<SupplicantStatus, std::vector<uint8_t>>
+	createNfcHandoverSelectMessageInternal();
+	SupplicantStatus reportNfcHandoverResponseInternal(
+	    const std::vector<uint8_t>& request);
+	SupplicantStatus reportNfcHandoverInitiationInternal(
+	    const std::vector<uint8_t>& select);
 
 	struct wpa_supplicant* retrieveIfacePtr();
 	struct wpa_supplicant* retrieveGroupIfacePtr(
