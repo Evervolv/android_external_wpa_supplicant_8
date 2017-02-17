@@ -55,13 +55,13 @@ std::string convertWpsConfigMethodsMaskToString(uint16_t config_methods)
 	      {WpsConfigMethods::INT_NFC_TOKEN, "int_nfc_token"},
 	      {WpsConfigMethods::EXT_NFC_TOKEN, "ext_nfc_token"},
 	      {WpsConfigMethods::NFC_INTERFACE, "nfc_interface"},
-	      {WpsConfigMethods::PUSHBUTTON, "pushbutton"},
+	      {WpsConfigMethods::PUSHBUTTON, "push_button"},
 	      {WpsConfigMethods::KEYPAD, "keypad"},
-	      {WpsConfigMethods::VIRT_PUSHBUTTON, "virt_pushbutton"},
-	      {WpsConfigMethods::PHY_PUSHBUTTON, "phy_pushbutton"},
+	      {WpsConfigMethods::VIRT_PUSHBUTTON, "virtual_push_button"},
+	      {WpsConfigMethods::PHY_PUSHBUTTON, "physical_push_button"},
 	      {WpsConfigMethods::P2PS, "p2ps"},
-	      {WpsConfigMethods::VIRT_DISPLAY, "virt_display"},
-	      {WpsConfigMethods::PHY_DISPLAY, "phy_display"}}) {
+	      {WpsConfigMethods::VIRT_DISPLAY, "virtual_display"},
+	      {WpsConfigMethods::PHY_DISPLAY, "physical_display"}}) {
 		if (config_methods & flag_and_name.first) {
 			config_methods_str += flag_and_name.second;
 			config_methods_str += " ";
