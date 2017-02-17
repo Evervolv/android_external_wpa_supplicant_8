@@ -421,6 +421,19 @@ static void free_bss_tmp_disallowed(struct wpa_supplicant *wpa_s)
 }
 
 
+void wpas_flush_fils_hlp_req(struct wpa_supplicant *wpa_s)
+{
+	struct fils_hlp_req *req;
+
+	while ((req = dl_list_first(&wpa_s->fils_hlp_req, struct fils_hlp_req,
+				    list)) != NULL) {
+		dl_list_del(&req->list);
+		wpabuf_free(req->pkt);
+		os_free(req);
+	}
+}
+
+
 static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 {
 	int i;
@@ -587,6 +600,24 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 	wpabuf_free(wpa_s->lci);
 	wpa_s->lci = NULL;
 	wpas_clear_beacon_rep_data(wpa_s);
+
+#ifdef CONFIG_PMKSA_CACHE_EXTERNAL
+#ifdef CONFIG_MESH
+	{
+		struct external_pmksa_cache *entry;
+
+		while ((entry = dl_list_last(&wpa_s->mesh_external_pmksa_cache,
+					     struct external_pmksa_cache,
+					     list)) != NULL) {
+			dl_list_del(&entry->list);
+			os_free(entry->pmksa_cache);
+			os_free(entry);
+		}
+	}
+#endif /* CONFIG_MESH */
+#endif /* CONFIG_PMKSA_CACHE_EXTERNAL */
+
+	wpas_flush_fils_hlp_req(wpa_s);
 }
 
 
@@ -2040,6 +2071,13 @@ void ibss_mesh_setup_freq(struct wpa_supplicant *wpa_s,
 		return;
 
 	vht_freq = *freq;
+
+#ifdef CONFIG_VHT_OVERRIDES
+	if (ssid->disable_vht) {
+		freq->vht_enabled = 0;
+		return;
+	}
+#endif /* CONFIG_VHT_OVERRIDES */
 
 	vht_freq.vht_enabled = vht_supported(mode);
 	if (!vht_freq.vht_enabled)
@@ -3704,6 +3742,7 @@ wpa_supplicant_alloc(struct wpa_supplicant *parent)
 	wpa_s->sched_scanning = 0;
 
 	dl_list_init(&wpa_s->bss_tmp_disallowed);
+	dl_list_init(&wpa_s->fils_hlp_req);
 
 	return wpa_s;
 }
@@ -3731,8 +3770,11 @@ static int wpa_set_htcap_mcs(struct wpa_supplicant *wpa_s,
 	wpa_msg(wpa_s, MSG_DEBUG, "set_htcap, ht_mcs -:%s:-", ht_mcs);
 
 	for (i = 0; i < IEEE80211_HT_MCS_MASK_LEN; i++) {
+		long v;
+
 		errno = 0;
-		long v = strtol(tmp, &end, 16);
+		v = strtol(tmp, &end, 16);
+
 		if (errno == 0) {
 			wpa_msg(wpa_s, MSG_DEBUG,
 				"htcap value[%i]: %ld end: %p  tmp: %p",
@@ -3842,18 +3884,10 @@ static int wpa_set_disable_ht40(struct wpa_supplicant *wpa_s,
 				struct ieee80211_ht_capabilities *htcaps_mask,
 				int disabled)
 {
-	/* Masking these out disables HT40 */
-	le16 msk = host_to_le16(HT_CAP_INFO_SUPP_CHANNEL_WIDTH_SET |
-				HT_CAP_INFO_SHORT_GI40MHZ);
-
 	wpa_msg(wpa_s, MSG_DEBUG, "set_disable_ht40: %d", disabled);
 
-	if (disabled)
-		htcaps->ht_capabilities_info &= ~msk;
-	else
-		htcaps->ht_capabilities_info |= msk;
-
-	htcaps_mask->ht_capabilities_info |= msk;
+	set_disable_ht40(htcaps, disabled);
+	set_disable_ht40(htcaps_mask, 0);
 
 	return 0;
 }
@@ -4129,10 +4163,14 @@ static int wpas_fst_send_action_cb(void *ctx, const u8 *da, struct wpabuf *data)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
-	WPA_ASSERT(os_memcmp(wpa_s->bssid, da, ETH_ALEN) == 0);
+	if (os_memcmp(wpa_s->bssid, da, ETH_ALEN) != 0) {
+		wpa_printf(MSG_INFO, "FST:%s:bssid=" MACSTR " != da=" MACSTR,
+			   __func__, MAC2STR(wpa_s->bssid), MAC2STR(da));
+		return -1;
+	}
 	return wpa_drv_send_action(wpa_s, wpa_s->assoc_freq, 0, wpa_s->bssid,
-					  wpa_s->own_addr, wpa_s->bssid,
-					  wpabuf_head(data), wpabuf_len(data),
+				   wpa_s->own_addr, wpa_s->bssid,
+				   wpabuf_head(data), wpabuf_len(data),
 				   0);
 }
 
@@ -4978,6 +5016,12 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 	if (wpa_bss_init(wpa_s) < 0)
 		return -1;
 
+#ifdef CONFIG_PMKSA_CACHE_EXTERNAL
+#ifdef CONFIG_MESH
+	dl_list_init(&wpa_s->mesh_external_pmksa_cache);
+#endif /* CONFIG_MESH */
+#endif /* CONFIG_PMKSA_CACHE_EXTERNAL */
+
 	/*
 	 * Set Wake-on-WLAN triggers, if configured.
 	 * Note: We don't restore/remove the triggers on shutdown (it doesn't
@@ -5316,7 +5360,7 @@ int wpa_supplicant_remove_iface(struct wpa_global *global,
 
 #ifdef CONFIG_MESH
 	if (mesh_if_created) {
-		wpa_drv_if_remove(global->ifaces, WPA_IF_MESH, ifname);
+		wpa_drv_if_remove(wpa_s->parent, WPA_IF_MESH, ifname);
 		os_free(ifname);
 	}
 #endif /* CONFIG_MESH */
