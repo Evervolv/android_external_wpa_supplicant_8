@@ -991,6 +991,9 @@ dbus_bool_t wpas_dbus_getter_global_capabilities(
 #ifdef CONFIG_INTERWORKING
 	capabilities[num_items++] = "interworking";
 #endif /* CONFIG_INTERWORKING */
+#ifdef CONFIG_IEEE80211W
+	capabilities[num_items++] = "pmf";
+#endif /* CONFIG_IEEE80211W */
 
 	return wpas_dbus_simple_array_property_getter(iter,
 						      DBUS_TYPE_STRING,
@@ -2489,6 +2492,28 @@ dbus_bool_t wpas_dbus_getter_capabilities(
 			goto nomem;
 	}
 
+	if (!wpa_dbus_dict_begin_string_array(&iter_dict, "GroupMgmt",
+					      &iter_dict_entry,
+					      &iter_dict_val,
+					      &iter_array) ||
+	    (res == 0 && (capa.enc & WPA_DRIVER_CAPA_ENC_BIP) &&
+	     !wpa_dbus_dict_string_array_add_element(
+		     &iter_array, "aes-128-cmac")) ||
+	    (res == 0 && (capa.enc & WPA_DRIVER_CAPA_ENC_BIP_GMAC_128) &&
+	     !wpa_dbus_dict_string_array_add_element(
+		     &iter_array, "bip-gmac-128")) ||
+	    (res == 0 && (capa.enc & WPA_DRIVER_CAPA_ENC_BIP_GMAC_256) &&
+	     !wpa_dbus_dict_string_array_add_element(
+		     &iter_array, "bip-gmac-256")) ||
+	    (res == 0 && (capa.enc & WPA_DRIVER_CAPA_ENC_BIP_CMAC_256) &&
+	     !wpa_dbus_dict_string_array_add_element(
+		     &iter_array, "bip-cmac-256")) ||
+	    !wpa_dbus_dict_end_string_array(&iter_dict,
+					    &iter_dict_entry,
+					    &iter_dict_val,
+					    &iter_array))
+		goto nomem;
+
 	/***** key management */
 	if (res < 0) {
 		const char *args[] = {
@@ -2785,6 +2810,61 @@ dbus_bool_t wpas_dbus_setter_ap_scan(
 	}
 	return TRUE;
 }
+
+
+#ifdef CONFIG_IEEE80211W
+
+/**
+ * wpas_dbus_getter_pmf - Control PMF default
+ * @iter: Pointer to incoming dbus message iter
+ * @error: Location to store error on failure
+ * @user_data: Function specific data
+ * Returns: TRUE on success, FALSE on failure
+ *
+ * Getter function for "Pmf" property.
+ */
+dbus_bool_t wpas_dbus_getter_pmf(
+	const struct wpa_dbus_property_desc *property_desc,
+	DBusMessageIter *iter, DBusError *error, void *user_data)
+{
+	struct wpa_supplicant *wpa_s = user_data;
+	dbus_uint32_t pmf = wpa_s->conf->pmf;
+
+	return wpas_dbus_simple_property_getter(iter, DBUS_TYPE_UINT32,
+						&pmf, error);
+}
+
+
+/**
+ * wpas_dbus_setter_pmf - Control PMF default
+ * @iter: Pointer to incoming dbus message iter
+ * @error: Location to store error on failure
+ * @user_data: Function specific data
+ * Returns: TRUE on success, FALSE on failure
+ *
+ * Setter function for "Pmf" property.
+ */
+dbus_bool_t wpas_dbus_setter_pmf(
+	const struct wpa_dbus_property_desc *property_desc,
+	DBusMessageIter *iter, DBusError *error, void *user_data)
+{
+	struct wpa_supplicant *wpa_s = user_data;
+	dbus_uint32_t pmf;
+
+	if (!wpas_dbus_simple_property_setter(iter, error, DBUS_TYPE_UINT32,
+					      &pmf))
+		return FALSE;
+
+	if (pmf > 2) {
+		dbus_set_error_const(error, DBUS_ERROR_FAILED,
+				     "Pmf must be 0, 1, or 2");
+		return FALSE;
+	}
+	wpa_s->conf->pmf = pmf;
+	return TRUE;
+}
+
+#endif /* CONFIG_IEEE80211W */
 
 
 /**
@@ -3698,6 +3778,9 @@ dbus_bool_t wpas_dbus_getter_bss_mode(
 			break;
 		case IEEE80211_CAP_DMG_AP:
 			mode = "infrastructure";
+			break;
+		default:
+			mode = "";
 			break;
 		}
 	} else {

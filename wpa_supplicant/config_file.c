@@ -1119,6 +1119,17 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 	}
 #endif /* CONFIG_WPS */
 #ifdef CONFIG_P2P
+	{
+		int i;
+		char _buf[WPS_DEV_TYPE_BUFSIZE], *buf;
+
+		for (i = 0; i < config->num_sec_device_types; i++) {
+			buf = wps_dev_type_bin2str(config->sec_device_type[i],
+						   _buf, sizeof(_buf));
+			if (buf)
+				fprintf(f, "sec_device_type=%s\n", buf);
+		}
+	}
 	if (config->p2p_listen_reg_class)
 		fprintf(f, "p2p_listen_reg_class=%d\n",
 			config->p2p_listen_reg_class);
@@ -1218,6 +1229,8 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 			config->bss_expiration_scan_count);
 	if (config->filter_ssids)
 		fprintf(f, "filter_ssids=%d\n", config->filter_ssids);
+	if (config->filter_rssi)
+		fprintf(f, "filter_rssi=%d\n", config->filter_rssi);
 	if (config->max_num_sta != DEFAULT_MAX_NUM_STA)
 		fprintf(f, "max_num_sta=%u\n", config->max_num_sta);
 	if (config->disassoc_low_ack)
@@ -1269,7 +1282,7 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 	if (config->sae_groups) {
 		int i;
 		fprintf(f, "sae_groups=");
-		for (i = 0; config->sae_groups[i] >= 0; i++) {
+		for (i = 0; config->sae_groups[i] > 0; i++) {
 			fprintf(f, "%s%d", i > 0 ? " " : "",
 				config->sae_groups[i]);
 		}
@@ -1320,6 +1333,9 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 
 	if (config->bgscan)
 		fprintf(f, "bgscan=\"%s\"\n", config->bgscan);
+
+	if (config->autoscan)
+		fprintf(f, "autoscan=%s\n", config->autoscan);
 
 	if (config->p2p_search_delay != DEFAULT_P2P_SEARCH_DELAY)
 		fprintf(f, "p2p_search_delay=%u\n",
@@ -1387,6 +1403,16 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 		fprintf(f, "ftm_responder=%d\n", config->ftm_responder);
 	if (config->ftm_initiator)
 		fprintf(f, "ftm_initiator=%d\n", config->ftm_initiator);
+
+	if (config->osu_dir)
+		fprintf(f, "osu_dir=%s\n", config->osu_dir);
+
+	if (config->fst_group_id)
+		fprintf(f, "fst_group_id=%s\n", config->fst_group_id);
+	if (config->fst_priority)
+		fprintf(f, "fst_priority=%d\n", config->fst_priority);
+	if (config->fst_llt)
+		fprintf(f, "fst_llt=%d\n", config->fst_llt);
 }
 
 #endif /* CONFIG_NO_CONFIG_WRITE */
