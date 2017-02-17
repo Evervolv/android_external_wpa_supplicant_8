@@ -29,6 +29,7 @@
 #include "common/qca-vendor-attr.h"
 #include "common/ieee802_11_defs.h"
 #include "common/ieee802_11_common.h"
+#include "common/wpa_common.h"
 #include "l2_packet/l2_packet.h"
 #include "netlink.h"
 #include "linux_defines.h"
@@ -675,6 +676,7 @@ nl80211_get_wiphy_data_ap(struct i802_bss *bss)
 	struct nl80211_wiphy_data *w;
 	int wiphy_idx, found = 0;
 	struct i802_bss *tmp_bss;
+	u8 channel;
 
 	if (bss->wiphy_data != NULL)
 		return bss->wiphy_data;
@@ -694,29 +696,35 @@ nl80211_get_wiphy_data_ap(struct i802_bss *bss)
 	dl_list_init(&w->bsss);
 	dl_list_init(&w->drvs);
 
-	w->nl_cb = nl_cb_alloc(NL_CB_DEFAULT);
-	if (!w->nl_cb) {
-		os_free(w);
-		return NULL;
-	}
-	nl_cb_set(w->nl_cb, NL_CB_SEQ_CHECK, NL_CB_CUSTOM, no_seq_check, NULL);
-	nl_cb_set(w->nl_cb, NL_CB_VALID, NL_CB_CUSTOM, process_beacon_event,
-		  w);
+	/* Beacon frames not supported in IEEE 802.11ad */
+	if (ieee80211_freq_to_chan(bss->freq, &channel) !=
+	    HOSTAPD_MODE_IEEE80211AD) {
+		w->nl_cb = nl_cb_alloc(NL_CB_DEFAULT);
+		if (!w->nl_cb) {
+			os_free(w);
+			return NULL;
+		}
+		nl_cb_set(w->nl_cb, NL_CB_SEQ_CHECK, NL_CB_CUSTOM,
+			  no_seq_check, NULL);
+		nl_cb_set(w->nl_cb, NL_CB_VALID, NL_CB_CUSTOM,
+			  process_beacon_event, w);
 
-	w->nl_beacons = nl_create_handle(bss->drv->global->nl_cb,
-					 "wiphy beacons");
-	if (w->nl_beacons == NULL) {
-		os_free(w);
-		return NULL;
-	}
+		w->nl_beacons = nl_create_handle(bss->drv->global->nl_cb,
+						 "wiphy beacons");
+		if (w->nl_beacons == NULL) {
+			os_free(w);
+			return NULL;
+		}
 
-	if (nl80211_register_beacons(bss->drv, w)) {
-		nl_destroy_handles(&w->nl_beacons);
-		os_free(w);
-		return NULL;
-	}
+		if (nl80211_register_beacons(bss->drv, w)) {
+			nl_destroy_handles(&w->nl_beacons);
+			os_free(w);
+			return NULL;
+		}
 
-	nl80211_register_eloop_read(&w->nl_beacons, nl80211_recv_beacons, w);
+		nl80211_register_eloop_read(&w->nl_beacons,
+					    nl80211_recv_beacons, w);
+	}
 
 	dl_list_add(&nl80211_wiphys, &w->list);
 
@@ -763,7 +771,8 @@ static void nl80211_put_wiphy_data_ap(struct i802_bss *bss)
 	if (!dl_list_empty(&w->bsss))
 		return;
 
-	nl80211_destroy_eloop_handle(&w->nl_beacons);
+	if (w->nl_beacons)
+		nl80211_destroy_eloop_handle(&w->nl_beacons);
 
 	nl_cb_put(w->nl_cb);
 	dl_list_del(&w->list);
@@ -2164,6 +2173,9 @@ static int nl80211_action_subscribe_ap(struct i802_bss *bss)
 	/* RRM Measurement Report */
 	if (nl80211_register_action_frame(bss, (u8 *) "\x05\x01", 2) < 0)
 		ret = -1;
+	/* RRM Link Measurement Report */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x05\x03", 2) < 0)
+		ret = -1;
 	/* RRM Neighbor Report Request */
 	if (nl80211_register_action_frame(bss, (u8 *) "\x05\x04", 2) < 0)
 		ret = -1;
@@ -2233,9 +2245,6 @@ static int nl80211_mgmt_subscribe_ap(struct i802_bss *bss)
 		goto out_err;
 
 	if (nl80211_register_spurious_class3(bss))
-		goto out_err;
-
-	if (nl80211_get_wiphy_data_ap(bss) == NULL)
 		goto out_err;
 
 	nl80211_mgmt_handle_register_eloop(bss);
@@ -2492,12 +2501,14 @@ wpa_driver_nl80211_finish_drv_init(struct wpa_driver_nl80211_data *drv,
 }
 
 
-static int wpa_driver_nl80211_del_beacon(struct wpa_driver_nl80211_data *drv)
+static int wpa_driver_nl80211_del_beacon(struct i802_bss *bss)
 {
 	struct nl_msg *msg;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
 
 	wpa_printf(MSG_DEBUG, "nl80211: Remove beacon (ifindex=%d)",
 		   drv->ifindex);
+	nl80211_put_wiphy_data_ap(bss);
 	msg = nl80211_drv_msg(drv, 0, NL80211_CMD_DEL_BEACON);
 	return send_and_recv_msgs(drv, msg, NULL, NULL);
 }
@@ -2550,7 +2561,7 @@ static void wpa_driver_nl80211_deinit(struct i802_bss *bss)
 	nl80211_remove_monitor_interface(drv);
 
 	if (is_ap_interface(drv->nlmode))
-		wpa_driver_nl80211_del_beacon(drv);
+		wpa_driver_nl80211_del_beacon(bss);
 
 	if (drv->eapol_sock >= 0) {
 		eloop_unregister_read_sock(drv->eapol_sock);
@@ -2624,30 +2635,30 @@ static u32 wpa_alg_to_cipher_suite(enum wpa_alg alg, size_t key_len)
 	switch (alg) {
 	case WPA_ALG_WEP:
 		if (key_len == 5)
-			return WLAN_CIPHER_SUITE_WEP40;
-		return WLAN_CIPHER_SUITE_WEP104;
+			return RSN_CIPHER_SUITE_WEP40;
+		return RSN_CIPHER_SUITE_WEP104;
 	case WPA_ALG_TKIP:
-		return WLAN_CIPHER_SUITE_TKIP;
+		return RSN_CIPHER_SUITE_TKIP;
 	case WPA_ALG_CCMP:
-		return WLAN_CIPHER_SUITE_CCMP;
+		return RSN_CIPHER_SUITE_CCMP;
 	case WPA_ALG_GCMP:
-		return WLAN_CIPHER_SUITE_GCMP;
+		return RSN_CIPHER_SUITE_GCMP;
 	case WPA_ALG_CCMP_256:
-		return WLAN_CIPHER_SUITE_CCMP_256;
+		return RSN_CIPHER_SUITE_CCMP_256;
 	case WPA_ALG_GCMP_256:
-		return WLAN_CIPHER_SUITE_GCMP_256;
+		return RSN_CIPHER_SUITE_GCMP_256;
 	case WPA_ALG_IGTK:
-		return WLAN_CIPHER_SUITE_AES_CMAC;
+		return RSN_CIPHER_SUITE_AES_128_CMAC;
 	case WPA_ALG_BIP_GMAC_128:
-		return WLAN_CIPHER_SUITE_BIP_GMAC_128;
+		return RSN_CIPHER_SUITE_BIP_GMAC_128;
 	case WPA_ALG_BIP_GMAC_256:
-		return WLAN_CIPHER_SUITE_BIP_GMAC_256;
+		return RSN_CIPHER_SUITE_BIP_GMAC_256;
 	case WPA_ALG_BIP_CMAC_256:
-		return WLAN_CIPHER_SUITE_BIP_CMAC_256;
+		return RSN_CIPHER_SUITE_BIP_CMAC_256;
 	case WPA_ALG_SMS4:
-		return WLAN_CIPHER_SUITE_SMS4;
+		return RSN_CIPHER_SUITE_SMS4;
 	case WPA_ALG_KRK:
-		return WLAN_CIPHER_SUITE_KRK;
+		return RSN_CIPHER_SUITE_KRK;
 	case WPA_ALG_NONE:
 	case WPA_ALG_PMK:
 		wpa_printf(MSG_ERROR, "nl80211: Unexpected encryption algorithm %d",
@@ -2665,21 +2676,21 @@ static u32 wpa_cipher_to_cipher_suite(unsigned int cipher)
 {
 	switch (cipher) {
 	case WPA_CIPHER_CCMP_256:
-		return WLAN_CIPHER_SUITE_CCMP_256;
+		return RSN_CIPHER_SUITE_CCMP_256;
 	case WPA_CIPHER_GCMP_256:
-		return WLAN_CIPHER_SUITE_GCMP_256;
+		return RSN_CIPHER_SUITE_GCMP_256;
 	case WPA_CIPHER_CCMP:
-		return WLAN_CIPHER_SUITE_CCMP;
+		return RSN_CIPHER_SUITE_CCMP;
 	case WPA_CIPHER_GCMP:
-		return WLAN_CIPHER_SUITE_GCMP;
+		return RSN_CIPHER_SUITE_GCMP;
 	case WPA_CIPHER_TKIP:
-		return WLAN_CIPHER_SUITE_TKIP;
+		return RSN_CIPHER_SUITE_TKIP;
 	case WPA_CIPHER_WEP104:
-		return WLAN_CIPHER_SUITE_WEP104;
+		return RSN_CIPHER_SUITE_WEP104;
 	case WPA_CIPHER_WEP40:
-		return WLAN_CIPHER_SUITE_WEP40;
+		return RSN_CIPHER_SUITE_WEP40;
 	case WPA_CIPHER_GTK_NOT_USED:
-		return WLAN_CIPHER_SUITE_NO_GROUP_ADDR;
+		return RSN_CIPHER_SUITE_NO_GROUP_ADDRESSED;
 	}
 
 	return 0;
@@ -2692,19 +2703,19 @@ static int wpa_cipher_to_cipher_suites(unsigned int ciphers, u32 suites[],
 	int num_suites = 0;
 
 	if (num_suites < max_suites && ciphers & WPA_CIPHER_CCMP_256)
-		suites[num_suites++] = WLAN_CIPHER_SUITE_CCMP_256;
+		suites[num_suites++] = RSN_CIPHER_SUITE_CCMP_256;
 	if (num_suites < max_suites && ciphers & WPA_CIPHER_GCMP_256)
-		suites[num_suites++] = WLAN_CIPHER_SUITE_GCMP_256;
+		suites[num_suites++] = RSN_CIPHER_SUITE_GCMP_256;
 	if (num_suites < max_suites && ciphers & WPA_CIPHER_CCMP)
-		suites[num_suites++] = WLAN_CIPHER_SUITE_CCMP;
+		suites[num_suites++] = RSN_CIPHER_SUITE_CCMP;
 	if (num_suites < max_suites && ciphers & WPA_CIPHER_GCMP)
-		suites[num_suites++] = WLAN_CIPHER_SUITE_GCMP;
+		suites[num_suites++] = RSN_CIPHER_SUITE_GCMP;
 	if (num_suites < max_suites && ciphers & WPA_CIPHER_TKIP)
-		suites[num_suites++] = WLAN_CIPHER_SUITE_TKIP;
+		suites[num_suites++] = RSN_CIPHER_SUITE_TKIP;
 	if (num_suites < max_suites && ciphers & WPA_CIPHER_WEP104)
-		suites[num_suites++] = WLAN_CIPHER_SUITE_WEP104;
+		suites[num_suites++] = RSN_CIPHER_SUITE_WEP104;
 	if (num_suites < max_suites && ciphers & WPA_CIPHER_WEP40)
-		suites[num_suites++] = WLAN_CIPHER_SUITE_WEP40;
+		suites[num_suites++] = RSN_CIPHER_SUITE_WEP40;
 
 	return num_suites;
 }
@@ -2962,8 +2973,8 @@ static int nl80211_set_conn_keys(struct wpa_driver_associate_params *params,
 			    params->wep_key[i]) ||
 		    nla_put_u32(msg, NL80211_KEY_CIPHER,
 				params->wep_key_len[i] == 5 ?
-				WLAN_CIPHER_SUITE_WEP40 :
-				WLAN_CIPHER_SUITE_WEP104) ||
+				RSN_CIPHER_SUITE_WEP40 :
+				RSN_CIPHER_SUITE_WEP104) ||
 		    nla_put_u8(msg, NL80211_KEY_IDX, i) ||
 		    (i == params->wep_tx_keyidx &&
 		     nla_put_flag(msg, NL80211_KEY_DEFAULT)))
@@ -3775,6 +3786,9 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 		   beacon_set);
 	if (beacon_set)
 		cmd = NL80211_CMD_SET_BEACON;
+	else if (!drv->device_ap_sme && !drv->use_monitor &&
+		 !nl80211_get_wiphy_data_ap(bss))
+		return -ENOBUFS;
 
 	wpa_hexdump(MSG_DEBUG, "nl80211: Beacon head",
 		    params->head, params->head_len);
@@ -3856,9 +3870,9 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 		   params->key_mgmt_suites);
 	num_suites = 0;
 	if (params->key_mgmt_suites & WPA_KEY_MGMT_IEEE8021X)
-		suites[num_suites++] = WLAN_AKM_SUITE_8021X;
+		suites[num_suites++] = RSN_AUTH_KEY_MGMT_UNSPEC_802_1X;
 	if (params->key_mgmt_suites & WPA_KEY_MGMT_PSK)
-		suites[num_suites++] = WLAN_AKM_SUITE_PSK;
+		suites[num_suites++] = RSN_AUTH_KEY_MGMT_PSK_OVER_802_1X;
 	if (num_suites &&
 	    nla_put(msg, NL80211_ATTR_AKM_SUITES, num_suites * sizeof(u32),
 		    suites))
@@ -4706,6 +4720,7 @@ static void nl80211_teardown_ap(struct i802_bss *bss)
 	else
 		nl80211_mgmt_unsubscribe(bss, "AP teardown");
 
+	nl80211_put_wiphy_data_ap(bss);
 	bss->beacon_set = 0;
 }
 
@@ -5054,6 +5069,9 @@ static int nl80211_connect_common(struct wpa_driver_nl80211_data *drv,
 				  struct wpa_driver_associate_params *params,
 				  struct nl_msg *msg)
 {
+	if (nla_put_flag(msg, NL80211_ATTR_IFACE_SOCKET_OWNER))
+		return -1;
+
 	if (params->bssid) {
 		wpa_printf(MSG_DEBUG, "  * bssid=" MACSTR,
 			   MAC2STR(params->bssid));
@@ -5155,39 +5173,39 @@ static int nl80211_connect_common(struct wpa_driver_nl80211_data *drv,
 	    params->key_mgmt_suite == WPA_KEY_MGMT_PSK_SHA256 ||
 	    params->key_mgmt_suite == WPA_KEY_MGMT_IEEE8021X_SUITE_B ||
 	    params->key_mgmt_suite == WPA_KEY_MGMT_IEEE8021X_SUITE_B_192) {
-		int mgmt = WLAN_AKM_SUITE_PSK;
+		int mgmt = RSN_AUTH_KEY_MGMT_PSK_OVER_802_1X;
 
 		switch (params->key_mgmt_suite) {
 		case WPA_KEY_MGMT_CCKM:
-			mgmt = WLAN_AKM_SUITE_CCKM;
+			mgmt = RSN_AUTH_KEY_MGMT_CCKM;
 			break;
 		case WPA_KEY_MGMT_IEEE8021X:
-			mgmt = WLAN_AKM_SUITE_8021X;
+			mgmt = RSN_AUTH_KEY_MGMT_UNSPEC_802_1X;
 			break;
 		case WPA_KEY_MGMT_FT_IEEE8021X:
-			mgmt = WLAN_AKM_SUITE_FT_8021X;
+			mgmt = RSN_AUTH_KEY_MGMT_FT_802_1X;
 			break;
 		case WPA_KEY_MGMT_FT_PSK:
-			mgmt = WLAN_AKM_SUITE_FT_PSK;
+			mgmt = RSN_AUTH_KEY_MGMT_FT_PSK;
 			break;
 		case WPA_KEY_MGMT_IEEE8021X_SHA256:
-			mgmt = WLAN_AKM_SUITE_8021X_SHA256;
+			mgmt = RSN_AUTH_KEY_MGMT_802_1X_SHA256;
 			break;
 		case WPA_KEY_MGMT_PSK_SHA256:
-			mgmt = WLAN_AKM_SUITE_PSK_SHA256;
+			mgmt = RSN_AUTH_KEY_MGMT_PSK_SHA256;
 			break;
 		case WPA_KEY_MGMT_OSEN:
-			mgmt = WLAN_AKM_SUITE_OSEN;
+			mgmt = RSN_AUTH_KEY_MGMT_OSEN;
 			break;
 		case WPA_KEY_MGMT_IEEE8021X_SUITE_B:
-			mgmt = WLAN_AKM_SUITE_8021X_SUITE_B;
+			mgmt = RSN_AUTH_KEY_MGMT_802_1X_SUITE_B;
 			break;
 		case WPA_KEY_MGMT_IEEE8021X_SUITE_B_192:
-			mgmt = WLAN_AKM_SUITE_8021X_SUITE_B_192;
+			mgmt = RSN_AUTH_KEY_MGMT_802_1X_SUITE_B_192;
 			break;
 		case WPA_KEY_MGMT_PSK:
 		default:
-			mgmt = WLAN_AKM_SUITE_PSK;
+			mgmt = RSN_AUTH_KEY_MGMT_PSK_OVER_802_1X;
 			break;
 		}
 		wpa_printf(MSG_DEBUG, "  * akm=0x%x", mgmt);
@@ -6739,7 +6757,7 @@ static int wpa_driver_nl80211_if_remove(struct i802_bss *bss,
 		wpa_printf(MSG_DEBUG, "nl80211: First BSS - reassign context");
 		nl80211_teardown_ap(bss);
 		if (!bss->added_if && !drv->first_bss->next)
-			wpa_driver_nl80211_del_beacon(drv);
+			wpa_driver_nl80211_del_beacon(bss);
 		nl80211_destroy_bss(bss);
 		if (!bss->added_if)
 			i802_set_iface_flags(bss, 0);
@@ -7101,7 +7119,7 @@ static int wpa_driver_nl80211_deinit_ap(void *priv)
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	if (!is_ap_interface(drv->nlmode))
 		return -1;
-	wpa_driver_nl80211_del_beacon(drv);
+	wpa_driver_nl80211_del_beacon(bss);
 	bss->beacon_set = 0;
 
 	/*
@@ -7121,7 +7139,7 @@ static int wpa_driver_nl80211_stop_ap(void *priv)
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	if (!is_ap_interface(drv->nlmode))
 		return -1;
-	wpa_driver_nl80211_del_beacon(drv);
+	wpa_driver_nl80211_del_beacon(bss);
 	bss->beacon_set = 0;
 	return 0;
 }
@@ -7810,6 +7828,7 @@ static int nl80211_tdls_oper(void *priv, enum tdls_oper oper, const u8 *peer)
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	struct nl_msg *msg;
 	enum nl80211_tdls_operation nl80211_oper;
+	int res;
 
 	if (!(drv->capa.flags & WPA_DRIVER_FLAGS_TDLS_SUPPORT))
 		return -EOPNOTSUPP;
@@ -7845,7 +7864,11 @@ static int nl80211_tdls_oper(void *priv, enum tdls_oper oper, const u8 *peer)
 		return -ENOBUFS;
 	}
 
-	return send_and_recv_msgs(drv, msg, NULL, NULL);
+	res = send_and_recv_msgs(drv, msg, NULL, NULL);
+	wpa_printf(MSG_DEBUG, "nl80211: TDLS_OPER: oper=%d mac=" MACSTR
+		   " --> res=%d (%s)", nl80211_oper, MAC2STR(peer), res,
+		   strerror(-res));
+	return res;
 }
 
 
