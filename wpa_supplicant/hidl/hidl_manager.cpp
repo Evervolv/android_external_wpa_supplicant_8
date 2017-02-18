@@ -789,7 +789,7 @@ void HidlManager::notifyHs20RxSubscriptionRemediation(
 	    wpa_s->ifname,
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onHs20SubscriptionRemediation,
-		std::placeholders::_1, hidl_osu_method, url));
+		std::placeholders::_1, wpa_s->bssid, hidl_osu_method, url));
 }
 
 /**
@@ -815,7 +815,7 @@ void HidlManager::notifyHs20RxDeauthImminentNotice(
 	    wpa_s->ifname,
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onHs20DeauthImminentNotice,
-		std::placeholders::_1, code, reauth_delay, url));
+		std::placeholders::_1, wpa_s->bssid, code, reauth_delay, url));
 }
 
 /**
