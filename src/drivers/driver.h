@@ -136,6 +136,29 @@ struct hostapd_channel_data {
 	unsigned int dfs_cac_ms;
 };
 
+#define HE_MAX_NUM_SS 		8
+#define HE_MAX_PHY_CAPAB_SIZE	3
+
+/**
+ * struct he_ppe_threshold - IEEE 802.11ax HE PPE Threshold
+ */
+struct he_ppe_threshold {
+	u32 numss_m1;
+	u32 ru_count;
+	u32 ppet16_ppet8_ru3_ru0[HE_MAX_NUM_SS];
+};
+
+/**
+ * struct he_capabilities - IEEE 802.11ax HE capabilities
+ */
+struct he_capabilities {
+	u8 he_supported;
+	u32 phy_cap[HE_MAX_PHY_CAPAB_SIZE];
+	u32 mac_cap;
+	u32 mcs;
+	struct he_ppe_threshold ppet;
+};
+
 #define HOSTAPD_MODE_FLAG_HT_INFO_KNOWN BIT(0)
 #define HOSTAPD_MODE_FLAG_VHT_INFO_KNOWN BIT(1)
 
@@ -194,6 +217,11 @@ struct hostapd_hw_modes {
 	u8 vht_mcs_set[8];
 
 	unsigned int flags; /* HOSTAPD_MODE_FLAG_* */
+
+	/**
+	 * he_capab - HE (IEEE 802.11ax) capabilities
+	 */
+	struct he_capabilities he_capab;
 };
 
 
@@ -494,6 +522,36 @@ struct wpa_driver_scan_params {
 	  * maximum duration and the actual duration may be shorter.
 	  */
 	 unsigned int duration_mandatory:1;
+
+	/**
+	 * relative_rssi_set - Whether relative RSSI parameters are set
+	 */
+	unsigned int relative_rssi_set:1;
+
+	/**
+	 * relative_rssi - Relative RSSI for reporting better BSSs
+	 *
+	 * Amount of RSSI by which a BSS should be better than the current
+	 * connected BSS to report the new BSS to user space.
+	 */
+	s8 relative_rssi;
+
+	/**
+	 * relative_adjust_band - Band to which RSSI should be adjusted
+	 *
+	 * The relative_adjust_rssi should be added to the band specified
+	 * by relative_adjust_band.
+	 */
+	enum set_band relative_adjust_band;
+
+	/**
+	 * relative_adjust_rssi - RSSI to be added to relative_adjust_band
+	 *
+	 * An amount of relative_band_rssi should be added to the BSSs that
+	 * belong to the band specified by relative_adjust_band while comparing
+	 * with other bands for BSS reporting.
+	 */
+	s8 relative_adjust_rssi;
 
 	/*
 	 * NOTE: Whenever adding new parameters here, please make sure
@@ -1393,6 +1451,14 @@ struct wpa_driver_capa {
 #define WPA_DRIVER_FLAGS_BEACON_RATE_HT		0x0000100000000000ULL
 /** Driver supports Beacon frame TX rate configuration (VHT rates) */
 #define WPA_DRIVER_FLAGS_BEACON_RATE_VHT	0x0000200000000000ULL
+/** Driver supports mgmt_tx with random TX address in non-connected state */
+#define WPA_DRIVER_FLAGS_MGMT_TX_RANDOM_TA	0x0000400000000000ULL
+/** Driver supports mgmt_tx with random TX addr in connected state */
+#define WPA_DRIVER_FLAGS_MGMT_TX_RANDOM_TA_CONNECTED	0x0000800000000000ULL
+/** Driver supports better BSS reporting with sched_scan in connected mode */
+#define WPA_DRIVER_FLAGS_SCHED_SCAN_RELATIVE_RSSI	0x0001000000000000ULL
+/** Driver supports HE capabilities */
+#define WPA_DRIVER_FLAGS_HE_CAPABILITIES	0x0002000000000000ULL
 	u64 flags;
 
 #define FULL_AP_CLIENT_STATE_SUPP(drv_flags) \
@@ -2785,6 +2851,9 @@ struct wpa_driver_ops {
 	 * transmitted on that channel; alternatively the frame may be sent on
 	 * the current operational channel (if in associated state in station
 	 * mode or while operating as an AP.)
+	 *
+	 * If @src differs from the device MAC address, use of a random
+	 * transmitter address is requested for this message exchange.
 	 */
 	int (*send_action)(void *priv, unsigned int freq, unsigned int wait,
 			   const u8 *dst, const u8 *src, const u8 *bssid,
@@ -4638,6 +4707,11 @@ union wpa_event_data {
 		 * than explicit rejection response from the AP.
 		 */
 		int timed_out;
+
+		/**
+		 * timeout_reason - Reason for the timeout
+		 */
+		const char *timeout_reason;
 	} assoc_reject;
 
 	struct timeout_event {

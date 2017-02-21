@@ -1061,6 +1061,7 @@ struct wpa_supplicant {
 	struct l2_packet_data *l2_test;
 	unsigned int extra_roc_dur;
 	enum wpa_supplicant_test_failure test_failure;
+	char *get_pref_freq_list_override;
 	unsigned int reject_btm_req_reason;
 	unsigned int p2p_go_csa_on_inv:1;
 	unsigned int ignore_auth_resp:1;
@@ -1112,6 +1113,42 @@ struct wpa_supplicant {
 
 	/* FILS HLP requests (struct fils_hlp_req) */
 	struct dl_list fils_hlp_req;
+
+	struct sched_scan_relative_params {
+		/**
+		 * relative_rssi_set - Enable relatively preferred BSS reporting
+		 *
+		 * 0 = Disable reporting relatively preferred BSSs
+		 * 1 = Enable reporting relatively preferred BSSs
+		 */
+		int relative_rssi_set;
+
+		/**
+		 * relative_rssi - Relative RSSI for reporting better BSSs
+		 *
+		 * Amount of RSSI by which a BSS should be better than the
+		 * current connected BSS so that the new BSS can be reported
+		 * to user space. This applies to sched_scan operations.
+		 */
+		int relative_rssi;
+
+		/**
+		 * relative_adjust_band - Band in which RSSI is to be adjusted
+		 */
+		enum set_band relative_adjust_band;
+
+		/**
+		 * relative_adjust_rssi - RSSI adjustment
+		 *
+		 * An amount of relative_adjust_rssi should be added to the
+		 * BSSs that belong to the relative_adjust_band while comparing
+		 * with other bands for BSS reporting.
+		 */
+		int relative_adjust_rssi;
+	} srp;
+
+	/* RIC elements for FT protocol */
+	struct wpabuf *ric_ies;
 };
 
 
@@ -1367,5 +1404,10 @@ struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 				     int i, struct wpa_bss *bss,
 				     struct wpa_ssid *group,
 				     int only_first_ssid, int debug_print);
+
+int wpas_ctrl_iface_get_pref_freq_list_override(struct wpa_supplicant *wpa_s,
+						enum wpa_driver_if_type if_type,
+						unsigned int *num,
+						unsigned int *freq_list);
 
 #endif /* WPA_SUPPLICANT_I_H */

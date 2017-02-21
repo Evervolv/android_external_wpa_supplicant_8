@@ -1,6 +1,6 @@
 /*
  * Qualcomm Atheros OUI and vendor specific assignments
- * Copyright (c) 2014-2015, Qualcomm Atheros, Inc.
+ * Copyright (c) 2014-2017, Qualcomm Atheros, Inc.
  *
  * This software may be distributed under the terms of the BSD license.
  * See README for more details.
@@ -233,6 +233,10 @@ enum qca_radiotap_vendor_ids {
  *	in the host driver. The different TDLS configurations are defined
  *	by the attributes in enum qca_wlan_vendor_attr_tdls_configuration.
  *
+ * @QCA_NL80211_VENDOR_SUBCMD_GET_HE_CAPABILITIES: Query device IEEE 802.11ax HE
+ *	capabilities. The response uses the attributes defined in
+ *	enum qca_wlan_vendor_attr_get_he_capabilities.
+ *
  * @QCA_NL80211_VENDOR_SUBCMD_ABORT_SCAN: Abort an ongoing vendor scan that was
  *	started with QCA_NL80211_VENDOR_SUBCMD_TRIGGER_SCAN. This command
  *	carries the scan cookie of the corresponding scan request. The scan
@@ -267,6 +271,23 @@ enum qca_radiotap_vendor_ids {
  * @QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_GET: Get the NUD statistics. These
  *	statistics are represented by the enum qca_attr_nud_stats_get
  *	attributes.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_FETCH_BSS_TRANSITION_STATUS: Sub-command to fetch
+ *	the BSS transition status, whether accept or reject, for a list of
+ *	candidate BSSIDs provided by the userspace. This uses the vendor
+ *	attributes QCA_WLAN_VENDOR_ATTR_BTM_MBO_TRANSITION_REASON and
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO. The userspace shall specify
+ *	the attributes QCA_WLAN_VENDOR_ATTR_BTM_MBO_TRANSITION_REASON and an
+ *	array of QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_BSSID nested in
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO in the request. In the response
+ *	the driver shall specify array of
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_BSSID and
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_STATUS pairs nested in
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_SET_TRACE_LEVEL: Set the trace level for a
+ *	specific QCA module. The trace levels are represented by
+ *	enum qca_attr_trace_level attributes.
  */
 enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_UNSPEC = 0,
@@ -385,13 +406,15 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_DMG_RF_GET_SELECTED_SECTOR = 141,
 	QCA_NL80211_VENDOR_SUBCMD_DMG_RF_SET_SELECTED_SECTOR = 142,
 	QCA_NL80211_VENDOR_SUBCMD_CONFIGURE_TDLS = 143,
-	/* 144 - reserved for QCA */
+	QCA_NL80211_VENDOR_SUBCMD_GET_HE_CAPABILITIES = 144,
 	QCA_NL80211_VENDOR_SUBCMD_ABORT_SCAN = 145,
 	QCA_NL80211_VENDOR_SUBCMD_SET_SAR_LIMITS = 146,
 	QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_ACS = 147,
 	QCA_NL80211_VENDOR_SUBCMD_CHIP_PWRSAVE_FAILURE = 148,
 	QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_SET = 149,
 	QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_GET = 150,
+	QCA_NL80211_VENDOR_SUBCMD_FETCH_BSS_TRANSITION_STATUS = 151,
+	QCA_NL80211_VENDOR_SUBCMD_SET_TRACE_LEVEL = 152,
 };
 
 
@@ -534,6 +557,22 @@ enum qca_wlan_vendor_attr {
 	 */
 	QCA_WLAN_VENDOR_ATTR_RX_AGGREGATION_STATS_HOLES_NUM = 34,
 	QCA_WLAN_VENDOR_ATTR_RX_AGGREGATION_STATS_HOLES_INFO = 35,
+	/* Unsigned 8-bit value representing MBO transition reason code as
+	 * provided by the AP used by subcommand
+	 * QCA_NL80211_VENDOR_SUBCMD_FETCH_BSS_TRANSITION_STATUS. This is
+	 * specified by the userspace in the request to the driver.
+	 */
+	QCA_WLAN_VENDOR_ATTR_BTM_MBO_TRANSITION_REASON = 36,
+	/* Array of nested attributes, BSSID and status code, used by subcommand
+	 * QCA_NL80211_VENDOR_SUBCMD_FETCH_BSS_TRANSITION_STATUS, where each
+	 * entry is taken from enum qca_wlan_vendor_attr_btm_candidate_info.
+	 * The userspace space specifies the list/array of candidate BSSIDs in
+	 * the order of preference in the request. The driver specifies the
+	 * status code, for each BSSID in the list, in the response. The
+	 * acceptable candidates are listed in the order preferred by the
+	 * driver.
+	 */
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO = 37,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_AFTER_LAST,
@@ -3302,6 +3341,85 @@ enum qca_attr_nud_stats_get {
 	QCA_ATTR_NUD_STATS_GET_LAST,
 	QCA_ATTR_NUD_STATS_GET_MAX =
 		QCA_ATTR_NUD_STATS_GET_LAST - 1,
+};
+
+enum qca_wlan_btm_candidate_status {
+	QCA_STATUS_ACCEPT = 0,
+	QCA_STATUS_REJECT_EXCESSIVE_FRAME_LOSS_EXPECTED = 1,
+	QCA_STATUS_REJECT_EXCESSIVE_DELAY_EXPECTED = 2,
+	QCA_STATUS_REJECT_INSUFFICIENT_QOS_CAPACITY = 3,
+	QCA_STATUS_REJECT_LOW_RSSI = 4,
+	QCA_STATUS_REJECT_HIGH_INTERFERENCE = 5,
+	QCA_STATUS_REJECT_UNKNOWN = 6,
+};
+
+enum qca_wlan_vendor_attr_btm_candidate_info {
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_INVALID = 0,
+
+	/* 6-byte MAC address representing the BSSID of transition candidate */
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_BSSID = 1,
+	/* Unsigned 32-bit value from enum qca_wlan_btm_candidate_status
+	 * returned by the driver. It says whether the BSSID provided in
+	 * QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_BSSID is acceptable by
+	 * the driver, if not it specifies the reason for rejection.
+	 * Note that the user-space can overwrite the transition reject reason
+	 * codes provided by driver based on more information.
+	 */
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_STATUS = 2,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_MAX =
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_AFTER_LAST - 1,
+};
+
+enum qca_attr_trace_level {
+	QCA_ATTR_TRACE_LEVEL_INVALID = 0,
+	/*
+	 * Nested array of the following attributes:
+	 * QCA_ATTR_TRACE_LEVEL_MODULE,
+	 * QCA_ATTR_TRACE_LEVEL_MASK.
+	 */
+	QCA_ATTR_TRACE_LEVEL_PARAM = 1,
+	/*
+	 * Specific QCA host driver module. Please refer to the QCA host
+	 * driver implementation to get the specific module ID.
+	 */
+	QCA_ATTR_TRACE_LEVEL_MODULE = 2,
+	/* Different trace level masks represented in the QCA host driver. */
+	QCA_ATTR_TRACE_LEVEL_MASK = 3,
+
+	/* keep last */
+	QCA_ATTR_TRACE_LEVEL_AFTER_LAST,
+	QCA_ATTR_TRACE_LEVEL_MAX =
+		QCA_ATTR_TRACE_LEVEL_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_get_he_capabilities - IEEE 802.11ax HE capabilities
+ */
+enum qca_wlan_vendor_attr_get_he_capabilities {
+	QCA_WLAN_VENDOR_ATTR_HE_CAPABILITIES_INVALID = 0,
+	/* Whether HE capabilities is supported
+	 * (u8 attribute: 0 = not supported, 1 = supported) */
+	QCA_WLAN_VENDOR_ATTR_HE_SUPPORTED = 1,
+	/* HE PHY capabilities, array of 3 u32 values  */
+	QCA_WLAN_VENDOR_ATTR_PHY_CAPAB = 2,
+	/* HE MAC capabilities (u32 attribute) */
+	QCA_WLAN_VENDOR_ATTR_MAC_CAPAB = 3,
+	/* HE MCS map (u32 attribute) */
+	QCA_WLAN_VENDOR_ATTR_HE_MCS = 4,
+	/* Number of SS (u32 attribute) */
+	QCA_WLAN_VENDOR_ATTR_NUM_SS = 5,
+	/* RU count (u32 attribute) */
+	QCA_WLAN_VENDOR_ATTR_RU_IDX_MASK = 6,
+	/* PPE threshold data, array of 8 u32 values */
+	QCA_WLAN_VENDOR_ATTR_PPE_THRESHOLD = 7,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_HE_CAPABILITIES_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_HE_CAPABILITIES_MAX =
+	QCA_WLAN_VENDOR_ATTR_HE_CAPABILITIES_AFTER_LAST - 1,
 };
 
 #endif /* QCA_VENDOR_H */

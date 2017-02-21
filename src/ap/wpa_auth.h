@@ -144,6 +144,8 @@ struct wpa_auth_config {
 	int wpa_strict_rekey;
 	int wpa_gmk_rekey;
 	int wpa_ptk_rekey;
+	u32 wpa_group_update_count;
+	u32 wpa_pairwise_update_count;
 	int rsn_pairwise;
 	int rsn_preauth;
 	int eapol_version;
@@ -247,7 +249,7 @@ enum {
 	WPA_MGMT_FRAME_PROTECTION_VIOLATION, WPA_INVALID_MGMT_GROUP_CIPHER,
 	WPA_INVALID_MDIE, WPA_INVALID_PROTO
 };
-	
+
 int wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 			struct wpa_state_machine *sm,
 			const u8 *wpa_ie, size_t wpa_ie_len,
@@ -361,7 +363,8 @@ int fils_decrypt_assoc(struct wpa_state_machine *sm, const u8 *fils_session,
 		       const struct ieee80211_mgmt *mgmt, size_t frame_len,
 		       u8 *pos, size_t left);
 int fils_encrypt_assoc(struct wpa_state_machine *sm, u8 *buf,
-		       size_t current_len, size_t max_len);
+		       size_t current_len, size_t max_len,
+		       const struct wpabuf *hlp);
 int fils_set_tk(struct wpa_state_machine *sm);
 
 #endif /* WPA_AUTH_H */

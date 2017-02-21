@@ -13,6 +13,7 @@
 #include "radius/radius_client.h"
 #include "common/ieee802_11_defs.h"
 #include "common/eapol_common.h"
+#include "common/dhcp.h"
 #include "eap_common/eap_wsc_common.h"
 #include "eap_server/eap.h"
 #include "wpa_auth.h"
@@ -55,6 +56,8 @@ void hostapd_config_defaults_bss(struct hostapd_bss_config *bss)
 
 	bss->wpa_group_rekey = 600;
 	bss->wpa_gmk_rekey = 86400;
+	bss->wpa_group_update_count = 4;
+	bss->wpa_pairwise_update_count = 4;
 	bss->wpa_key_mgmt = WPA_KEY_MGMT_PSK;
 	bss->wpa_pairwise = WPA_CIPHER_TKIP;
 	bss->wpa_group = WPA_CIPHER_TKIP;
@@ -100,6 +103,9 @@ void hostapd_config_defaults_bss(struct hostapd_bss_config *bss)
 
 #ifdef CONFIG_FILS
 	dl_list_init(&bss->fils_realms);
+	bss->fils_hlp_wait_time = 30;
+	bss->dhcp_server_port = DHCP_SERVER_PORT;
+	bss->dhcp_relay_port = DHCP_SERVER_PORT;
 #endif /* CONFIG_FILS */
 }
 

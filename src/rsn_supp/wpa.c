@@ -288,7 +288,7 @@ static int wpa_supplicant_get_pmk(struct wpa_sm *sm,
 	} else if (wpa_key_mgmt_wpa_ieee8021x(sm->key_mgmt) && sm->eapol) {
 		int res, pmk_len;
 
-		if (sm->key_mgmt & WPA_KEY_MGMT_IEEE8021X_SUITE_B_192)
+		if (wpa_key_mgmt_sha384(sm->key_mgmt))
 			pmk_len = PMK_LEN_SUITE_B_192;
 		else
 			pmk_len = PMK_LEN;
@@ -1393,7 +1393,8 @@ static int wpa_supplicant_process_1_of_2_rsn(struct wpa_sm *sm,
 	int maxkeylen;
 	struct wpa_eapol_ie_parse ie;
 
-	wpa_hexdump(MSG_DEBUG, "RSN: msg 1/2 key data", keydata, keydatalen);
+	wpa_hexdump_key(MSG_DEBUG, "RSN: msg 1/2 key data",
+			keydata, keydatalen);
 	if (wpa_supplicant_parse_ies(keydata, keydatalen, &ie) < 0)
 		return -1;
 	if (ie.gtk && !(key_info & WPA_KEY_INFO_ENCR_KEY_DATA)) {
@@ -3439,6 +3440,8 @@ int fils_process_auth(struct wpa_sm *sm, const u8 *data, size_t len)
 				       sm->fils_nonce, sm->fils_anonce, NULL, 0,
 				       sm->pmk, &sm->pmk_len);
 		os_memset(rmsk, 0, sizeof(rmsk));
+		if (res)
+			return -1;
 
 		if (!sm->fils_erp_pmkid_set) {
 			wpa_printf(MSG_DEBUG, "FILS: PMKID not available");
@@ -3561,6 +3564,71 @@ struct wpabuf * fils_build_assoc_req(struct wpa_sm *sm, const u8 **kek,
 		    *anonce, FILS_NONCE_LEN);
 
 	return buf;
+}
+
+
+static void fils_process_hlp_resp(struct wpa_sm *sm, const u8 *resp, size_t len)
+{
+	const u8 *pos, *end;
+
+	wpa_hexdump(MSG_MSGDUMP, "FILS: HLP response", resp, len);
+	if (len < 2 * ETH_ALEN)
+		return;
+	pos = resp + 2 * ETH_ALEN;
+	end = resp + len;
+	if (end - pos >= 6 &&
+	    os_memcmp(pos, "\xaa\xaa\x03\x00\x00\x00", 6) == 0)
+		pos += 6; /* Remove SNAP/LLC header */
+	wpa_sm_fils_hlp_rx(sm, resp, resp + ETH_ALEN, pos, end - pos);
+}
+
+
+static void fils_process_hlp_container(struct wpa_sm *sm, const u8 *pos,
+				       size_t len)
+{
+	const u8 *end = pos + len;
+	u8 *tmp, *tmp_pos;
+
+	/* Check if there are any FILS HLP Container elements */
+	while (end - pos >= 2) {
+		if (2 + pos[1] > end - pos)
+			return;
+		if (pos[0] == WLAN_EID_EXTENSION &&
+		    pos[1] >= 1 + 2 * ETH_ALEN &&
+		    pos[2] == WLAN_EID_EXT_FILS_HLP_CONTAINER)
+			break;
+		pos += 2 + pos[1];
+	}
+	if (end - pos < 2)
+		return; /* No FILS HLP Container elements */
+
+	tmp = os_malloc(end - pos);
+	if (!tmp)
+		return;
+
+	while (end - pos >= 2) {
+		if (2 + pos[1] > end - pos ||
+		    pos[0] != WLAN_EID_EXTENSION ||
+		    pos[1] < 1 + 2 * ETH_ALEN ||
+		    pos[2] != WLAN_EID_EXT_FILS_HLP_CONTAINER)
+			break;
+		tmp_pos = tmp;
+		os_memcpy(tmp_pos, pos + 3, pos[1] - 1);
+		tmp_pos += pos[1] - 1;
+		pos += 2 + pos[1];
+
+		/* Add possible fragments */
+		while (end - pos >= 2 && pos[0] == WLAN_EID_FRAGMENT &&
+		       2 + pos[1] <= end - pos) {
+			os_memcpy(tmp_pos, pos + 2, pos[1]);
+			tmp_pos += pos[1];
+			pos += 2 + pos[1];
+		}
+
+		fils_process_hlp_resp(sm, tmp, tmp_pos - tmp);
+	}
+
+	os_free(tmp);
 }
 
 
@@ -3705,7 +3773,8 @@ int fils_process_assoc_resp(struct wpa_sm *sm, const u8 *resp, size_t len)
 	/* TK is not needed anymore in supplicant */
 	os_memset(sm->ptk.tk, 0, WPA_TK_MAX_LEN);
 
-	/* TODO: FILS HLP Container */
+	/* FILS HLP Container */
+	fils_process_hlp_container(sm, ie_start, end - ie_start);
 
 	/* TODO: FILS IP Address Assignment */
 

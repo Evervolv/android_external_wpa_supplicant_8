@@ -147,7 +147,7 @@ static u16 hostapd_parse_location_lci_req_age(const u8 *buf, size_t len)
 	/* Subelements are arranged as IEs */
 	subelem = get_ie(buf + 4, len - 4, LCI_REQ_SUBELEM_MAX_AGE);
 	if (subelem && subelem[1] == 2)
-		return *(u16 *) (subelem + 2);
+		return WPA_GET_LE16(subelem + 2);
 
 	return 0;
 }
@@ -370,13 +370,7 @@ int hostapd_send_lci_req(struct hostapd_data *hapd, const u8 *addr)
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 	int ret;
 
-	if (!sta) {
-		wpa_printf(MSG_INFO,
-			   "Request LCI: Destination address is not in station list");
-		return -1;
-	}
-
-	if (!(sta->flags & WLAN_STA_AUTHORIZED)) {
+	if (!sta || !(sta->flags & WLAN_STA_AUTHORIZED)) {
 		wpa_printf(MSG_INFO,
 			   "Request LCI: Destination address is not connected");
 		return -1;
@@ -479,9 +473,8 @@ int hostapd_send_range_req(struct hostapd_data *hapd, const u8 *addr,
 		wpa_printf(MSG_DEBUG,
 			   "Request range: Range request is already in process; overriding");
 		hapd->range_req_active = 0;
-		eloop_register_timeout(HOSTAPD_RRM_REQUEST_TIMEOUT, 0,
-				       hostapd_range_rep_timeout_handler, hapd,
-				       NULL);
+		eloop_cancel_timeout(hostapd_range_rep_timeout_handler, hapd,
+				     NULL);
 	}
 
 	/* Action + measurement type + token + reps + EID + len = 7 */
