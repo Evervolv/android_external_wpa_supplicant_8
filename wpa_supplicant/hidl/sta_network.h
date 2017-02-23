@@ -104,8 +104,8 @@ public:
 	    const hidl_string& path, setEapCAPath_cb _hidl_cb) override;
 	Return<void> setEapClientCert(
 	    const hidl_string& path, setEapClientCert_cb _hidl_cb) override;
-	Return<void> setEapPrivateKey(
-	    const hidl_string& path, setEapPrivateKey_cb _hidl_cb) override;
+	Return<void> setEapPrivateKeyId(
+	    const hidl_string& id, setEapPrivateKeyId_cb _hidl_cb) override;
 	Return<void> setEapSubjectMatch(
 	    const hidl_string& match, setEapSubjectMatch_cb _hidl_cb) override;
 	Return<void> setEapAltSubjectMatch(
@@ -147,7 +147,8 @@ public:
 	Return<void> getEapCACert(getEapCACert_cb _hidl_cb) override;
 	Return<void> getEapCAPath(getEapCAPath_cb _hidl_cb) override;
 	Return<void> getEapClientCert(getEapClientCert_cb _hidl_cb) override;
-	Return<void> getEapPrivateKey(getEapPrivateKey_cb _hidl_cb) override;
+	Return<void> getEapPrivateKeyId(
+	    getEapPrivateKeyId_cb _hidl_cb) override;
 	Return<void> getEapSubjectMatch(
 	    getEapSubjectMatch_cb _hidl_cb) override;
 	Return<void> getEapAltSubjectMatch(
@@ -216,7 +217,7 @@ private:
 	SupplicantStatus setEapCACertInternal(const std::string& path);
 	SupplicantStatus setEapCAPathInternal(const std::string& path);
 	SupplicantStatus setEapClientCertInternal(const std::string& path);
-	SupplicantStatus setEapPrivateKeyInternal(const std::string& path);
+	SupplicantStatus setEapPrivateKeyIdInternal(const std::string& id);
 	SupplicantStatus setEapSubjectMatchInternal(const std::string& match);
 	SupplicantStatus setEapAltSubjectMatchInternal(
 	    const std::string& match);
@@ -253,7 +254,7 @@ private:
 	std::pair<SupplicantStatus, std::string> getEapCACertInternal();
 	std::pair<SupplicantStatus, std::string> getEapCAPathInternal();
 	std::pair<SupplicantStatus, std::string> getEapClientCertInternal();
-	std::pair<SupplicantStatus, std::string> getEapPrivateKeyInternal();
+	std::pair<SupplicantStatus, std::string> getEapPrivateKeyIdInternal();
 	std::pair<SupplicantStatus, std::string> getEapSubjectMatchInternal();
 	std::pair<SupplicantStatus, std::string>
 	getEapAltSubjectMatchInternal();
