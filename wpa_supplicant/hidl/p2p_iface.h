@@ -172,7 +172,7 @@ public:
 	    uint16_t config_methods, setWpsConfigMethods_cb _hidl_cb) override;
 	Return<void> enableWfd(bool enable, enableWfd_cb _hidl_cb) override;
 	Return<void> setWfdDeviceInfo(
-	    const hidl_array<uint8_t, 8>& info,
+	    const hidl_array<uint8_t, 6>& info,
 	    setWfdDeviceInfo_cb _hidl_cb) override;
 	Return<void> createNfcHandoverRequestMessage(
 	    createNfcHandoverRequestMessage_cb _hidl_cb) override;
@@ -279,7 +279,7 @@ private:
 	SupplicantStatus setWpsConfigMethodsInternal(uint16_t config_methods);
 	SupplicantStatus enableWfdInternal(bool enable);
 	SupplicantStatus setWfdDeviceInfoInternal(
-	    const std::array<uint8_t, 8>& info);
+	    const std::array<uint8_t, 6>& info);
 	std::pair<SupplicantStatus, std::vector<uint8_t>>
 	createNfcHandoverRequestMessageInternal();
 	std::pair<SupplicantStatus, std::vector<uint8_t>>
