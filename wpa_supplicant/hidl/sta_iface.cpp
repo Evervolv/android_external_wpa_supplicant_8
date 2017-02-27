@@ -37,7 +37,7 @@ constexpr char kSetBtCoexistenceScanStart[] = "BTCOEXSCAN-START";
 constexpr char kSetBtCoexistenceScanStop[] = "BTCOEXSCAN-STOP";
 constexpr char kSetSupendModeEnabled[] = "SETSUSPENDMODE 1";
 constexpr char kSetSupendModeDisabled[] = "SETSUSPENDMODE 0";
-constexpr char kSetCountryCode[] = "COUNTRY ";
+constexpr char kSetCountryCode[] = "COUNTRY";
 constexpr uint32_t kExtRadioWorkDefaultTimeoutInSec = static_cast<uint32_t>(
     ISupplicantStaIface::ExtRadioWorkDefaults::TIMEOUT_IN_SECS);
 constexpr char kExtRadioWorkNamePrefix[] = "ext:";

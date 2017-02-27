@@ -414,16 +414,28 @@ int HidlManager::registerInterface(struct wpa_supplicant *wpa_s)
 		if (addHidlObjectToMap<P2pIface>(
 			wpa_s->ifname,
 			new P2pIface(wpa_s->global, wpa_s->ifname),
-			p2p_iface_object_map_))
+			p2p_iface_object_map_)) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Failed to register P2P interface with HIDL "
+			    "control: %s",
+			    wpa_s->ifname);
 			return 1;
+		}
 		p2p_iface_callbacks_map_[wpa_s->ifname] =
 		    std::vector<android::sp<ISupplicantP2pIfaceCallback>>();
 	} else {
 		if (addHidlObjectToMap<StaIface>(
 			wpa_s->ifname,
 			new StaIface(wpa_s->global, wpa_s->ifname),
-			sta_iface_object_map_))
+			sta_iface_object_map_)) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Failed to register STA interface with HIDL "
+			    "control: %s",
+			    wpa_s->ifname);
 			return 1;
+		}
 		sta_iface_callbacks_map_[wpa_s->ifname] =
 		    std::vector<android::sp<ISupplicantStaIfaceCallback>>();
 	}
@@ -449,16 +461,28 @@ int HidlManager::unregisterInterface(struct wpa_supplicant *wpa_s)
 
 	if (isP2pIface(wpa_s)) {
 		if (removeHidlObjectFromMap(
-			wpa_s->ifname, p2p_iface_object_map_))
+			wpa_s->ifname, p2p_iface_object_map_)) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Failed to unregister P2P interface with HIDL "
+			    "control: %s",
+			    wpa_s->ifname);
 			return 1;
+		}
 		if (removeAllIfaceCallbackHidlObjectsFromMap(
 			wpa_s->ifname, p2p_iface_callbacks_map_)) {
 			return 1;
 		}
 	} else {
 		if (removeHidlObjectFromMap(
-			wpa_s->ifname, sta_iface_object_map_))
+			wpa_s->ifname, sta_iface_object_map_)) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Failed to unregister STA interface with HIDL "
+			    "control: %s",
+			    wpa_s->ifname);
 			return 1;
+		}
 		if (removeAllIfaceCallbackHidlObjectsFromMap(
 			wpa_s->ifname, sta_iface_callbacks_map_)) {
 			return 1;
@@ -495,8 +519,14 @@ int HidlManager::registerNetwork(
 		if (addHidlObjectToMap<P2pNetwork>(
 			network_key,
 			new P2pNetwork(wpa_s->global, wpa_s->ifname, ssid->id),
-			p2p_network_object_map_))
+			p2p_network_object_map_)) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Failed to register P2P network with HIDL "
+			    "control: %d",
+			    ssid->id);
 			return 1;
+		}
 		p2p_network_callbacks_map_[network_key] =
 		    std::vector<android::sp<ISupplicantP2pNetworkCallback>>();
 		// Invoke the |onNetworkAdded| method on all registered
@@ -510,8 +540,14 @@ int HidlManager::registerNetwork(
 		if (addHidlObjectToMap<StaNetwork>(
 			network_key,
 			new StaNetwork(wpa_s->global, wpa_s->ifname, ssid->id),
-			sta_network_object_map_))
+			sta_network_object_map_)) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Failed to register STA network with HIDL "
+			    "control: %d",
+			    ssid->id);
 			return 1;
+		}
 		sta_network_callbacks_map_[network_key] =
 		    std::vector<android::sp<ISupplicantStaNetworkCallback>>();
 		// Invoke the |onNetworkAdded| method on all registered
@@ -545,8 +581,15 @@ int HidlManager::unregisterNetwork(
 	    getNetworkObjectMapKey(wpa_s->ifname, ssid->id);
 
 	if (isP2pIface(wpa_s)) {
-		if (removeHidlObjectFromMap(network_key, p2p_iface_object_map_))
+		if (removeHidlObjectFromMap(
+			network_key, p2p_network_object_map_)) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Failed to unregister P2P network with HIDL "
+			    "control: %d",
+			    ssid->id);
 			return 1;
+		}
 		if (removeAllNetworkCallbackHidlObjectsFromMap(
 			network_key, p2p_network_callbacks_map_))
 			return 1;
@@ -559,8 +602,15 @@ int HidlManager::unregisterNetwork(
 			&ISupplicantP2pIfaceCallback::onNetworkRemoved,
 			std::placeholders::_1, ssid->id));
 	} else {
-		if (removeHidlObjectFromMap(network_key, sta_iface_object_map_))
+		if (removeHidlObjectFromMap(
+			network_key, sta_network_object_map_)) {
+			wpa_printf(
+			    MSG_ERROR,
+			    "Failed to unregister STA network with HIDL "
+			    "control: %d",
+			    ssid->id);
 			return 1;
+		}
 		if (removeAllNetworkCallbackHidlObjectsFromMap(
 			network_key, sta_network_callbacks_map_))
 			return 1;
