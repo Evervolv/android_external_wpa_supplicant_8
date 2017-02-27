@@ -25,6 +25,9 @@ L_CFLAGS += -DANDROID_LOG_NAME=\"wpa_supplicant\"
 # Disable unused parameter warnings
 L_CFLAGS += -Wno-unused-parameter
 
+# Disable redefined macro warnings
+L_CFLAGS += -Wno-macro-redefined
+
 # Set Android extended P2P functionality
 L_CFLAGS += -DANDROID_P2P
 

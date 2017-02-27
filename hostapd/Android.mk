@@ -27,6 +27,9 @@ L_CFLAGS += -DANDROID_LOG_NAME=\"hostapd\"
 # Disable unused parameter warnings
 L_CFLAGS += -Wno-unused-parameter
 
+# Disable macro redefined warnings
+L_CFLAGS += -Wno-macro-redefined
+
 # Set Android extended P2P functionality
 L_CFLAGS += -DANDROID_P2P
 
@@ -151,7 +154,6 @@ OBJS += src/common/wpa_common.c
 OBJS += src/common/hw_features_common.c
 
 OBJS += src/eapol_auth/eapol_auth_sm.c
-
 
 ifndef CONFIG_NO_DUMP_STATE
 # define HOSTAPD_DUMP_STATE to include support for dumping internal state
