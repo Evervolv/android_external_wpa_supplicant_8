@@ -453,6 +453,8 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 #ifdef CONFIG_TESTING_OPTIONS
 	l2_packet_deinit(wpa_s->l2_test);
 	wpa_s->l2_test = NULL;
+	os_free(wpa_s->get_pref_freq_list_override);
+	wpa_s->get_pref_freq_list_override = NULL;
 #endif /* CONFIG_TESTING_OPTIONS */
 
 	if (wpa_s->conf != NULL) {
@@ -618,6 +620,9 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 #endif /* CONFIG_PMKSA_CACHE_EXTERNAL */
 
 	wpas_flush_fils_hlp_req(wpa_s);
+
+	wpabuf_free(wpa_s->ric_ies);
+	wpa_s->ric_ies = NULL;
 }
 
 
@@ -1868,11 +1873,6 @@ static int drv_supports_vht(struct wpa_supplicant *wpa_s,
 	struct hostapd_hw_modes *mode = NULL;
 	u8 channel;
 	int i;
-
-#ifdef CONFIG_HT_OVERRIDES
-	if (ssid->disable_ht)
-		return 0;
-#endif /* CONFIG_HT_OVERRIDES */
 
 	hw_mode = ieee80211_freq_to_chan(ssid->frequency, &channel);
 	if (hw_mode == NUM_HOSTAPD_MODES)
@@ -4368,6 +4368,20 @@ static void radio_work_free(struct wpa_radio_work *work)
 }
 
 
+static int radio_work_is_connect(struct wpa_radio_work *work)
+{
+	return os_strcmp(work->type, "sme-connect") == 0 ||
+		os_strcmp(work->type, "connect") == 0;
+}
+
+
+static int radio_work_is_scan(struct wpa_radio_work *work)
+{
+	return os_strcmp(work->type, "scan") == 0 ||
+		os_strcmp(work->type, "p2p-scan") == 0;
+}
+
+
 static struct wpa_radio_work * radio_work_get_next_work(struct wpa_radio *radio)
 {
 	struct wpa_radio_work *active_work = NULL;
@@ -4397,8 +4411,7 @@ static struct wpa_radio_work * radio_work_get_next_work(struct wpa_radio *radio)
 		return NULL;
 	}
 
-	if (os_strcmp(active_work->type, "sme-connect") == 0 ||
-	    os_strcmp(active_work->type, "connect") == 0) {
+	if (radio_work_is_connect(active_work)) {
 		/*
 		 * If the active work is either connect or sme-connect,
 		 * do not parallelize them with other radio works.
@@ -4417,10 +4430,20 @@ static struct wpa_radio_work * radio_work_get_next_work(struct wpa_radio *radio)
 		 * If connect or sme-connect are enqueued, parallelize only
 		 * those operations ahead of them in the queue.
 		 */
-		if (os_strcmp(tmp->type, "connect") == 0 ||
-		    os_strcmp(tmp->type, "sme-connect") == 0)
+		if (radio_work_is_connect(tmp))
 			break;
 
+		/* Serialize parallel scan and p2p_scan operations on the same
+		 * interface since the driver_nl80211 mechanism for tracking
+		 * scan cookies does not yet have support for this. */
+		if (active_work->wpa_s == tmp->wpa_s &&
+		    radio_work_is_scan(active_work) &&
+		    radio_work_is_scan(tmp)) {
+			wpa_dbg(active_work->wpa_s, MSG_DEBUG,
+				"Do not start work '%s' when another work '%s' is already scheduled",
+				tmp->type, active_work->type);
+			continue;
+		}
 		/*
 		 * Check that the radio works are distinct and
 		 * on different bands.
@@ -5325,6 +5348,7 @@ int wpa_supplicant_remove_iface(struct wpa_global *global,
 #ifdef CONFIG_MESH
 	unsigned int mesh_if_created = wpa_s->mesh_if_created;
 	char *ifname = NULL;
+	struct wpa_supplicant *parent = wpa_s->parent;
 #endif /* CONFIG_MESH */
 
 	/* Remove interface from the global list of interfaces */
@@ -5360,7 +5384,7 @@ int wpa_supplicant_remove_iface(struct wpa_global *global,
 
 #ifdef CONFIG_MESH
 	if (mesh_if_created) {
-		wpa_drv_if_remove(wpa_s->parent, WPA_IF_MESH, ifname);
+		wpa_drv_if_remove(parent, WPA_IF_MESH, ifname);
 		os_free(ifname);
 	}
 #endif /* CONFIG_MESH */
@@ -5969,6 +5993,7 @@ int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 	case WPA_CTRL_REQ_SIM:
 		str_clear_free(eap->external_sim_resp);
 		eap->external_sim_resp = os_strdup(value);
+		eap->pending_req_sim = 0;
 		break;
 	case WPA_CTRL_REQ_PSK_PASSPHRASE:
 		if (wpa_config_set(ssid, "psk", value, 0) < 0)

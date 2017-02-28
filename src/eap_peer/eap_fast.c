@@ -484,7 +484,8 @@ static int eap_fast_phase2_request(struct eap_sm *sm,
 
 	if (*resp == NULL && config &&
 	    (config->pending_req_identity || config->pending_req_password ||
-	     config->pending_req_otp || config->pending_req_new_password)) {
+	     config->pending_req_otp || config->pending_req_new_password ||
+	     config->pending_req_sim)) {
 		wpabuf_free(data->pending_phase2_req);
 		data->pending_phase2_req = wpabuf_alloc_copy(hdr, len);
 	} else if (*resp == NULL)
@@ -1677,6 +1678,10 @@ static Boolean eap_fast_has_reauth_data(struct eap_sm *sm, void *priv)
 static void eap_fast_deinit_for_reauth(struct eap_sm *sm, void *priv)
 {
 	struct eap_fast_data *data = priv;
+
+	if (data->phase2_priv && data->phase2_method &&
+	    data->phase2_method->deinit_for_reauth)
+		data->phase2_method->deinit_for_reauth(sm, data->phase2_priv);
 	os_free(data->key_block_p);
 	data->key_block_p = NULL;
 	wpabuf_free(data->pending_phase2_req);
