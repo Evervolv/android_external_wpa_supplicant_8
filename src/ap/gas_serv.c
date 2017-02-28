@@ -50,9 +50,12 @@ gas_dialog_create(struct hostapd_data *hapd, const u8 *addr, u8 dialog_token)
 		sta->flags |= WLAN_STA_GAS;
 		/*
 		 * The default inactivity is 300 seconds. We don't need
-		 * it to be that long.
+		 * it to be that long. Use five second timeout and increase this
+		 * with the comeback_delay for testing cases.
 		 */
-		ap_sta_session_timeout(hapd, sta, 5);
+		ap_sta_session_timeout(hapd, sta,
+				       hapd->conf->gas_comeback_delay / 1024 +
+				       5);
 	} else {
 		ap_sta_replenish_timeout(hapd, sta, 5);
 	}
@@ -688,7 +691,7 @@ static void anqp_add_osu_provider(struct wpabuf *buf,
 
 	/* OSU Method List */
 	count = wpabuf_put(buf, 1);
-	for (i = 0; p->method_list[i] >= 0; i++)
+	for (i = 0; p->method_list && p->method_list[i] >= 0; i++)
 		wpabuf_put_u8(buf, p->method_list[i]);
 	*count = i;
 

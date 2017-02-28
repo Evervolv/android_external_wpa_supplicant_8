@@ -2489,6 +2489,28 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		bss->wpa_gmk_rekey = atoi(pos);
 	} else if (os_strcmp(buf, "wpa_ptk_rekey") == 0) {
 		bss->wpa_ptk_rekey = atoi(pos);
+	} else if (os_strcmp(buf, "wpa_group_update_count") == 0) {
+		char *endp;
+		unsigned long val = strtoul(pos, &endp, 0);
+
+		if (*endp || val < 1 || val > (u32) -1) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: Invalid wpa_group_update_count=%lu; allowed range 1..4294967295",
+				   line, val);
+			return 1;
+		}
+		bss->wpa_group_update_count = (u32) val;
+	} else if (os_strcmp(buf, "wpa_pairwise_update_count") == 0) {
+		char *endp;
+		unsigned long val = strtoul(pos, &endp, 0);
+
+		if (*endp || val < 1 || val > (u32) -1) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: Invalid wpa_pairwise_update_count=%lu; allowed range 1..4294967295",
+				   line, val);
+			return 1;
+		}
+		bss->wpa_pairwise_update_count = (u32) val;
 	} else if (os_strcmp(buf, "wpa_passphrase") == 0) {
 		int len = os_strlen(pos);
 		if (len < 8 || len > 63) {
@@ -2986,6 +3008,24 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "use_sta_nsts") == 0) {
 		bss->use_sta_nsts = atoi(pos);
 #endif /* CONFIG_IEEE80211AC */
+#ifdef CONFIG_IEEE80211AX
+	} else if (os_strcmp(buf, "ieee80211ax") == 0) {
+		conf->ieee80211ax = atoi(pos);
+	} else if (os_strcmp(buf, "he_su_beamformer") == 0) {
+		conf->he_phy_capab.he_su_beamformer = atoi(pos);
+	} else if (os_strcmp(buf, "he_su_beamformee") == 0) {
+		conf->he_phy_capab.he_su_beamformee = atoi(pos);
+	} else if (os_strcmp(buf, "he_mu_beamformer") == 0) {
+		conf->he_phy_capab.he_mu_beamformer = atoi(pos);
+	} else if (os_strcmp(buf, "he_bss_color") == 0) {
+		conf->he_op.he_bss_color = atoi(pos);
+	} else if (os_strcmp(buf, "he_default_pe_duration") == 0) {
+		conf->he_op.he_default_pe_duration = atoi(pos);
+	} else if (os_strcmp(buf, "he_twt_required") == 0) {
+		conf->he_op.he_twt_required = atoi(pos);
+	} else if (os_strcmp(buf, "he_rts_threshold") == 0) {
+		conf->he_op.he_rts_threshold = atoi(pos);
+#endif /* CONFIG_IEEE80211AX */
 	} else if (os_strcmp(buf, "max_listen_interval") == 0) {
 		bss->max_listen_interval = atoi(pos);
 	} else if (os_strcmp(buf, "disable_pmksa_caching") == 0) {
@@ -3615,6 +3655,21 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "fils_realm") == 0) {
 		if (parse_fils_realm(bss, pos) < 0)
 			return 1;
+	} else if (os_strcmp(buf, "dhcp_server") == 0) {
+		if (hostapd_parse_ip_addr(pos, &bss->dhcp_server)) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: invalid IP address '%s'",
+				   line, pos);
+			return 1;
+		}
+	} else if (os_strcmp(buf, "dhcp_rapid_commit_proxy") == 0) {
+		bss->dhcp_rapid_commit_proxy = atoi(pos);
+	} else if (os_strcmp(buf, "fils_hlp_wait_time") == 0) {
+		bss->fils_hlp_wait_time = atoi(pos);
+	} else if (os_strcmp(buf, "dhcp_server_port") == 0) {
+		bss->dhcp_server_port = atoi(pos);
+	} else if (os_strcmp(buf, "dhcp_relay_port") == 0) {
+		bss->dhcp_relay_port = atoi(pos);
 #endif /* CONFIG_FILS */
 	} else if (os_strcmp(buf, "multicast_to_unicast") == 0) {
 		bss->multicast_to_unicast = atoi(pos);

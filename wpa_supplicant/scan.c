@@ -1249,6 +1249,26 @@ int wpa_supplicant_delayed_sched_scan(struct wpa_supplicant *wpa_s,
 }
 
 
+static void
+wpa_scan_set_relative_rssi_params(struct wpa_supplicant *wpa_s,
+				  struct wpa_driver_scan_params *params)
+{
+	if (wpa_s->wpa_state != WPA_COMPLETED ||
+	    !(wpa_s->drv_flags & WPA_DRIVER_FLAGS_SCHED_SCAN_RELATIVE_RSSI) ||
+	    wpa_s->srp.relative_rssi_set == 0)
+		return;
+
+	params->relative_rssi_set = 1;
+	params->relative_rssi = wpa_s->srp.relative_rssi;
+
+	if (wpa_s->srp.relative_adjust_rssi == 0)
+		return;
+
+	params->relative_adjust_band = wpa_s->srp.relative_adjust_band;
+	params->relative_adjust_rssi = wpa_s->srp.relative_adjust_rssi;
+}
+
+
 /**
  * wpa_supplicant_req_sched_scan - Start a periodic scheduled scan
  * @wpa_s: Pointer to wpa_supplicant data
@@ -1502,6 +1522,8 @@ scan:
 				ETH_ALEN;
 		}
 	}
+
+	wpa_scan_set_relative_rssi_params(wpa_s, scan_params);
 
 	ret = wpa_supplicant_start_sched_scan(wpa_s, scan_params);
 	wpabuf_free(extra_ie);
@@ -1766,10 +1788,12 @@ struct wpabuf * wpa_scan_get_vendor_ie_multi(const struct wpa_scan_res *res,
  * This doc https://supportforums.cisco.com/docs/DOC-12954 says, "the general
  * rule of thumb is that any SNR above 20 is good." This one
  * http://www.cisco.com/en/US/tech/tk722/tk809/technologies_q_and_a_item09186a00805e9a96.shtml#qa23
- * recommends 25 as a minimum SNR for 54 Mbps data rate. 30 is chosen here as a
- * conservative value.
+ * recommends 25 as a minimum SNR for 54 Mbps data rate. The estimates used in
+ * scan_est_throughput() allow even smaller SNR values for the maximum rates
+ * (21 for 54 Mbps, 22 for VHT80 MCS9, 24 for HT40 and HT20 MCS7). Use 25 as a
+ * somewhat conservative value here.
  */
-#define GREAT_SNR 30
+#define GREAT_SNR 25
 
 #define IS_5GHZ(n) (n > 4000)
 
@@ -1817,10 +1841,12 @@ static int wpa_scan_result_compar(const void *a, const void *b)
 	}
 
 	/* if SNR is close, decide by max rate or frequency band */
-	if ((snr_a && snr_b && abs(snr_b - snr_a) < 5) ||
-	    (wa->qual && wb->qual && abs(wb->qual - wa->qual) < 10)) {
+	if (snr_a && snr_b && abs(snr_b - snr_a) < 7) {
 		if (wa->est_throughput != wb->est_throughput)
 			return wb->est_throughput - wa->est_throughput;
+	}
+	if ((snr_a && snr_b && abs(snr_b - snr_a) < 5) ||
+	    (wa->qual && wb->qual && abs(wb->qual - wa->qual) < 10)) {
 		if (IS_5GHZ(wa->freq) ^ IS_5GHZ(wb->freq))
 			return IS_5GHZ(wa->freq) ? -1 : 1;
 	}
@@ -2392,6 +2418,10 @@ wpa_scan_clone_params(const struct wpa_driver_scan_params *src)
 		params->bssid = bssid;
 	}
 
+	params->relative_rssi_set = src->relative_rssi_set;
+	params->relative_rssi = src->relative_rssi;
+	params->relative_adjust_band = src->relative_adjust_band;
+	params->relative_adjust_rssi = src->relative_adjust_rssi;
 	return params;
 
 failed:
@@ -2449,7 +2479,7 @@ int wpas_start_pno(struct wpa_supplicant *wpa_s)
 		return 0;
 
 	if ((wpa_s->wpa_state > WPA_SCANNING) &&
-	    (wpa_s->wpa_state <= WPA_COMPLETED)) {
+	    (wpa_s->wpa_state < WPA_COMPLETED)) {
 		wpa_printf(MSG_ERROR, "PNO: In assoc process");
 		return -EAGAIN;
 	}
@@ -2569,6 +2599,8 @@ int wpas_start_pno(struct wpa_supplicant *wpa_s)
 			params.mac_addr_mask = wpa_s->mac_addr_pno + ETH_ALEN;
 		}
 	}
+
+	wpa_scan_set_relative_rssi_params(wpa_s, &params);
 
 	ret = wpa_supplicant_start_sched_scan(wpa_s, &params);
 	os_free(params.filter_ssids);

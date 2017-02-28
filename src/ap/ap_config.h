@@ -330,6 +330,8 @@ struct hostapd_bss_config {
 	int wpa_strict_rekey;
 	int wpa_gmk_rekey;
 	int wpa_ptk_rekey;
+	u32 wpa_group_update_count;
+	u32 wpa_pairwise_update_count;
 	int rsn_pairwise;
 	int rsn_preauth;
 	char *rsn_preauth_interfaces;
@@ -607,11 +609,34 @@ struct hostapd_bss_config {
 	u8 fils_cache_id[FILS_CACHE_ID_LEN];
 	int fils_cache_id_set;
 	struct dl_list fils_realms; /* list of struct fils_realm */
+	struct hostapd_ip_addr dhcp_server;
+	int dhcp_rapid_commit_proxy;
+	unsigned int fils_hlp_wait_time;
+	u16 dhcp_server_port;
+	u16 dhcp_relay_port;
 #endif /* CONFIG_FILS */
 
 	int multicast_to_unicast;
 };
 
+/**
+ * struct he_phy_capabilities_info - HE PHY capabilities
+ */
+struct he_phy_capabilities_info {
+	Boolean he_su_beamformer;
+	Boolean he_su_beamformee;
+	Boolean he_mu_beamformer;
+};
+
+/**
+ * struct he_operation - HE operation
+ */
+struct he_operation {
+	u8 he_bss_color;
+	u8 he_default_pe_duration;
+	u8 he_twt_required;
+	u8 he_rts_threshold;
+};
 
 /**
  * struct hostapd_config - Per-radio interface configuration
@@ -725,6 +750,12 @@ struct hostapd_config {
 	struct wpabuf *lci;
 	struct wpabuf *civic;
 	int stationary_ap;
+
+	int ieee80211ax;
+#ifdef CONFIG_IEEE80211AX
+	struct he_phy_capabilities_info he_phy_capab;
+	struct he_operation he_op;
+#endif /* CONFIG_IEEE80211AX */
 };
 
 

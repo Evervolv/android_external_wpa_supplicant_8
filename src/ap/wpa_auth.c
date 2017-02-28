@@ -60,8 +60,6 @@ static void wpa_group_put(struct wpa_authenticator *wpa_auth,
 			  struct wpa_group *group);
 static u8 * ieee80211w_kde_add(struct wpa_state_machine *sm, u8 *pos);
 
-static const u32 dot11RSNAConfigGroupUpdateCount = 4;
-static const u32 dot11RSNAConfigPairwiseUpdateCount = 4;
 static const u32 eapol_key_timeout_first = 100; /* ms */
 static const u32 eapol_key_timeout_subseq = 1000; /* ms */
 static const u32 eapol_key_timeout_first_group = 500; /* ms */
@@ -515,11 +513,6 @@ void wpa_deinit(struct wpa_authenticator *wpa_auth)
 	eloop_cancel_timeout(wpa_rekey_gmk, wpa_auth, NULL);
 	eloop_cancel_timeout(wpa_rekey_gtk, wpa_auth, NULL);
 
-#ifdef CONFIG_PEERKEY
-	while (wpa_auth->stsl_negotiations)
-		wpa_stsl_remove(wpa_auth, wpa_auth->stsl_negotiations);
-#endif /* CONFIG_PEERKEY */
-
 	pmksa_cache_auth_deinit(wpa_auth->pmksa);
 
 #ifdef CONFIG_IEEE80211R_AP
@@ -615,6 +608,7 @@ int wpa_auth_sta_associated(struct wpa_authenticator *wpa_auth,
 				"start 4-way handshake");
 		/* Go to PTKINITDONE state to allow GTK rekeying */
 		sm->wpa_ptk_state = WPA_PTK_PTKINITDONE;
+		sm->Pair = TRUE;
 		return 0;
 	}
 #endif /* CONFIG_IEEE80211R_AP */
@@ -625,6 +619,7 @@ int wpa_auth_sta_associated(struct wpa_authenticator *wpa_auth,
 				"FILS authentication already completed - do not start 4-way handshake");
 		/* Go to PTKINITDONE state to allow GTK rekeying */
 		sm->wpa_ptk_state = WPA_PTK_PTKINITDONE;
+		sm->Pair = TRUE;
 		return 0;
 	}
 #endif /* CONFIG_FILS */
@@ -862,7 +857,8 @@ static int wpa_try_alt_snonce(struct wpa_state_machine *sm, u8 *data,
 			pmk_len = sm->pmk_len;
 		}
 
-		wpa_derive_ptk(sm, sm->alt_SNonce, pmk, pmk_len, &PTK);
+		if (wpa_derive_ptk(sm, sm->alt_SNonce, pmk, pmk_len, &PTK) < 0)
+			break;
 
 		if (wpa_verify_key_mic(sm->wpa_key_mgmt, &PTK, data, data_len)
 		    == 0) {
@@ -1482,9 +1478,11 @@ void __wpa_send_eapol(struct wpa_authenticator *wpa_auth,
 	WPA_PUT_BE16(key->key_info, key_info);
 
 	alg = pairwise ? sm->pairwise : wpa_auth->conf.wpa_group;
-	WPA_PUT_BE16(key->key_length, wpa_cipher_key_len(alg));
-	if (key_info & WPA_KEY_INFO_SMK_MESSAGE)
+	if ((key_info & WPA_KEY_INFO_SMK_MESSAGE) ||
+	    (sm->wpa == WPA_VERSION_WPA2 && !pairwise))
 		WPA_PUT_BE16(key->key_length, 0);
+	else
+		WPA_PUT_BE16(key->key_length, wpa_cipher_key_len(alg));
 
 	/* FIX: STSL: what to use as key_replay_counter? */
 	for (i = RSNA_MAX_EAPOL_RETRIES - 1; i > 0; i--) {
@@ -1619,7 +1617,7 @@ static void wpa_send_eapol(struct wpa_authenticator *wpa_auth,
 {
 	int timeout_ms;
 	int pairwise = key_info & WPA_KEY_INFO_KEY_TYPE;
-	int ctr;
+	u32 ctr;
 
 	if (sm == NULL)
 		return;
@@ -1636,7 +1634,7 @@ static void wpa_send_eapol(struct wpa_authenticator *wpa_auth,
 	if (pairwise && ctr == 1 && !(key_info & WPA_KEY_INFO_MIC))
 		sm->pending_1_of_4_timeout = 1;
 	wpa_printf(MSG_DEBUG, "WPA: Use EAPOL-Key timeout of %u ms (retry "
-		   "counter %d)", timeout_ms, ctr);
+		   "counter %u)", timeout_ms, ctr);
 	eloop_register_timeout(timeout_ms / 1000, (timeout_ms % 1000) * 1000,
 			       wpa_send_eapol_timeout, wpa_auth, sm);
 }
@@ -1927,7 +1925,7 @@ SM_STATE(WPA_PTK, INITPMK)
 	} else if (wpa_auth_get_msk(sm->wpa_auth, sm->addr, msk, &len) == 0) {
 		unsigned int pmk_len;
 
-		if (sm->wpa_key_mgmt & WPA_KEY_MGMT_IEEE8021X_SUITE_B_192)
+		if (wpa_key_mgmt_sha384(sm->wpa_key_mgmt))
 			pmk_len = PMK_LEN_SUITE_B_192;
 		else
 			pmk_len = PMK_LEN;
@@ -1998,7 +1996,7 @@ SM_STATE(WPA_PTK, PTKSTART)
 	sm->alt_snonce_valid = FALSE;
 
 	sm->TimeoutCtr++;
-	if (sm->TimeoutCtr > (int) dot11RSNAConfigPairwiseUpdateCount) {
+	if (sm->TimeoutCtr > sm->wpa_auth->conf.wpa_pairwise_update_count) {
 		/* No point in sending the EAPOL-Key - we will disconnect
 		 * immediately following this. */
 		return;
@@ -2230,10 +2228,10 @@ int fils_decrypt_assoc(struct wpa_state_machine *sm, const u8 *fils_session,
 	 * field to the FILS Session element (both inclusive).
 	 */
 	aad[4] = (const u8 *) &mgmt->u.assoc_req.capab_info;
-	aad_len[4] = crypt - aad[0];
+	aad_len[4] = crypt - aad[4];
 
 	if (aes_siv_decrypt(sm->PTK.kek, sm->PTK.kek_len, crypt, end - crypt,
-			    1, aad, aad_len, pos + (crypt - ie_start)) < 0) {
+			    5, aad, aad_len, pos + (crypt - ie_start)) < 0) {
 		wpa_printf(MSG_DEBUG,
 			   "FILS: Invalid AES-SIV data in the frame");
 		return -1;
@@ -2274,7 +2272,8 @@ int fils_decrypt_assoc(struct wpa_state_machine *sm, const u8 *fils_session,
 
 
 int fils_encrypt_assoc(struct wpa_state_machine *sm, u8 *buf,
-		       size_t current_len, size_t max_len)
+		       size_t current_len, size_t max_len,
+		       const struct wpabuf *hlp)
 {
 	u8 *end = buf + max_len;
 	u8 *pos = buf + current_len;
@@ -2334,7 +2333,9 @@ int fils_encrypt_assoc(struct wpa_state_machine *sm, u8 *buf,
 	wpabuf_put_u8(plain, WLAN_EID_EXT_FILS_KEY_CONFIRM);
 	wpabuf_put_data(plain, sm->fils_key_auth_ap, sm->fils_key_auth_len);
 
-	/* TODO: FILS HLP Container */
+	/* FILS HLP Container */
+	if (hlp)
+		wpabuf_put_buf(plain, hlp);
 
 	/* TODO: FILS IP Address Assignment */
 
@@ -2464,7 +2465,8 @@ SM_STATE(WPA_PTK, PTKCALCNEGOTIATING)
 			pmk_len = sm->pmk_len;
 		}
 
-		wpa_derive_ptk(sm, sm->SNonce, pmk, pmk_len, &PTK);
+		if (wpa_derive_ptk(sm, sm->SNonce, pmk, pmk_len, &PTK) < 0)
+			break;
 
 		if (mic_len &&
 		    wpa_verify_key_mic(sm->wpa_key_mgmt, &PTK,
@@ -2686,7 +2688,7 @@ SM_STATE(WPA_PTK, PTKINITNEGOTIATING)
 	sm->TimeoutEvt = FALSE;
 
 	sm->TimeoutCtr++;
-	if (sm->TimeoutCtr > (int) dot11RSNAConfigPairwiseUpdateCount) {
+	if (sm->TimeoutCtr > sm->wpa_auth->conf.wpa_pairwise_update_count) {
 		/* No point in sending the EAPOL-Key - we will disconnect
 		 * immediately following this. */
 		return;
@@ -2981,11 +2983,12 @@ SM_STEP(WPA_PTK)
 		    sm->EAPOLKeyPairwise)
 			SM_ENTER(WPA_PTK, PTKCALCNEGOTIATING);
 		else if (sm->TimeoutCtr >
-			 (int) dot11RSNAConfigPairwiseUpdateCount) {
+			 sm->wpa_auth->conf.wpa_pairwise_update_count) {
 			wpa_auth->dot11RSNA4WayHandshakeFailures++;
-			wpa_auth_vlogger(sm->wpa_auth, sm->addr, LOGGER_DEBUG,
-					 "PTKSTART: Retry limit %d reached",
-					 dot11RSNAConfigPairwiseUpdateCount);
+			wpa_auth_vlogger(
+				sm->wpa_auth, sm->addr, LOGGER_DEBUG,
+				"PTKSTART: Retry limit %u reached",
+				sm->wpa_auth->conf.wpa_pairwise_update_count);
 			SM_ENTER(WPA_PTK, DISCONNECT);
 		} else if (sm->TimeoutEvt)
 			SM_ENTER(WPA_PTK, PTKSTART);
@@ -3009,12 +3012,12 @@ SM_STEP(WPA_PTK)
 			 sm->EAPOLKeyPairwise && sm->MICVerified)
 			SM_ENTER(WPA_PTK, PTKINITDONE);
 		else if (sm->TimeoutCtr >
-			 (int) dot11RSNAConfigPairwiseUpdateCount) {
+			 sm->wpa_auth->conf.wpa_pairwise_update_count) {
 			wpa_auth->dot11RSNA4WayHandshakeFailures++;
-			wpa_auth_vlogger(sm->wpa_auth, sm->addr, LOGGER_DEBUG,
-					 "PTKINITNEGOTIATING: Retry limit %d "
-					 "reached",
-					 dot11RSNAConfigPairwiseUpdateCount);
+			wpa_auth_vlogger(
+				sm->wpa_auth, sm->addr, LOGGER_DEBUG,
+				"PTKINITNEGOTIATING: Retry limit %u reached",
+				sm->wpa_auth->conf.wpa_pairwise_update_count);
 			SM_ENTER(WPA_PTK, DISCONNECT);
 		} else if (sm->TimeoutEvt)
 			SM_ENTER(WPA_PTK, PTKINITNEGOTIATING);
@@ -3049,7 +3052,7 @@ SM_STATE(WPA_PTK_GROUP, REKEYNEGOTIATING)
 	SM_ENTRY_MA(WPA_PTK_GROUP, REKEYNEGOTIATING, wpa_ptk_group);
 
 	sm->GTimeoutCtr++;
-	if (sm->GTimeoutCtr > (int) dot11RSNAConfigGroupUpdateCount) {
+	if (sm->GTimeoutCtr > sm->wpa_auth->conf.wpa_group_update_count) {
 		/* No point in sending the EAPOL-Key - we will disconnect
 		 * immediately following this. */
 		return;
@@ -3099,7 +3102,7 @@ SM_STATE(WPA_PTK_GROUP, REKEYNEGOTIATING)
 		       (wpa_mic_len(sm->wpa_key_mgmt) ? WPA_KEY_INFO_MIC : 0) |
 		       WPA_KEY_INFO_ACK |
 		       (!sm->Pair ? WPA_KEY_INFO_INSTALL : 0),
-		       rsc, gsm->GNonce, kde, kde_len, gsm->GN, 1);
+		       rsc, NULL, kde, kde_len, gsm->GN, 1);
 
 	os_free(kde_buf);
 }
@@ -3128,6 +3131,10 @@ SM_STATE(WPA_PTK_GROUP, KEYERROR)
 		sm->group->GKeyDoneStations--;
 	sm->GUpdateStationKeys = FALSE;
 	sm->Disconnect = TRUE;
+	wpa_auth_vlogger(sm->wpa_auth, sm->addr, LOGGER_INFO,
+			 "group key handshake failed (%s) after %u tries",
+			 sm->wpa == WPA_VERSION_WPA ? "WPA" : "RSN",
+			 sm->wpa_auth->conf.wpa_group_update_count);
 }
 
 
@@ -3147,7 +3154,7 @@ SM_STEP(WPA_PTK_GROUP)
 		    !sm->EAPOLKeyPairwise && sm->MICVerified)
 			SM_ENTER(WPA_PTK_GROUP, REKEYESTABLISHED);
 		else if (sm->GTimeoutCtr >
-			 (int) dot11RSNAConfigGroupUpdateCount)
+			 sm->wpa_auth->conf.wpa_group_update_count)
 			SM_ENTER(WPA_PTK_GROUP, KEYERROR);
 		else if (sm->TimeoutEvt)
 			SM_ENTER(WPA_PTK_GROUP, REKEYNEGOTIATING);
@@ -3607,8 +3614,8 @@ int wpa_get_mib(struct wpa_authenticator *wpa_auth, char *buf, size_t buflen)
 		"dot11RSNAConfigNumberOfGTKSAReplayCounters=0\n",
 		RSN_VERSION,
 		!!wpa_auth->conf.wpa_strict_rekey,
-		dot11RSNAConfigGroupUpdateCount,
-		dot11RSNAConfigPairwiseUpdateCount,
+		wpa_auth->conf.wpa_group_update_count,
+		wpa_auth->conf.wpa_pairwise_update_count,
 		wpa_cipher_key_len(wpa_auth->conf.wpa_group) * 8,
 		dot11RSNAConfigPMKLifetime,
 		dot11RSNAConfigPMKReauthThreshold,
@@ -3768,7 +3775,7 @@ int wpa_auth_pmksa_add(struct wpa_state_machine *sm, const u8 *pmk,
 	    sm->wpa_auth->conf.disable_pmksa_caching)
 		return -1;
 
-	if (sm->wpa_key_mgmt & WPA_KEY_MGMT_IEEE8021X_SUITE_B_192) {
+	if (wpa_key_mgmt_sha384(sm->wpa_key_mgmt)) {
 		if (pmk_len > PMK_LEN_SUITE_B_192)
 			pmk_len = PMK_LEN_SUITE_B_192;
 	} else if (pmk_len > PMK_LEN) {
