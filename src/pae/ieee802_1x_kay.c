@@ -1559,7 +1559,7 @@ ieee802_1x_mka_decode_dist_sak_body(
 		ieee802_1x_cp_connect_authenticated(kay->cp);
 		ieee802_1x_cp_sm_step(kay->cp);
 		wpa_printf(MSG_WARNING, "KaY:The Key server advise no MACsec");
-		participant->to_use_sak = TRUE;
+		participant->to_use_sak = FALSE;
 		return 0;
 	}
 
@@ -2361,9 +2361,9 @@ static void ieee802_1x_participant_timer(void *eloop_ctx, void *timeout_ctx)
 					      &participant->rxsc_list,
 					      struct receive_sc, list) {
 				if (sci_equal(&rxsc->sci, &peer->sci)) {
-					secy_delete_receive_sc(kay, rxsc);
 					ieee802_1x_kay_deinit_receive_sc(
 						participant, rxsc);
+					secy_delete_receive_sc(kay, rxsc);
 				}
 			}
 			dl_list_del(&peer->list);
@@ -2378,6 +2378,12 @@ static void ieee802_1x_participant_timer(void *eloop_ctx, void *timeout_ctx)
 			participant->advised_capability =
 				MACSEC_CAP_NOT_IMPLEMENTED;
 			participant->to_use_sak = FALSE;
+			participant->ltx = FALSE;
+			participant->lrx = FALSE;
+			participant->otx = FALSE;
+			participant->orx = FALSE;
+			participant->is_key_server = FALSE;
+			participant->is_elected = FALSE;
 			kay->authenticated = TRUE;
 			kay->secured = FALSE;
 			kay->failed = FALSE;
@@ -2422,7 +2428,8 @@ static void ieee802_1x_participant_timer(void *eloop_ctx, void *timeout_ctx)
 		participant->new_sak = FALSE;
 	}
 
-	if (participant->retry_count < MAX_RETRY_CNT) {
+	if (participant->retry_count < MAX_RETRY_CNT ||
+	    participant->mode == PSK) {
 		ieee802_1x_participant_send_mkpdu(participant);
 		participant->retry_count++;
 	}
@@ -2822,7 +2829,7 @@ int ieee802_1x_kay_enable_new_info(struct ieee802_1x_kay *kay)
 	if (!principal)
 		return -1;
 
-	if (principal->retry_count < MAX_RETRY_CNT) {
+	if (principal->retry_count < MAX_RETRY_CNT || principal->mode == PSK) {
 		ieee802_1x_participant_send_mkpdu(principal);
 		principal->retry_count++;
 	}
@@ -3362,6 +3369,7 @@ ieee802_1x_kay_create_mka(struct ieee802_1x_kay *kay, struct mka_key_name *ckn,
 		participant->mka_life = MKA_LIFE_TIME / 1000 + time(NULL) +
 			usecs / 1000000;
 	}
+	participant->mode = mode;
 
 	return participant;
 
@@ -3424,11 +3432,11 @@ ieee802_1x_kay_delete_mka(struct ieee802_1x_kay *kay, struct mka_key_name *ckn)
 	while (!dl_list_empty(&participant->rxsc_list)) {
 		rxsc = dl_list_entry(participant->rxsc_list.next,
 				     struct receive_sc, list);
-		secy_delete_receive_sc(kay, rxsc);
 		ieee802_1x_kay_deinit_receive_sc(participant, rxsc);
+		secy_delete_receive_sc(kay, rxsc);
 	}
-	secy_delete_transmit_sc(kay, participant->txsc);
 	ieee802_1x_kay_deinit_transmit_sc(participant, participant->txsc);
+	secy_delete_transmit_sc(kay, participant->txsc);
 
 	os_memset(&participant->cak, 0, sizeof(participant->cak));
 	os_memset(&participant->kek, 0, sizeof(participant->kek));

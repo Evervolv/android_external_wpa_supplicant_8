@@ -1,9 +1,9 @@
 # Example wpa_supplicant build time configuration
 #
 # This file lists the configuration options that are used when building the
-# hostapd binary. All lines starting with # are ignored. Configuration option
-# lines must be commented out complete, if they are not to be included, i.e.,
-# just setting VARIABLE=n is not disabling that variable.
+# wpa_supplicant binary. All lines starting with # are ignored. Configuration
+# option lines must be commented out complete, if they are not to be included,
+# i.e., just setting VARIABLE=n is not disabling that variable.
 #
 # This file is included in Makefile, so variables like CFLAGS and LIBS can also
 # be modified from here. In most cases, these lines should use += in order not
@@ -570,3 +570,13 @@ CONFIG_PEERKEY=y
 
 # Mesh Networking (IEEE 802.11s)
 #CONFIG_MESH=y
+
+# Background scanning modules
+# These can be used to request wpa_supplicant to perform background scanning
+# operations for roaming within an ESS (same SSID). See the bgscan parameter in
+# the wpa_supplicant.conf file for more details.
+# Periodic background scans based on signal strength
+#CONFIG_BGSCAN_SIMPLE=y
+# Learn channels used by the network and try to avoid bgscans on other
+# channels (experimental)
+#CONFIG_BGSCAN_LEARN=y

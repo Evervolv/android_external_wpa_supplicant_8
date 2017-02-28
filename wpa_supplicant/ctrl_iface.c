@@ -339,6 +339,75 @@ static int wpas_ctrl_iface_set_lci(struct wpa_supplicant *wpa_s,
 }
 
 
+static int
+wpas_ctrl_set_relative_rssi(struct wpa_supplicant *wpa_s, const char *cmd)
+{
+	int relative_rssi;
+
+	if (os_strcmp(cmd, "disable") == 0) {
+		wpa_s->srp.relative_rssi_set = 0;
+		return 0;
+	}
+
+	relative_rssi = atoi(cmd);
+	if (relative_rssi < 0 || relative_rssi > 100)
+		return -1;
+	wpa_s->srp.relative_rssi = relative_rssi;
+	wpa_s->srp.relative_rssi_set = 1;
+	return 0;
+}
+
+
+static int wpas_ctrl_set_relative_band_adjust(struct wpa_supplicant *wpa_s,
+					      const char *cmd)
+{
+	char *pos;
+	int adjust_rssi;
+
+	/* <band>:adjust_value */
+	pos = os_strchr(cmd, ':');
+	if (!pos)
+		return -1;
+	pos++;
+	adjust_rssi = atoi(pos);
+	if (adjust_rssi < -100 || adjust_rssi > 100)
+		return -1;
+
+	if (os_strncmp(cmd, "2G", 2) == 0)
+		wpa_s->srp.relative_adjust_band = WPA_SETBAND_2G;
+	else if (os_strncmp(cmd, "5G", 2) == 0)
+		wpa_s->srp.relative_adjust_band = WPA_SETBAND_5G;
+	else
+		return -1;
+
+	wpa_s->srp.relative_adjust_rssi = adjust_rssi;
+
+	return 0;
+}
+
+
+static int wpas_ctrl_iface_set_ric_ies(struct wpa_supplicant *wpa_s,
+				   const char *cmd)
+{
+	struct wpabuf *ric_ies;
+
+	if (*cmd == '\0' || os_strcmp(cmd, "\"\"") == 0) {
+		wpabuf_free(wpa_s->ric_ies);
+		wpa_s->ric_ies = NULL;
+		return 0;
+	}
+
+	ric_ies = wpabuf_parse_bin(cmd);
+	if (!ric_ies)
+		return -1;
+
+	wpabuf_free(wpa_s->ric_ies);
+	wpa_s->ric_ies = ric_ies;
+
+	return 0;
+}
+
+
 static int wpa_supplicant_ctrl_iface_set(struct wpa_supplicant *wpa_s,
 					 char *cmd)
 {
@@ -530,6 +599,12 @@ static int wpa_supplicant_ctrl_iface_set(struct wpa_supplicant *wpa_s,
 		wpa_s->ignore_assoc_disallow = !!atoi(value);
 	} else if (os_strcasecmp(cmd, "reject_btm_req_reason") == 0) {
 		wpa_s->reject_btm_req_reason = atoi(value);
+	} else if (os_strcasecmp(cmd, "get_pref_freq_list_override") == 0) {
+		os_free(wpa_s->get_pref_freq_list_override);
+		if (!value[0])
+			wpa_s->get_pref_freq_list_override = NULL;
+		else
+			wpa_s->get_pref_freq_list_override = os_strdup(value);
 #endif /* CONFIG_TESTING_OPTIONS */
 #ifndef CONFIG_NO_CONFIG_BLOBS
 	} else if (os_strcmp(cmd, "blob") == 0) {
@@ -551,6 +626,12 @@ static int wpa_supplicant_ctrl_iface_set(struct wpa_supplicant *wpa_s,
 		ret = wpas_ctrl_iface_set_lci(wpa_s, value);
 	} else if (os_strcasecmp(cmd, "tdls_trigger_control") == 0) {
 		ret = wpa_drv_set_tdls_mode(wpa_s, atoi(value));
+	} else if (os_strcasecmp(cmd, "relative_rssi") == 0) {
+		ret = wpas_ctrl_set_relative_rssi(wpa_s, value);
+	} else if (os_strcasecmp(cmd, "relative_band_adjust") == 0) {
+		ret = wpas_ctrl_set_relative_band_adjust(wpa_s, value);
+	} else if (os_strcasecmp(cmd, "ric_ies") == 0) {
+		ret = wpas_ctrl_iface_set_ric_ies(wpa_s, value);
 	} else {
 		value[-1] = '=';
 		ret = wpa_config_process_global(wpa_s->conf, cmd, -1);
@@ -6038,10 +6119,24 @@ static int p2p_ctrl_group_member(struct wpa_supplicant *wpa_s, const char *cmd,
 }
 
 
+static int wpas_find_p2p_dev_addr_bss(struct wpa_global *global,
+				      const u8 *p2p_dev_addr)
+{
+	struct wpa_supplicant *wpa_s;
+
+	for (wpa_s = global->ifaces; wpa_s; wpa_s = wpa_s->next) {
+		if (wpa_bss_get_p2p_dev_addr(wpa_s, p2p_dev_addr))
+			return 1;
+	}
+
+	return 0;
+}
+
+
 static int p2p_ctrl_peer(struct wpa_supplicant *wpa_s, char *cmd,
 			 char *buf, size_t buflen)
 {
-	u8 addr[ETH_ALEN], *addr_ptr;
+	u8 addr[ETH_ALEN], *addr_ptr, group_capab;
 	int next, res;
 	const struct p2p_peer_info *info;
 	char *pos, *end;
@@ -6070,6 +6165,16 @@ static int p2p_ctrl_peer(struct wpa_supplicant *wpa_s, char *cmd,
 	info = p2p_get_peer_info(wpa_s->global->p2p, addr_ptr, next);
 	if (info == NULL)
 		return -1;
+	group_capab = info->group_capab;
+
+	if (group_capab &&
+	    !wpas_find_p2p_dev_addr_bss(wpa_s->global, info->p2p_device_addr)) {
+		wpa_printf(MSG_DEBUG,
+			   "P2P: Could not find any BSS with p2p_dev_addr "
+			   MACSTR ", hence override group_capab from 0x%x to 0",
+			   MAC2STR(info->p2p_device_addr), group_capab);
+		group_capab = 0;
+	}
 
 	pos = buf;
 	end = buf + buflen;
@@ -6095,7 +6200,7 @@ static int p2p_ctrl_peer(struct wpa_supplicant *wpa_s, char *cmd,
 			  info->serial_number,
 			  info->config_methods,
 			  info->dev_capab,
-			  info->group_capab,
+			  group_capab,
 			  info->level);
 	if (os_snprintf_error(end - pos, res))
 		return pos - buf;
@@ -6373,6 +6478,20 @@ static int p2p_ctrl_set(struct wpa_supplicant *wpa_s, char *cmd)
 
 	if (os_strcmp(cmd, "disable_ip_addr_req") == 0) {
 		wpa_s->p2p_disable_ip_addr_req = !!atoi(param);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "override_pref_op_chan") == 0) {
+		int op_class, chan;
+
+		op_class = atoi(param);
+		param = os_strchr(param, ':');
+		if (!param)
+			return -1;
+		param++;
+		chan = atoi(param);
+		p2p_set_override_pref_op_chan(wpa_s->global->p2p, op_class,
+					      chan);
 		return 0;
 	}
 
@@ -7144,6 +7263,46 @@ static int wpas_ctrl_iface_signal_monitor(struct wpa_supplicant *wpa_s,
 }
 
 
+#ifdef CONFIG_TESTING_OPTIONS
+int wpas_ctrl_iface_get_pref_freq_list_override(struct wpa_supplicant *wpa_s,
+						enum wpa_driver_if_type if_type,
+						unsigned int *num,
+						unsigned int *freq_list)
+{
+	char *pos = wpa_s->get_pref_freq_list_override;
+	char *end;
+	unsigned int count = 0;
+
+	/* Override string format:
+	 *  <if_type1>:<freq1>,<freq2>,... <if_type2>:... */
+
+	while (pos) {
+		if (atoi(pos) == (int) if_type)
+			break;
+		pos = os_strchr(pos, ' ');
+		if (pos)
+			pos++;
+	}
+	if (!pos)
+		return -1;
+	pos = os_strchr(pos, ':');
+	if (!pos)
+		return -1;
+	pos++;
+	end = os_strchr(pos, ' ');
+	while (pos && (!end || pos < end) && count < *num) {
+		freq_list[count++] = atoi(pos);
+		pos = os_strchr(pos, ',');
+		if (pos)
+			pos++;
+	}
+
+	*num = count;
+	return 0;
+}
+#endif /* CONFIG_TESTING_OPTIONS */
+
+
 static int wpas_ctrl_iface_get_pref_freq_list(
 	struct wpa_supplicant *wpa_s, char *cmd, char *buf, size_t buflen)
 {
@@ -7435,6 +7594,8 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 	wpa_s->ignore_assoc_disallow = 0;
 	wpa_s->reject_btm_req_reason = 0;
 	wpa_sm_set_test_assoc_ie(wpa_s->wpa, NULL);
+	os_free(wpa_s->get_pref_freq_list_override);
+	wpa_s->get_pref_freq_list_override = NULL;
 #endif /* CONFIG_TESTING_OPTIONS */
 
 	wpa_s->disconnected = 0;
@@ -7457,6 +7618,9 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 #ifdef CONFIG_SME
 	wpa_s->sme.last_unprot_disconnect.sec = 0;
 #endif /* CONFIG_SME */
+
+	wpabuf_free(wpa_s->ric_ies);
+	wpa_s->ric_ies = NULL;
 }
 
 
@@ -8045,6 +8209,7 @@ static int wpas_ctrl_iface_driver_scan_res(struct wpa_supplicant *wpa_s,
 	struct wpa_scan_res *res;
 	struct os_reltime now;
 	char *pos, *end;
+	int ret = -1;
 
 	if (!param)
 		return -1;
@@ -8072,8 +8237,8 @@ static int wpas_ctrl_iface_driver_scan_res(struct wpa_supplicant *wpa_s,
 		res->flags = strtol(pos + 7, NULL, 16);
 
 	pos = os_strstr(param, " bssid=");
-	if (pos)
-		hwaddr_aton(pos + 7, res->bssid);
+	if (pos && hwaddr_aton(pos + 7, res->bssid))
+		goto fail;
 
 	pos = os_strstr(param, " freq=");
 	if (pos)
@@ -8120,8 +8285,8 @@ static int wpas_ctrl_iface_driver_scan_res(struct wpa_supplicant *wpa_s,
 		res->parent_tsf = strtoll(pos + 7, NULL, 16);
 
 	pos = os_strstr(param, " tsf_bssid=");
-	if (pos)
-		hwaddr_aton(pos + 11, res->tsf_bssid);
+	if (pos && hwaddr_aton(pos + 11, res->tsf_bssid))
+		goto fail;
 
 	pos = os_strstr(param, " ie=");
 	if (pos) {
@@ -8130,7 +8295,8 @@ static int wpas_ctrl_iface_driver_scan_res(struct wpa_supplicant *wpa_s,
 		if (!end)
 			end = pos + os_strlen(pos);
 		res->ie_len = (end - pos) / 2;
-		hexstr2bin(pos, (u8 *) (res + 1), res->ie_len);
+		if (hexstr2bin(pos, (u8 *) (res + 1), res->ie_len))
+			goto fail;
 	}
 
 	pos = os_strstr(param, " beacon_ie=");
@@ -8140,15 +8306,18 @@ static int wpas_ctrl_iface_driver_scan_res(struct wpa_supplicant *wpa_s,
 		if (!end)
 			end = pos + os_strlen(pos);
 		res->beacon_ie_len = (end - pos) / 2;
-		hexstr2bin(pos, ((u8 *) (res + 1)) + res->ie_len,
-			   res->beacon_ie_len);
+		if (hexstr2bin(pos, ((u8 *) (res + 1)) + res->ie_len,
+			       res->beacon_ie_len))
+			goto fail;
 	}
 
 	os_get_reltime(&now);
 	wpa_bss_update_scan_res(wpa_s, res, &now);
+	ret = 0;
+fail:
 	os_free(res);
 
-	return 0;
+	return ret;
 }
 
 

@@ -307,7 +307,7 @@ endif
 
 ifdef CONFIG_FILS
 CFLAGS += -DCONFIG_FILS
-NEED_CRC32=y
+OBJS += ../src/ap/fils_hlp.o
 NEED_SHA384=y
 NEED_AES_SIV=y
 endif
@@ -323,6 +323,11 @@ endif
 
 ifdef CONFIG_IEEE80211AC
 CFLAGS += -DCONFIG_IEEE80211AC
+endif
+
+ifdef CONFIG_IEEE80211AX
+CFLAGS += -DCONFIG_IEEE80211AX
+OBJS += ../src/ap/ieee802_11_he.o
 endif
 
 ifdef CONFIG_MBO
@@ -875,6 +880,9 @@ endif
 endif
 ifdef NEED_SHA384
 CFLAGS += -DCONFIG_SHA384
+ifneq ($(CONFIG_TLS), openssl)
+OBJS += ../src/crypto/sha384.o
+endif
 OBJS += ../src/crypto/sha384-prf.o
 endif
 
@@ -902,10 +910,6 @@ endif
 
 ifdef NEED_ECC
 CFLAGS += -DCONFIG_ECC
-endif
-
-ifdef NEED_CRC32
-OBJS += ../src/utils/crc32.o
 endif
 
 ifdef CONFIG_NO_RANDOM_POOL

@@ -489,7 +489,7 @@ static void eap_peer_erp_init(struct eap_sm *sm)
 	u8 *emsk = NULL;
 	size_t emsk_len = 0;
 	u8 EMSKname[EAP_EMSK_NAME_LEN];
-	u8 len[2];
+	u8 len[2], ctx[3];
 	char *realm;
 	size_t realm_len, nai_buf_len;
 	struct eap_erp_key *erp = NULL;
@@ -526,7 +526,7 @@ static void eap_peer_erp_init(struct eap_sm *sm)
 
 	wpa_hexdump_key(MSG_DEBUG, "EAP: EMSK", emsk, emsk_len);
 
-	WPA_PUT_BE16(len, 8);
+	WPA_PUT_BE16(len, EAP_EMSK_NAME_LEN);
 	if (hmac_sha256_kdf(sm->eapSessionId, sm->eapSessionIdLen, "EMSK",
 			    len, sizeof(len),
 			    EMSKname, EAP_EMSK_NAME_LEN) < 0) {
@@ -550,9 +550,11 @@ static void eap_peer_erp_init(struct eap_sm *sm)
 	erp->rRK_len = emsk_len;
 	wpa_hexdump_key(MSG_DEBUG, "EAP: ERP rRK", erp->rRK, erp->rRK_len);
 
+	ctx[0] = EAP_ERP_CS_HMAC_SHA256_128;
+	WPA_PUT_BE16(&ctx[1], erp->rRK_len);
 	if (hmac_sha256_kdf(erp->rRK, erp->rRK_len,
-			    "EAP Re-authentication Integrity Key@ietf.org",
-			    len, sizeof(len), erp->rIK, erp->rRK_len) < 0) {
+			    "Re-authentication Integrity Key@ietf.org",
+			    ctx, sizeof(ctx), erp->rIK, erp->rRK_len) < 0) {
 		wpa_printf(MSG_DEBUG, "EAP: Could not derive rIK for ERP");
 		goto fail;
 	}
@@ -2244,6 +2246,7 @@ static void eap_sm_request(struct eap_sm *sm, enum wpa_ctrl_req_type field,
 		config->pending_req_passphrase++;
 		break;
 	case WPA_CTRL_REQ_SIM:
+		config->pending_req_sim++;
 		txt = msg;
 		break;
 	case WPA_CTRL_REQ_EXT_CERT_CHECK:
