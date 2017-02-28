@@ -1575,14 +1575,7 @@ SupplicantStatus StaNetwork::sendNetworkEapIdentityResponseInternal(
     const std::vector<uint8_t> &identity)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	// Convert the incoming parameters to a string to pass to
-	// wpa_supplicant.
-	uint32_t identity_hex_len = identity.size() * 2 + 1;
-	std::vector<char> identity_hex(identity_hex_len);
-	wpa_snprintf_hex(
-	    identity_hex.data(), identity_hex.size(), identity.data(),
-	    identity.size());
-	std::string ctrl_rsp_param = identity_hex.data();
+	std::string ctrl_rsp_param(identity.begin(), identity.end());
 	enum wpa_ctrl_req_type rtype = WPA_CTRL_REQ_EAP_IDENTITY;
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (wpa_supplicant_ctrl_rsp_handle(
