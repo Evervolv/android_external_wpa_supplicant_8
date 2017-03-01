@@ -728,7 +728,7 @@ StaIface::getMacAddressInternal()
 	    sizeof(driver_cmd_reply_buf));
 	// Reply is of the format: "Macaddr = XX:XX:XX:XX:XX:XX"
 	std::string reply_str = driver_cmd_reply_buf;
-	if (ret || reply_str.empty() ||
+	if (ret < 0 || reply_str.empty() ||
 	    reply_str.find("=") == std::string::npos) {
 		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
 	}
