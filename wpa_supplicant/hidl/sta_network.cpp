@@ -30,22 +30,22 @@ constexpr uint32_t kAllowedKeyMgmtMask =
      static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::FT_EAP) |
      static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::FT_PSK) |
      static_cast<uint32_t>(ISupplicantStaNetwork::KeyMgmtMask::OSEN));
-constexpr uint32_t kAllowedproto_mask =
+constexpr uint32_t kAllowedProtoMask =
     (static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::WPA) |
      static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::RSN) |
      static_cast<uint32_t>(ISupplicantStaNetwork::ProtoMask::OSEN));
-constexpr uint32_t kAllowedauth_alg_mask =
+constexpr uint32_t kAllowedAuthAlgMask =
     (static_cast<uint32_t>(ISupplicantStaNetwork::AuthAlgMask::OPEN) |
      static_cast<uint32_t>(ISupplicantStaNetwork::AuthAlgMask::SHARED) |
      static_cast<uint32_t>(ISupplicantStaNetwork::AuthAlgMask::LEAP));
-constexpr uint32_t kAllowedgroup_cipher_mask =
+constexpr uint32_t kAllowedGroupCipherMask =
     (static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::WEP40) |
      static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::WEP104) |
      static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::TKIP) |
      static_cast<uint32_t>(ISupplicantStaNetwork::GroupCipherMask::CCMP) |
      static_cast<uint32_t>(
 	 ISupplicantStaNetwork::GroupCipherMask::GTK_NOT_USED));
-constexpr uint32_t kAllowedpairwise_cipher_mask =
+constexpr uint32_t kAllowedPairwisewCipherMask =
     (static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::NONE) |
      static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::TKIP) |
      static_cast<uint32_t>(ISupplicantStaNetwork::PairwiseCipherMask::CCMP));
@@ -724,7 +724,7 @@ SupplicantStatus StaNetwork::setKeyMgmtInternal(uint32_t key_mgmt_mask)
 SupplicantStatus StaNetwork::setProtoInternal(uint32_t proto_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	if (proto_mask & ~kAllowedproto_mask) {
+	if (proto_mask & ~kAllowedProtoMask) {
 		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
 	}
 	wpa_ssid->proto = proto_mask;
@@ -736,7 +736,7 @@ SupplicantStatus StaNetwork::setProtoInternal(uint32_t proto_mask)
 SupplicantStatus StaNetwork::setAuthAlgInternal(uint32_t auth_alg_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	if (auth_alg_mask & ~kAllowedauth_alg_mask) {
+	if (auth_alg_mask & ~kAllowedAuthAlgMask) {
 		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
 	}
 	wpa_ssid->auth_alg = auth_alg_mask;
@@ -748,7 +748,7 @@ SupplicantStatus StaNetwork::setAuthAlgInternal(uint32_t auth_alg_mask)
 SupplicantStatus StaNetwork::setGroupCipherInternal(uint32_t group_cipher_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	if (group_cipher_mask & ~kAllowedgroup_cipher_mask) {
+	if (group_cipher_mask & ~kAllowedGroupCipherMask) {
 		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
 	}
 	wpa_ssid->group_cipher = group_cipher_mask;
@@ -761,7 +761,7 @@ SupplicantStatus StaNetwork::setPairwiseCipherInternal(
     uint32_t pairwise_cipher_mask)
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	if (pairwise_cipher_mask & ~kAllowedpairwise_cipher_mask) {
+	if (pairwise_cipher_mask & ~kAllowedPairwisewCipherMask) {
 		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, ""};
 	}
 	wpa_ssid->pairwise_cipher = pairwise_cipher_mask;
@@ -1128,31 +1128,36 @@ std::pair<SupplicantStatus, bool> StaNetwork::getScanSsidInternal()
 std::pair<SupplicantStatus, uint32_t> StaNetwork::getKeyMgmtInternal()
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	return {{SupplicantStatusCode::SUCCESS, ""}, wpa_ssid->key_mgmt};
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		wpa_ssid->key_mgmt & kAllowedKeyMgmtMask};
 }
 
 std::pair<SupplicantStatus, uint32_t> StaNetwork::getProtoInternal()
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	return {{SupplicantStatusCode::SUCCESS, ""}, wpa_ssid->proto};
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		wpa_ssid->proto & kAllowedProtoMask};
 }
 
 std::pair<SupplicantStatus, uint32_t> StaNetwork::getAuthAlgInternal()
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	return {{SupplicantStatusCode::SUCCESS, ""}, wpa_ssid->auth_alg};
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		wpa_ssid->auth_alg & kAllowedAuthAlgMask};
 }
 
 std::pair<SupplicantStatus, uint32_t> StaNetwork::getGroupCipherInternal()
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	return {{SupplicantStatusCode::SUCCESS, ""}, wpa_ssid->group_cipher};
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		wpa_ssid->group_cipher & kAllowedGroupCipherMask};
 }
 
 std::pair<SupplicantStatus, uint32_t> StaNetwork::getPairwiseCipherInternal()
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	return {{SupplicantStatusCode::SUCCESS, ""}, wpa_ssid->pairwise_cipher};
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		wpa_ssid->pairwise_cipher & kAllowedPairwisewCipherMask};
 }
 
 std::pair<SupplicantStatus, std::string> StaNetwork::getPskPassphraseInternal()
