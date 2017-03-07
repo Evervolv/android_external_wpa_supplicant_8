@@ -922,7 +922,8 @@ void HidlManager::notifyAssocReject(struct wpa_supplicant *wpa_s)
 	    wpa_s->ifname,
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onAssociationRejected,
-		std::placeholders::_1, bssid, wpa_s->assoc_status_code));
+		std::placeholders::_1, bssid, wpa_s->assoc_status_code,
+		wpa_s->assoc_timed_out == 1));
 }
 
 void HidlManager::notifyAuthTimeout(struct wpa_supplicant *wpa_s)
