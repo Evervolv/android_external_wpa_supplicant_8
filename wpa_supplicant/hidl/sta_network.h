@@ -76,6 +76,8 @@ public:
 	    setPairwiseCipher_cb _hidl_cb) override;
 	Return<void> setPskPassphrase(
 	    const hidl_string& psk, setPskPassphrase_cb _hidl_cb) override;
+	Return<void> setPsk(
+	    const hidl_array<uint8_t, 32>& psk, setPsk_cb _hidl_cb) override;
 	Return<void> setWepKey(
 	    uint32_t key_idx, const hidl_vec<uint8_t>& wep_key,
 	    setWepKey_cb _hidl_cb) override;
@@ -133,6 +135,7 @@ public:
 	Return<void> getGroupCipher(getGroupCipher_cb _hidl_cb) override;
 	Return<void> getPairwiseCipher(getPairwiseCipher_cb _hidl_cb) override;
 	Return<void> getPskPassphrase(getPskPassphrase_cb _hidl_cb) override;
+	Return<void> getPsk(getPsk_cb _hidl_cb) override;
 	Return<void> getWepKey(
 	    uint32_t key_idx, getWepKey_cb _hidl_cb) override;
 	Return<void> getWepTxKeyIdx(getWepTxKeyIdx_cb _hidl_cb) override;
@@ -200,6 +203,7 @@ private:
 	SupplicantStatus setPairwiseCipherInternal(
 	    uint32_t pairwise_cipher_mask);
 	SupplicantStatus setPskPassphraseInternal(const std::string& psk);
+	SupplicantStatus setPskInternal(const std::array<uint8_t, 32>& psk);
 	SupplicantStatus setWepKeyInternal(
 	    uint32_t key_idx, const std::vector<uint8_t>& wep_key);
 	SupplicantStatus setWepTxKeyIdxInternal(uint32_t key_idx);
@@ -237,6 +241,7 @@ private:
 	std::pair<SupplicantStatus, uint32_t> getGroupCipherInternal();
 	std::pair<SupplicantStatus, uint32_t> getPairwiseCipherInternal();
 	std::pair<SupplicantStatus, std::string> getPskPassphraseInternal();
+	std::pair<SupplicantStatus, std::array<uint8_t, 32>> getPskInternal();
 	std::pair<SupplicantStatus, std::vector<uint8_t>> getWepKeyInternal(
 	    uint32_t key_idx);
 	std::pair<SupplicantStatus, uint32_t> getWepTxKeyIdxInternal();
