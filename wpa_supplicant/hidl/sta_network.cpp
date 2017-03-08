@@ -193,6 +193,14 @@ Return<void> StaNetwork::setPskPassphrase(
 	    &StaNetwork::setPskPassphraseInternal, _hidl_cb, psk);
 }
 
+Return<void> StaNetwork::setPsk(
+    const hidl_array<uint8_t, 32> &psk, setPsk_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::setPskInternal, _hidl_cb, psk);
+}
+
 Return<void> StaNetwork::setWepKey(
     uint32_t key_idx, const hidl_vec<uint8_t> &wep_key, setWepKey_cb _hidl_cb)
 {
@@ -413,6 +421,13 @@ Return<void> StaNetwork::getPskPassphrase(getPskPassphrase_cb _hidl_cb)
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
 	    &StaNetwork::getPskPassphraseInternal, _hidl_cb);
+}
+
+Return<void> StaNetwork::getPsk(getPsk_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::getPskInternal, _hidl_cb);
 }
 
 Return<void> StaNetwork::getWepKey(uint32_t key_idx, getWepKey_cb _hidl_cb)
@@ -795,6 +810,18 @@ SupplicantStatus StaNetwork::setPskPassphraseInternal(const std::string &psk)
 	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
+SupplicantStatus StaNetwork::setPskInternal(const std::array<uint8_t, 32> &psk)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	WPA_ASSERT(psk.size() == sizeof(wpa_ssid->psk));
+	str_clear_free(wpa_ssid->passphrase);
+	wpa_ssid->passphrase = nullptr;
+	os_memcpy(wpa_ssid->psk, psk.data(), sizeof(wpa_ssid->psk));
+	wpa_ssid->psk_set = 1;
+	resetInternalStateAfterParamsUpdate();
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
 SupplicantStatus StaNetwork::setWepKeyInternal(
     uint32_t key_idx, const std::vector<uint8_t> &wep_key)
 {
@@ -1163,11 +1190,23 @@ std::pair<SupplicantStatus, uint32_t> StaNetwork::getPairwiseCipherInternal()
 std::pair<SupplicantStatus, std::string> StaNetwork::getPskPassphraseInternal()
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
-	std::string psk;
-	if (wpa_ssid->passphrase) {
-		psk = wpa_ssid->passphrase;
+	if (!wpa_ssid->passphrase) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
 	}
-	return {{SupplicantStatusCode::SUCCESS, ""}, std::move(psk)};
+	return {{SupplicantStatusCode::SUCCESS, ""}, wpa_ssid->passphrase};
+}
+
+std::pair<SupplicantStatus, std::array<uint8_t, 32>>
+StaNetwork::getPskInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	WPA_ASSERT(psk.size() == sizeof(wpa_ssid->psk));
+	if (!wpa_ssid->psk_set) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	std::array<uint8_t, 32> psk;
+	os_memcpy(psk.data(), wpa_ssid->psk, psk.size());
+	return {{SupplicantStatusCode::SUCCESS, ""}, psk};
 }
 
 std::pair<SupplicantStatus, std::vector<uint8_t>> StaNetwork::getWepKeyInternal(
