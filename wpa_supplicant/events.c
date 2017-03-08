@@ -3806,6 +3806,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 				data->assoc_reject.timed_out ? " timeout" : "",
 				buf);
 		wpa_s->assoc_status_code = data->assoc_reject.status_code;
+		wpa_s->assoc_timed_out = data->assoc_reject.timed_out;
 		wpas_notify_assoc_status_code(wpa_s);
 		if (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME)
 			sme_event_assoc_reject(wpa_s, data);
