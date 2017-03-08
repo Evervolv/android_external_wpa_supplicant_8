@@ -1004,6 +1004,8 @@ struct wpa_supplicant {
 
 	/* WLAN_STATUS_* status codes from (Re)Association Response frame. */
 	u16 assoc_status_code;
+	/* Indicates if the previous association request timed out. */
+	u8 assoc_timed_out;
 
 	struct ext_password_data *ext_pw;
 
