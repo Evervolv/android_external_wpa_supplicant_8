@@ -145,7 +145,7 @@ void wpas_notify_disconnect_reason(struct wpa_supplicant *wpa_s)
 
 	wpas_dbus_signal_prop_changed(wpa_s, WPAS_DBUS_PROP_DISCONNECT_REASON);
 
-	wpas_hidl_notify_assoc_reject(wpa_s);
+	wpas_hidl_notify_disconnect_reason(wpa_s);
 }
 
 
