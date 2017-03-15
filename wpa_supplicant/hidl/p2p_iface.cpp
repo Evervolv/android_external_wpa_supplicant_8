@@ -696,8 +696,7 @@ std::pair<SupplicantStatus, std::string> P2pIface::connectInternal(
 	std::string pin_ret;
 	if (provision_method == WpsProvisionMethod::DISPLAY &&
 	    pre_selected_pin.empty()) {
-		pin_ret.reserve(9);
-		os_snprintf(&pin_ret[0], pin_ret.size(), "%08d", new_pin);
+		pin_ret = misc_utils::convertWpsPinToString(new_pin);
 	}
 	return {{SupplicantStatusCode::SUCCESS, ""}, pin_ret};
 }
@@ -1058,10 +1057,8 @@ std::pair<SupplicantStatus, std::string> P2pIface::startWpsPinDisplayInternal(
 	if (pin < 0) {
 		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, ""};
 	}
-	std::string pin_str;
-	pin_str.reserve(9);
-	snprintf(&pin_str[0], pin_str.size(), "%08d", pin);
-	return {{SupplicantStatusCode::SUCCESS, ""}, pin_str};
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		misc_utils::convertWpsPinToString(pin)};
 }
 
 SupplicantStatus P2pIface::cancelWpsInternal(const std::string& group_ifname)

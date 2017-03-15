@@ -10,6 +10,7 @@
 #include "hidl_manager.h"
 #include "hidl_return_util.h"
 #include "iface_config_utils.h"
+#include "misc_utils.h"
 #include "sta_iface.h"
 
 extern "C" {
@@ -873,10 +874,8 @@ std::pair<SupplicantStatus, std::string> StaIface::startWpsPinDisplayInternal(
 	if (pin < 0) {
 		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, ""};
 	}
-	std::string pin_str;
-	pin_str.reserve(9);
-	snprintf(&pin_str[0], pin_str.size(), "%08d", pin);
-	return {{SupplicantStatusCode::SUCCESS, ""}, pin_str};
+	return {{SupplicantStatusCode::SUCCESS, ""},
+		misc_utils::convertWpsPinToString(pin)};
 }
 
 SupplicantStatus StaIface::cancelWpsInternal()
