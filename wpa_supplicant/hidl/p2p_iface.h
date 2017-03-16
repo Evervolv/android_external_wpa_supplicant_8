@@ -184,6 +184,7 @@ public:
 	Return<void> reportNfcHandoverInitiation(
 	    const hidl_vec<uint8_t>& select,
 	    reportNfcHandoverInitiation_cb _hidl_cb) override;
+	Return<void> saveConfig(saveConfig_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -287,6 +288,7 @@ private:
 	    const std::vector<uint8_t>& request);
 	SupplicantStatus reportNfcHandoverInitiationInternal(
 	    const std::vector<uint8_t>& select);
+	SupplicantStatus saveConfigInternal();
 
 	struct wpa_supplicant* retrieveIfacePtr();
 	struct wpa_supplicant* retrieveGroupIfacePtr(
