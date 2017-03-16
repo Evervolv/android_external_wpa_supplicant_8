@@ -894,7 +894,8 @@ void HidlManager::notifyDisconnectReason(struct wpa_supplicant *wpa_s)
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onDisconnected,
 		std::placeholders::_1, bssid, wpa_s->disconnect_reason < 0,
-		wpa_s->disconnect_reason));
+		static_cast<ISupplicantStaIfaceCallback::ReasonCode>(
+		    wpa_s->disconnect_reason)));
 }
 
 /**
@@ -922,7 +923,9 @@ void HidlManager::notifyAssocReject(struct wpa_supplicant *wpa_s)
 	    wpa_s->ifname,
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onAssociationRejected,
-		std::placeholders::_1, bssid, wpa_s->assoc_status_code,
+		std::placeholders::_1, bssid,
+		static_cast<ISupplicantStaIfaceCallback::StatusCode>(
+		    wpa_s->assoc_status_code),
 		wpa_s->assoc_timed_out == 1));
 }
 
