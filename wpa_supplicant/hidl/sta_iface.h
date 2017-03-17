@@ -153,6 +153,8 @@ public:
 	    uint32_t timeout_in_sec, addExtRadioWork_cb _hidl_cb) override;
 	Return<void> removeExtRadioWork(
 	    uint32_t id, removeExtRadioWork_cb _hidl_cb) override;
+	Return<void> enableAutoReconnect(
+	    bool enable, enableAutoReconnect_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -223,6 +225,7 @@ private:
 	    const std::string& name, uint32_t freq_in_mhz,
 	    uint32_t timeout_in_sec);
 	SupplicantStatus removeExtRadioWorkInternal(uint32_t id);
+	SupplicantStatus enableAutoReconnectInternal(bool enable);
 
 	struct wpa_supplicant* retrieveIfacePtr();
 
