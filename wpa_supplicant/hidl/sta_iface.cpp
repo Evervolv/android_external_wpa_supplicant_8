@@ -488,6 +488,14 @@ Return<void> StaIface::removeExtRadioWork(
 	    &StaIface::removeExtRadioWorkInternal, _hidl_cb, id);
 }
 
+Return<void> StaIface::enableAutoReconnect(
+    bool enable, enableAutoReconnect_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &StaIface::enableAutoReconnectInternal, _hidl_cb, enable);
+}
+
 std::pair<SupplicantStatus, std::string> StaIface::getNameInternal()
 {
 	return {{SupplicantStatusCode::SUCCESS, ""}, ifname_};
@@ -986,6 +994,13 @@ SupplicantStatus StaIface::removeExtRadioWorkInternal(uint32_t id)
 		return {SupplicantStatusCode::SUCCESS, ""};
 	}
 	return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+}
+
+SupplicantStatus StaIface::enableAutoReconnectInternal(bool enable)
+{
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	wpa_s->auto_reconnect_disabled = enable ? 0 : 1;
+	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
 /**
