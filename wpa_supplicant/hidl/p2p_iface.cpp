@@ -495,6 +495,13 @@ Return<void> P2pIface::reportNfcHandoverInitiation(
 	    &P2pIface::reportNfcHandoverInitiationInternal, _hidl_cb, select);
 }
 
+Return<void> P2pIface::saveConfig(saveConfig_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &P2pIface::saveConfigInternal, _hidl_cb);
+}
+
 std::pair<SupplicantStatus, std::string> P2pIface::getNameInternal()
 {
 	return {{SupplicantStatusCode::SUCCESS, ""}, ifname_};
@@ -1202,6 +1209,18 @@ SupplicantStatus P2pIface::reportNfcHandoverInitiationInternal(
 	}
 
 	if (wpas_p2p_nfc_report_handover(wpa_s, 1, req.get(), sel.get(), 0)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus P2pIface::saveConfigInternal()
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	if (!wpa_s->conf->update_config) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	if (wpa_config_write(wpa_s->confname, wpa_s->conf)) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};

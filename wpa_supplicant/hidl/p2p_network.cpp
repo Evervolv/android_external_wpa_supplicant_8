@@ -103,6 +103,21 @@ Return<void> P2pNetwork::isGo(isGo_cb _hidl_cb)
 	    &P2pNetwork::isGoInternal, _hidl_cb);
 }
 
+Return<void> P2pNetwork::setClientList(
+    const hidl_vec<hidl_array<uint8_t, 6>> &clients, setClientList_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &P2pNetwork::setClientListInternal, _hidl_cb, clients);
+}
+
+Return<void> P2pNetwork::getClientList(getClientList_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &P2pNetwork::getClientListInternal, _hidl_cb);
+}
+
 std::pair<SupplicantStatus, uint32_t> P2pNetwork::getIdInternal()
 {
 	return {{SupplicantStatusCode::SUCCESS, ""}, network_id_};
@@ -167,6 +182,47 @@ std::pair<SupplicantStatus, bool> P2pNetwork::isGoInternal()
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	return {{SupplicantStatusCode::SUCCESS, ""},
 		(wpa_ssid->mode == wpa_ssid::wpas_mode::WPAS_MODE_P2P_GO)};
+}
+
+SupplicantStatus P2pNetwork::setClientListInternal(
+    const std::vector<hidl_array<uint8_t, 6>> &clients)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	os_free(wpa_ssid->p2p_client_list);
+	// Internal representation uses a generic MAC addr/mask storage format
+	// (even though the mask is always 0xFF'ed for p2p_client_list). So, the
+	// first 6 bytes holds the client MAC address and the next 6 bytes are
+	// OxFF'ed.
+	wpa_ssid->p2p_client_list =
+	    (u8 *)os_malloc(ETH_ALEN * 2 * clients.size());
+	if (!wpa_ssid->p2p_client_list) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	u8 *list = wpa_ssid->p2p_client_list;
+	for (const auto &client : clients) {
+		os_memcpy(list, client.data(), ETH_ALEN);
+		list += ETH_ALEN;
+		os_memset(list, 0xFF, ETH_ALEN);
+		list += ETH_ALEN;
+	}
+	wpa_ssid->num_p2p_clients = clients.size();
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+std::pair<SupplicantStatus, std::vector<hidl_array<uint8_t, 6>>>
+P2pNetwork::getClientListInternal()
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	if (!wpa_ssid->p2p_client_list) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	std::vector<hidl_array<uint8_t, 6>> clients;
+	u8 *list = wpa_ssid->p2p_client_list;
+	for (size_t i = 0; i < wpa_ssid->num_p2p_clients; i++) {
+		clients.emplace_back(list);
+		list += 2 * ETH_ALEN;
+	}
+	return {{SupplicantStatusCode::SUCCESS, ""}, clients};
 }
 
 /**
