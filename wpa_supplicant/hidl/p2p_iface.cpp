@@ -456,7 +456,7 @@ Return<void> P2pIface::enableWfd(bool enable, enableWfd_cb _hidl_cb)
 }
 
 Return<void> P2pIface::setWfdDeviceInfo(
-    const hidl_array<uint8_t, 8>& info, setWfdDeviceInfo_cb _hidl_cb)
+    const hidl_array<uint8_t, 6>& info, setWfdDeviceInfo_cb _hidl_cb)
 {
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
@@ -1134,7 +1134,7 @@ SupplicantStatus P2pIface::enableWfdInternal(bool enable)
 }
 
 SupplicantStatus P2pIface::setWfdDeviceInfoInternal(
-    const std::array<uint8_t, 8>& info)
+    const std::array<uint8_t, 6>& info)
 {
 	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
 	uint32_t wfd_device_info_hex_len = info.size() * 2 + 1;
