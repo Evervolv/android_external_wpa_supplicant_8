@@ -20,7 +20,7 @@ extern "C" {
 namespace {
 using android::hardware::hidl_array;
 
-constexpr uint8_t kWfdDeviceInfoLen = 8;
+constexpr uint8_t kWfdDeviceInfoLen = 6;
 // GSM-AUTH:<RAND1>:<RAND2>[:<RAND3>]
 constexpr char kGsmAuthRegex2[] = "GSM-AUTH:([0-9a-f]+):([0-9a-f]+)";
 constexpr char kGsmAuthRegex3[] =
