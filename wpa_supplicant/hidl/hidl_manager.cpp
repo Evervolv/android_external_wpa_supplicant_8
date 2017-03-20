@@ -650,13 +650,22 @@ int HidlManager::notifyStateChange(struct wpa_supplicant *wpa_s)
 		    wpa_s->current_ssid->ssid,
 		    wpa_s->current_ssid->ssid + wpa_s->current_ssid->ssid_len);
 	}
+	uint8_t *bssid;
+	// wpa_supplicant sets the |pending_bssid| field when it starts a
+	// connection. Only after association state does it update the |bssid|
+	// field. So, in the HIDL callback send the appropriate bssid.
+	if (wpa_s->wpa_state <= WPA_ASSOCIATED) {
+		bssid = wpa_s->pending_bssid;
+	} else {
+		bssid = wpa_s->bssid;
+	}
 	callWithEachStaIfaceCallback(
 	    wpa_s->ifname, std::bind(
 			       &ISupplicantStaIfaceCallback::onStateChanged,
 			       std::placeholders::_1,
 			       static_cast<ISupplicantStaIfaceCallback::State>(
 				   wpa_s->wpa_state),
-			       wpa_s->bssid, hidl_network_id, hidl_ssid));
+			       bssid, hidl_network_id, hidl_ssid));
 	return 0;
 }
 
