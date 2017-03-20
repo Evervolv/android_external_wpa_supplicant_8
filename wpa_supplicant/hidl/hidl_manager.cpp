@@ -1232,10 +1232,8 @@ void HidlManager::notifyP2pProvisionDiscovery(
 
 	std::string hidl_generated_pin;
 	if (generated_pin > 0) {
-		hidl_generated_pin.reserve(9);
-		os_snprintf(
-		    &hidl_generated_pin[0], hidl_generated_pin.size(), "%08d",
-		    generated_pin);
+		hidl_generated_pin =
+		    misc_utils::convertWpsPinToString(generated_pin);
 	}
 	bool hidl_is_request = (request == 1 ? true : false);
 
