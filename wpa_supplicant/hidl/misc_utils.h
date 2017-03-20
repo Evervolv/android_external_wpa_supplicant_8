@@ -15,6 +15,7 @@ extern "C" {
 }
 
 namespace {
+constexpr size_t kWpsPinNumDigits = 8;
 // Custom deleter for wpabuf.
 void freeWpaBuf(wpabuf *ptr) { wpabuf_free(ptr); }
 }  // namespace
@@ -51,6 +52,14 @@ inline std::vector<uint8_t> convertWpaBufToVector(const struct wpabuf *buf)
 	} else {
 		return std::vector<uint8_t>();
 	}
+}
+
+// Returns a string holding the wps pin.
+inline std::string convertWpsPinToString(int pin)
+{
+	char pin_str[kWpsPinNumDigits + 1];
+	snprintf(pin_str, sizeof(pin_str), "%08d", pin);
+	return pin_str;
 }
 
 }  // namespace misc_utils
