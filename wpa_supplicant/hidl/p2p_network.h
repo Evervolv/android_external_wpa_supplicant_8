@@ -55,6 +55,10 @@ public:
 	Return<void> isCurrent(isCurrent_cb _hidl_cb) override;
 	Return<void> isPersistent(isPersistent_cb _hidl_cb) override;
 	Return<void> isGo(isGo_cb _hidl_cb) override;
+	Return<void> setClientList(
+	    const hidl_vec<hidl_array<uint8_t, 6>>& clients,
+	    setClientList_cb _hidl_cb) override;
+	Return<void> getClientList(getClientList_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -68,6 +72,10 @@ private:
 	std::pair<SupplicantStatus, bool> isCurrentInternal();
 	std::pair<SupplicantStatus, bool> isPersistentInternal();
 	std::pair<SupplicantStatus, bool> isGoInternal();
+	SupplicantStatus setClientListInternal(
+	    const std::vector<hidl_array<uint8_t, 6>>& clients);
+	std::pair<SupplicantStatus, std::vector<hidl_array<uint8_t, 6>>>
+	getClientListInternal();
 
 	struct wpa_ssid* retrieveNetworkPtr();
 	struct wpa_supplicant* retrieveIfacePtr();
