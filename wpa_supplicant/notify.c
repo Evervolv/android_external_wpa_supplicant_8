@@ -190,6 +190,8 @@ void wpas_notify_bssid_changed(struct wpa_supplicant *wpa_s)
 		return;
 
 	wpas_dbus_signal_prop_changed(wpa_s, WPAS_DBUS_PROP_CURRENT_BSS);
+
+	wpas_hidl_notify_bssid_changed(wpa_s);
 }
 
 
