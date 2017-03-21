@@ -303,6 +303,20 @@ void wpas_hidl_notify_auth_timeout(struct wpa_supplicant *wpa_s)
 	hidl_manager->notifyAuthTimeout(wpa_s);
 }
 
+void wpas_hidl_notify_bssid_changed(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	wpa_printf(MSG_DEBUG, "Notifying bssid changed to hidl control");
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyBssidChanged(wpa_s);
+}
+
 void wpas_hidl_notify_wps_event_fail(
     struct wpa_supplicant *wpa_s, uint8_t *peer_macaddr, uint16_t config_error,
     uint16_t error_indication)
