@@ -951,14 +951,53 @@ void HidlManager::notifyAuthTimeout(struct wpa_supplicant *wpa_s)
 	if (is_zero_ether_addr(bssid)) {
 		bssid = wpa_s->pending_bssid;
 	}
-	std::array<uint8_t, ETH_ALEN> hidl_bssid;
-	os_memcpy(hidl_bssid.data(), bssid, ETH_ALEN);
-
 	callWithEachStaIfaceCallback(
 	    wpa_s->ifname,
 	    std::bind(
 		&ISupplicantStaIfaceCallback::onAuthenticationTimeout,
-		std::placeholders::_1, hidl_bssid));
+		std::placeholders::_1, bssid));
+}
+
+void HidlManager::notifyBssidChanged(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	const std::string ifname(wpa_s->ifname);
+	if (sta_iface_object_map_.find(ifname) == sta_iface_object_map_.end())
+		return;
+
+	// wpa_supplicant does not explicitly give us the reason for bssid
+	// change, but we figure that out from what is set out of |wpa_s->bssid|
+	// & |wpa_s->pending_bssid|.
+	const u8 *bssid;
+	ISupplicantStaIfaceCallback::BssidChangeReason reason;
+	if (is_zero_ether_addr(wpa_s->bssid) &&
+	    !is_zero_ether_addr(wpa_s->pending_bssid)) {
+		bssid = wpa_s->pending_bssid;
+		reason =
+		    ISupplicantStaIfaceCallback::BssidChangeReason::ASSOC_START;
+	} else if (
+	    !is_zero_ether_addr(wpa_s->bssid) &&
+	    is_zero_ether_addr(wpa_s->pending_bssid)) {
+		bssid = wpa_s->bssid;
+		reason = ISupplicantStaIfaceCallback::BssidChangeReason::
+		    ASSOC_COMPLETE;
+	} else if (
+	    is_zero_ether_addr(wpa_s->bssid) &&
+	    is_zero_ether_addr(wpa_s->pending_bssid)) {
+		bssid = wpa_s->pending_bssid;
+		reason =
+		    ISupplicantStaIfaceCallback::BssidChangeReason::DISASSOC;
+	} else {
+		wpa_printf(MSG_ERROR, "Unknown bssid change reason");
+		return;
+	}
+
+	callWithEachStaIfaceCallback(
+	    wpa_s->ifname, std::bind(
+			       &ISupplicantStaIfaceCallback::onBssidChanged,
+			       std::placeholders::_1, reason, bssid));
 }
 
 void HidlManager::notifyWpsEventFail(
