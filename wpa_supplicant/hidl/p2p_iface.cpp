@@ -592,7 +592,7 @@ P2pIface::getDeviceAddressInternal()
 	std::array<uint8_t, 6> addr;
 	static_assert(ETH_ALEN == addr.size(), "Size mismatch");
 	os_memcpy(addr.data(), wpa_s->global->p2p_dev_addr, ETH_ALEN);
-	return {{SupplicantStatusCode::SUCCESS, ""}, {}};
+	return {{SupplicantStatusCode::SUCCESS, ""}, addr};
 }
 
 SupplicantStatus P2pIface::setSsidPostfixInternal(
