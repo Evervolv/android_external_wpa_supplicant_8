@@ -62,7 +62,10 @@ std::string convertWpsConfigMethodsMaskToString(uint16_t config_methods)
 	      {WpsConfigMethods::P2PS, "p2ps"},
 	      {WpsConfigMethods::VIRT_DISPLAY, "virtual_display"},
 	      {WpsConfigMethods::PHY_DISPLAY, "physical_display"}}) {
-		if (config_methods & flag_and_name.first) {
+		const auto flag =
+		    static_cast<std::underlying_type<WpsConfigMethods>::type>(
+			flag_and_name.first);
+		if ((config_methods & flag) == flag) {
 			config_methods_str += flag_and_name.second;
 			config_methods_str += " ";
 		}
