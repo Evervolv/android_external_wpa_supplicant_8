@@ -1058,17 +1058,24 @@ void HidlManager::notifyP2pDeviceFound(
     const struct p2p_peer_info *info, const u8 *peer_wfd_device_info,
     u8 peer_wfd_device_info_len)
 {
-	if (!wpa_s || !addr || !info || !peer_wfd_device_info)
+	if (!wpa_s || !addr || !info)
 		return;
 
 	if (p2p_iface_object_map_.find(wpa_s->ifname) ==
 	    p2p_iface_object_map_.end())
 		return;
 
-	if (peer_wfd_device_info_len != kWfdDeviceInfoLen) {
-		wpa_printf(
-		    MSG_ERROR, "Unexpected WFD device info len: %d",
-		    peer_wfd_device_info_len);
+	std::array<uint8_t, kWfdDeviceInfoLen> hidl_peer_wfd_device_info{};
+	if (peer_wfd_device_info) {
+		if (peer_wfd_device_info_len != kWfdDeviceInfoLen) {
+			wpa_printf(
+			    MSG_ERROR, "Unexpected WFD device info len: %d",
+			    peer_wfd_device_info_len);
+		} else {
+			os_memcpy(
+			    hidl_peer_wfd_device_info.data(),
+			    peer_wfd_device_info, kWfdDeviceInfoLen);
+		}
 	}
 
 	callWithEachP2pIfaceCallback(
@@ -1077,7 +1084,7 @@ void HidlManager::notifyP2pDeviceFound(
 		&ISupplicantP2pIfaceCallback::onDeviceFound,
 		std::placeholders::_1, addr, info->p2p_device_addr,
 		info->pri_dev_type, info->device_name, info->config_methods,
-		info->dev_capab, info->group_capab, peer_wfd_device_info));
+		info->dev_capab, info->group_capab, hidl_peer_wfd_device_info));
 }
 
 void HidlManager::notifyP2pDeviceLost(

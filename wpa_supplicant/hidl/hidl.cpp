@@ -370,7 +370,7 @@ void wpas_hidl_notify_p2p_device_found(
     const struct p2p_peer_info *info, const u8 *peer_wfd_device_info,
     u8 peer_wfd_device_info_len)
 {
-	if (!wpa_s || !addr || !info || !peer_wfd_device_info)
+	if (!wpa_s || !addr || !info)
 		return;
 
 	wpa_printf(
