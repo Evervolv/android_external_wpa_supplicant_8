@@ -1610,12 +1610,12 @@ LOCAL_STATIC_LIBRARIES += $(LIB_STATIC_EAP_PROXY)
 LOCAL_SHARED_LIBRARIES += $(LIB_SHARED_EAP_PROXY)
 endif
 ifeq ($(CONFIG_TLS), openssl)
-LOCAL_SHARED_LIBRARIES += libcrypto libssl libkeystore_binder
+LOCAL_SHARED_LIBRARIES += libcrypto libssl libkeystore-wifi-hidl
 endif
 
 # With BoringSSL we need libkeystore-engine in order to provide access to
 # keystore keys.
-LOCAL_SHARED_LIBRARIES += libkeystore-engine
+LOCAL_SHARED_LIBRARIES += libkeystore-engine-wifi-hidl
 
 ifdef CONFIG_DRIVER_NL80211
 ifneq ($(wildcard external/libnl),)
