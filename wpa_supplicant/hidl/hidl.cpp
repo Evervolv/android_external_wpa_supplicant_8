@@ -474,9 +474,9 @@ void wpas_hidl_notify_p2p_group_formation_failure(
 
 void wpas_hidl_notify_p2p_group_started(
     struct wpa_supplicant *wpa_s, const struct wpa_ssid *ssid, int persistent,
-    int client, const u8 *ip)
+    int client)
 {
-	if (!wpa_s || !ssid || !ip)
+	if (!wpa_s || !ssid)
 		return;
 
 	wpa_printf(
@@ -487,8 +487,7 @@ void wpas_hidl_notify_p2p_group_started(
 	if (!hidl_manager)
 		return;
 
-	hidl_manager->notifyP2pGroupStarted(
-	    wpa_s, ssid, persistent, client, ip);
+	hidl_manager->notifyP2pGroupStarted(wpa_s, ssid, persistent, client);
 }
 
 void wpas_hidl_notify_p2p_group_removed(
