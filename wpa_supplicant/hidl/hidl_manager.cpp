@@ -1175,10 +1175,9 @@ void HidlManager::notifyP2pGroupFormationFailure(
 }
 
 void HidlManager::notifyP2pGroupStarted(
-    struct wpa_supplicant *wpa_group_s, const struct wpa_ssid *ssid,
-    int persistent, int client, const u8 *ip)
+    struct wpa_supplicant *wpa_group_s, const struct wpa_ssid *ssid, int persistent, int client)
 {
-	if (!wpa_group_s || !wpa_group_s->parent || !ssid || !ip)
+	if (!wpa_group_s || !wpa_group_s->parent || !ssid)
 		return;
 
 	// For group notifications, need to use the parent iface for callbacks.
