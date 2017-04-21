@@ -527,7 +527,7 @@ Return<void> StaNetwork::getEapAltSubjectMatch(
 {
 	return validateAndCall(
 	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
-	    &StaNetwork::getEapSubjectMatchInternal, _hidl_cb);
+	    &StaNetwork::getEapAltSubjectMatchInternal, _hidl_cb);
 }
 
 Return<void> StaNetwork::getEapEngine(getEapEngine_cb _hidl_cb)
