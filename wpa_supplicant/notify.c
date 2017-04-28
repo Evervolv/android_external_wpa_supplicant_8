@@ -364,6 +364,7 @@ void wpas_notify_persistent_group_added(struct wpa_supplicant *wpa_s,
 {
 #ifdef CONFIG_P2P
 	wpas_dbus_register_persistent_group(wpa_s, ssid);
+	wpas_hidl_register_network(wpa_s, ssid);
 #endif /* CONFIG_P2P */
 }
 
@@ -373,6 +374,7 @@ void wpas_notify_persistent_group_removed(struct wpa_supplicant *wpa_s,
 {
 #ifdef CONFIG_P2P
 	wpas_dbus_unregister_persistent_group(wpa_s, ssid->id);
+	wpas_hidl_unregister_network(wpa_s, ssid);
 #endif /* CONFIG_P2P */
 }
 
