@@ -985,8 +985,11 @@ std::pair<SupplicantStatus, uint64_t> P2pIface::requestServiceDiscoveryInternal(
 	if (!query_buf) {
 		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
 	}
+	const uint8_t* dst_addr = is_zero_ether_addr(peer_address.data())
+				      ? nullptr
+				      : peer_address.data();
 	uint64_t identifier =
-	    wpas_p2p_sd_request(wpa_s, peer_address.data(), query_buf.get());
+	    wpas_p2p_sd_request(wpa_s, dst_addr, query_buf.get());
 	if (identifier == 0) {
 		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
 	}
