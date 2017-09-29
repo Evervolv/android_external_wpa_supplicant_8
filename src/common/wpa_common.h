@@ -206,6 +206,7 @@ struct wpa_ptk {
 			u8 rx_mic_key[8];
 		} auth;
 	} u;
+	int installed; /* 1 if key has already been installed to driver */
 } STRUCT_PACKED;
 
 struct wpa_gtk {
