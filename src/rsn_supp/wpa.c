@@ -3797,7 +3797,7 @@ int fils_process_assoc_resp(struct wpa_sm *sm, const u8 *resp, size_t len)
 	os_memcpy(gd.gtk, kde.gtk + 2, kde.gtk_len - 2);
 
 	wpa_printf(MSG_DEBUG, "FILS: Set GTK to driver");
-	if (wpa_supplicant_install_gtk(sm, &gd, elems.key_delivery) < 0) {
+	if (wpa_supplicant_install_gtk(sm, &gd, elems.key_delivery, 0) < 0) {
 		wpa_printf(MSG_DEBUG, "FILS: Failed to set GTK");
 		goto fail;
 	}
