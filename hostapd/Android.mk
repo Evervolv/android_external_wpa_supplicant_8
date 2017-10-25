@@ -155,6 +155,7 @@ OBJS += src/common/hw_features_common.c
 
 OBJS += src/eapol_auth/eapol_auth_sm.c
 
+
 ifndef CONFIG_NO_DUMP_STATE
 # define HOSTAPD_DUMP_STATE to include support for dumping internal state
 # through control interface commands (undefine it, if you want to save in
@@ -217,11 +218,6 @@ L_CFLAGS += -DCONFIG_RSN_PREAUTH
 CONFIG_L2_PACKET=y
 endif
 
-ifdef CONFIG_PEERKEY
-L_CFLAGS += -DCONFIG_PEERKEY
-OBJS += src/ap/peerkey_auth.c
-endif
-
 ifdef CONFIG_HS20
 NEED_AES_OMAC1=y
 CONFIG_PROXYARP=y
@@ -254,6 +250,15 @@ OBJS += src/ap/wpa_auth_ft.c
 NEED_SHA256=y
 NEED_AES_OMAC1=y
 NEED_AES_UNWRAP=y
+NEED_AES_SIV=y
+NEED_ETH_P_OUI=y
+NEED_SHA256=y
+NEED_HMAC_SHA256_KDF=y
+endif
+
+ifdef NEED_ETH_P_OUI
+L_CFLAGS += -DCONFIG_ETH_P_OUI
+OBJS += src/ap/eth_p_oui.c
 endif
 
 ifdef CONFIG_SAE
@@ -263,15 +268,30 @@ NEED_ECC=y
 NEED_DH_GROUPS=y
 endif
 
+ifdef CONFIG_OWE
+L_CFLAGS += -DCONFIG_OWE
+NEED_ECC=y
+NEED_HMAC_SHA256_KDF=y
+NEED_HMAC_SHA384_KDF=y
+NEED_HMAC_SHA512_KDF=y
+NEED_SHA256=y
+NEED_SHA384=y
+NEED_SHA512=y
+endif
+
 ifdef CONFIG_FILS
 L_CFLAGS += -DCONFIG_FILS
 OBJS += src/ap/fils_hlp.c
 NEED_SHA384=y
 NEED_AES_SIV=y
+ifdef CONFIG_FILS_SK_PFS
+L_CFLAGS += -DCONFIG_FILS_SK_PFS
+NEED_ECC=y
+endif
 endif
 
 ifdef CONFIG_WNM
-L_CFLAGS += -DCONFIG_WNM
+L_CFLAGS += -DCONFIG_WNM -DCONFIG_WNM_AP
 OBJS += src/ap/wnm_ap.c
 endif
 
@@ -515,6 +535,23 @@ endif
 
 endif
 
+ifdef CONFIG_DPP
+L_CFLAGS += -DCONFIG_DPP
+OBJS += src/common/dpp.c
+OBJS += src/ap/dpp_hostapd.c
+OBJS += src/ap/gas_query_ap.c
+NEED_AES_SIV=y
+NEED_HMAC_SHA256_KDF=y
+NEED_HMAC_SHA384_KDF=y
+NEED_HMAC_SHA512_KDF=y
+NEED_SHA256=y
+NEED_SHA384=y
+NEED_SHA512=y
+NEED_JSON=y
+NEED_GAS=y
+NEED_BASE64=y
+endif
+
 ifdef CONFIG_EAP_IKEV2
 L_CFLAGS += -DEAP_SERVER_IKEV2
 OBJS += src/eap_server/eap_server_ikev2.c src/eap_server/ikev2.c
@@ -597,6 +634,10 @@ NEED_SHA256=y
 NEED_TLS_PRF_SHA256=y
 LIBS += -lcrypto
 LIBS_h += -lcrypto
+ifndef CONFIG_TLS_DEFAULT_CIPHERS
+CONFIG_TLS_DEFAULT_CIPHERS = "DEFAULT:!EXP:!LOW"
+endif
+L_CFLAGS += -DTLS_DEFAULT_CIPHERS=\"$(CONFIG_TLS_DEFAULT_CIPHERS)\"
 endif
 
 ifeq ($(CONFIG_TLS), gnutls)
@@ -731,6 +772,12 @@ endif
 ifdef NEED_AES_EAX
 AESOBJS += src/crypto/aes-eax.c
 NEED_AES_CTR=y
+NEED_AES_OMAC1=y
+endif
+ifdef NEED_AES_SIV
+AESOBJS += src/crypto/aes-siv.c
+NEED_AES_CTR=y
+NEED_AES_OMAC1=y
 endif
 ifdef NEED_AES_CTR
 AESOBJS += src/crypto/aes-ctr.c
@@ -752,9 +799,6 @@ NEED_AES_DEC=y
 ifneq ($(CONFIG_TLS), openssl)
 AESOBJS += src/crypto/aes-cbc.c
 endif
-endif
-ifdef NEED_AES_SIV
-AESOBJS += src/crypto/aes-siv.c
 endif
 ifdef NEED_AES_DEC
 ifdef CONFIG_INTERNAL_AES
@@ -839,6 +883,15 @@ endif
 ifdef NEED_TLS_PRF_SHA256
 OBJS += src/crypto/sha256-tlsprf.c
 endif
+ifdef NEED_HMAC_SHA256_KDF
+OBJS += src/crypto/sha256-kdf.c
+endif
+ifdef NEED_HMAC_SHA384_KDF
+OBJS += src/crypto/sha384-kdf.c
+endif
+ifdef NEED_HMAC_SHA512_KDF
+OBJS += src/crypto/sha512-kdf.c
+endif
 endif
 ifdef NEED_SHA384
 L_CFLAGS += -DCONFIG_SHA384
@@ -846,6 +899,15 @@ ifneq ($(CONFIG_TLS), openssl)
 OBJS += src/crypto/sha384.c
 endif
 OBJS += src/crypto/sha384-prf.c
+endif
+ifdef NEED_SHA512
+L_CFLAGS += -DCONFIG_SHA512
+ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), linux)
+OBJS += src/crypto/sha512.c
+endif
+endif
+OBJS += src/crypto/sha512-prf.c
 endif
 
 ifdef CONFIG_INTERNAL_SHA384
@@ -903,6 +965,11 @@ ifdef NEED_BASE64
 OBJS += src/utils/base64.c
 endif
 
+ifdef NEED_JSON
+OBJS += src/utils/json.c
+L_CFLAGS += -DCONFIG_JSON
+endif
+
 ifdef NEED_AP_MLME
 OBJS += src/ap/wmm.c
 OBJS += src/ap/ap_list.c
@@ -936,6 +1003,10 @@ endif
 
 ifdef CONFIG_INTERWORKING
 L_CFLAGS += -DCONFIG_INTERWORKING
+NEED_GAS=y
+endif
+
+ifdef NEED_GAS
 OBJS += src/common/gas.c
 OBJS += src/ap/gas_serv.c
 endif
