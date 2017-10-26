@@ -22,14 +22,6 @@ L_CFLAGS += -DVERSION_STR_POSTFIX=\"-$(PLATFORM_VERSION)\"
 # Set Android log name
 L_CFLAGS += -DANDROID_LOG_NAME=\"wpa_supplicant\"
 
-L_CFLAGS += -Wall -Werror
-
-# Disable unused function warnings
-L_CFLAGS += -Wno-unused-function
-
-# Disable unused variable warnings
-L_CFLAGS += -Wno-unused-variable
-
 # Disable unused parameter warnings
 L_CFLAGS += -Wno-unused-parameter
 
