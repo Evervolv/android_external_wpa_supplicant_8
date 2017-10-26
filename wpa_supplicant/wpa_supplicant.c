@@ -6353,7 +6353,7 @@ int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 			      (const u8 *) value, os_strlen(value));
 
 	rtype = wpa_supplicant_ctrl_req_from_string(field);
-	return wpa_supplicant_ctrl_rsp_handle(wpa_s, ssid, rtype, value);
+	return wpa_supplicant_ctrl_rsp_handle(wpa_s, ssid, rtype, value, strlen(value));
 #else /* IEEE8021X_EAPOL */
 	wpa_printf(MSG_DEBUG, "CTRL_IFACE: IEEE 802.1X not included");
 	return -1;
@@ -6363,7 +6363,7 @@ int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 				   struct wpa_ssid *ssid,
 				   enum wpa_ctrl_req_type rtype,
-				   const char *value)
+				   const char *value, int value_len)
 {
 #ifdef IEEE8021X_EAPOL
 	struct eap_peer_config *eap = &ssid->eap;
@@ -6371,8 +6371,8 @@ int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 	switch (rtype) {
 	case WPA_CTRL_REQ_EAP_IDENTITY:
 		os_free(eap->identity);
-		eap->identity = (u8 *) os_strdup(value);
-		eap->identity_len = os_strlen(value);
+		eap->identity = (u8 *) dup_binstr(value, value_len);
+		eap->identity_len = value_len;
 		eap->pending_req_identity = 0;
 		if (ssid == wpa_s->current_ssid)
 			wpa_s->reassociate = 1;
@@ -6380,7 +6380,7 @@ int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 	case WPA_CTRL_REQ_EAP_PASSWORD:
 		bin_clear_free(eap->password, eap->password_len);
 		eap->password = (u8 *) os_strdup(value);
-		eap->password_len = os_strlen(value);
+		eap->password_len = value_len;
 		eap->pending_req_password = 0;
 		if (ssid == wpa_s->current_ssid)
 			wpa_s->reassociate = 1;
@@ -6388,7 +6388,7 @@ int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 	case WPA_CTRL_REQ_EAP_NEW_PASSWORD:
 		bin_clear_free(eap->new_password, eap->new_password_len);
 		eap->new_password = (u8 *) os_strdup(value);
-		eap->new_password_len = os_strlen(value);
+		eap->new_password_len = value_len;
 		eap->pending_req_new_password = 0;
 		if (ssid == wpa_s->current_ssid)
 			wpa_s->reassociate = 1;
@@ -6403,7 +6403,7 @@ int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 	case WPA_CTRL_REQ_EAP_OTP:
 		bin_clear_free(eap->otp, eap->otp_len);
 		eap->otp = (u8 *) os_strdup(value);
-		eap->otp_len = os_strlen(value);
+		eap->otp_len = value_len;
 		os_free(eap->pending_req_otp);
 		eap->pending_req_otp = NULL;
 		eap->pending_req_otp_len = 0;

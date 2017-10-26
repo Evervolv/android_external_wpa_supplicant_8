@@ -1389,7 +1389,7 @@ int wpa_supplicant_ctrl_iface_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 				   struct wpa_ssid *ssid,
 				   enum wpa_ctrl_req_type rtype,
-				   const char *value);
+				   const char *value, int len);
 
 void ibss_mesh_setup_freq(struct wpa_supplicant *wpa_s,
 			  const struct wpa_ssid *ssid,
