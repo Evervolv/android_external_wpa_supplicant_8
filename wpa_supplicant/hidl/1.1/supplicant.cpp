@@ -11,6 +11,20 @@
 #include "hidl_return_util.h"
 #include "supplicant.h"
 
+namespace {
+// Pre-populated interface params for interfaces controlled by wpa_supplicant.
+// Note: This may differ for other OEM's. So, modify this accordingly.
+constexpr char kIfaceDriverName[] = "nl80211";
+constexpr char kStaIfaceConfPath[] =
+		"/data/misc/wifi/wpa_supplicant.conf";
+constexpr char kStaIfaceConfOverlayPath[] =
+		"/vendor/etc/wifi/wpa_supplicant_overlay.conf";
+constexpr char kP2pIfaceConfPath[] =
+		"/data/misc/wifi/p2p_supplicant.conf";
+constexpr char kP2pIfaceConfOverlayPath[] =
+		"/vendor/etc/wifi/p2p_supplicant_overlay.conf";
+}  // namespace
+
 namespace android {
 namespace hardware {
 namespace wifi {
@@ -19,16 +33,27 @@ namespace V1_1 {
 namespace implementation {
 using hidl_return_util::validateAndCall;
 
-// These are hardcoded for android.
-const char Supplicant::kDriverName[] = "nl80211";
-const char Supplicant::kConfigFilePath[] =
-    "/data/misc/wifi/wpa_supplicant.conf";
-
 Supplicant::Supplicant(struct wpa_global* global) : wpa_global_(global) {}
 bool Supplicant::isValid()
 {
 	// This top level object cannot be invalidated.
 	return true;
+}
+
+Return<void> Supplicant::addInterface(
+    const IfaceInfo& iface_info, addInterface_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &Supplicant::addInterfaceInternal, _hidl_cb, iface_info);
+}
+
+Return<void> Supplicant::removeInterface(
+    const IfaceInfo& iface_info, removeInterface_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+	    &Supplicant::removeInterfaceInternal, _hidl_cb, iface_info);
 }
 
 Return<void> Supplicant::getInterface(
@@ -91,6 +116,58 @@ Return<bool> Supplicant::isDebugShowKeysEnabled()
 	// TODO: Add SupplicantStatus in this method return for uniformity with
 	// the other methods in supplicant HIDL interface.
 	return ((wpa_debug_show_keys != 0) ? true : false);
+}
+
+std::pair<SupplicantStatus, sp<ISupplicantIface>>
+Supplicant::addInterfaceInternal(const IfaceInfo& iface_info)
+{
+	android::sp<ISupplicantIface> iface;
+
+	// Check if required |ifname| argument is empty.
+	if (iface_info.name.empty()) {
+		return {{SupplicantStatusCode::FAILURE_ARGS_INVALID, ""}, {}};
+	}
+	// Try to get the wpa_supplicant record for this iface, return
+	// the iface object with the appropriate status code if it exists.
+	SupplicantStatus status;
+	std::tie(status, iface) = getInterfaceInternal(iface_info);
+	if (status.code == SupplicantStatusCode::SUCCESS) {
+		return {{SupplicantStatusCode::FAILURE_IFACE_EXISTS, ""},
+			iface};
+	}
+
+	struct wpa_interface iface_params = {};
+	iface_params.driver = kIfaceDriverName;
+	if (iface_info.type == IfaceType::P2P) {
+		iface_params.confname = kP2pIfaceConfPath;
+		iface_params.confanother = kP2pIfaceConfOverlayPath;
+	} else {
+		iface_params.confname = kStaIfaceConfPath;
+		iface_params.confanother = kStaIfaceConfOverlayPath;
+	}
+	iface_params.ifname = iface_info.name.c_str();
+	struct wpa_supplicant* wpa_s =
+	    wpa_supplicant_add_iface(wpa_global_, &iface_params, NULL);
+	if (!wpa_s) {
+		return {{SupplicantStatusCode::FAILURE_UNKNOWN, ""}, {}};
+	}
+	// The supplicant core creates a corresponding hidl object via
+	// HidlManager when |wpa_supplicant_add_iface| is called.
+	return getInterfaceInternal(iface_info);
+}
+
+SupplicantStatus Supplicant::removeInterfaceInternal(
+    const IfaceInfo& iface_info)
+{
+	struct wpa_supplicant* wpa_s =
+	    wpa_supplicant_get_iface(wpa_global_, iface_info.name.c_str());
+	if (!wpa_s) {
+		return {SupplicantStatusCode::FAILURE_IFACE_UNKNOWN, ""};
+	}
+	if (wpa_supplicant_remove_iface(wpa_global_, wpa_s, 0)) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
 }
 
 std::pair<SupplicantStatus, sp<ISupplicantIface>>
