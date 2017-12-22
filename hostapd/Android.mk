@@ -1069,6 +1069,12 @@ else
 OBJS_c += src/utils/edit_simple.c
 endif
 
+ifdef CONFIG_CTRL_IFACE_HIDL
+HOSTAPD_USE_HIDL=y
+L_CFLAGS += -DCONFIG_CTRL_IFACE_HIDL
+L_CPPFLAGS = -Wall -Werror
+endif
+
 ########################
 
 include $(CLEAR_VARS)
@@ -1086,6 +1092,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := hostapd
 LOCAL_MODULE_TAGS := optional
 LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_RELATIVE_PATH := hw
 ifdef CONFIG_DRIVER_CUSTOM
 LOCAL_STATIC_LIBRARIES := libCustomWifi
 endif
@@ -1100,10 +1107,39 @@ else
 LOCAL_STATIC_LIBRARIES += libnl_2
 endif
 endif
+ifeq ($(HOSTAPD_USE_HIDL), y)
+LOCAL_SHARED_LIBRARIES += android.hardware.wifi.hostapd@1.0
+LOCAL_SHARED_LIBRARIES += libhidlbase libhidltransport libhwbinder libutils
+LOCAL_STATIC_LIBRARIES += libhostapd_hidl
+endif
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_SRC_FILES := $(OBJS)
 LOCAL_C_INCLUDES := $(INCLUDES)
 LOCAL_INIT_RC := hostapd.android.rc
 include $(BUILD_EXECUTABLE)
 
+ifeq ($(HOSTAPD_USE_HIDL), y)
+### Hidl service library ###
+########################
+include $(CLEAR_VARS)
+LOCAL_MODULE := libhostapd_hidl
+LOCAL_VENDOR_MODULE := true
+LOCAL_CPPFLAGS := $(L_CPPFLAGS)
+LOCAL_CFLAGS := $(L_CFLAGS)
+LOCAL_C_INCLUDES := $(INCLUDES)
+HIDL_INTERFACE_VERSION = 1.0
+LOCAL_SRC_FILES := \
+    hidl/$(HIDL_INTERFACE_VERSION)/hidl.cpp \
+    hidl/$(HIDL_INTERFACE_VERSION)/hostapd.cpp
+LOCAL_SHARED_LIBRARIES := \
+    android.hardware.wifi.hostapd@1.0 \
+    libhidlbase \
+    libhidltransport \
+    libhwbinder \
+    libutils \
+    liblog
+LOCAL_EXPORT_C_INCLUDE_DIRS := \
+    $(LOCAL_PATH)/hidl/$(HIDL_INTERFACE_VERSION)
+include $(BUILD_STATIC_LIBRARY)
+endif # HOSTAPD_USE_HIDL == y
 endif # ifeq ($(WPA_BUILD_HOSTAPD),true)
