@@ -200,11 +200,57 @@ Return<void> Hostapd::removeAccessPoint(
 HostapdStatus Hostapd::addAccessPointInternal(
     const IfaceParams& iface_params, const NetworkParams& nw_params)
 {
+	if (hostapd_get_iface(interfaces_, iface_params.ifaceName.c_str())) {
+		wpa_printf(
+		    MSG_ERROR, "Interface %s already present",
+		    iface_params.ifaceName.c_str());
+		return {HostapdStatusCode::FAILURE_IFACE_EXISTS, ""};
+	}
+	const auto conf_params = CreateHostapdConfig(iface_params, nw_params);
+	if (conf_params.empty()) {
+		wpa_printf(MSG_ERROR, "Failed to create config params");
+		return {HostapdStatusCode::FAILURE_ARGS_INVALID, ""};
+	}
+	const auto conf_file_path =
+	    WriteHostapdConfig(iface_params.ifaceName, conf_params);
+	if (conf_file_path.empty()) {
+		wpa_printf(MSG_ERROR, "Failed to write config file");
+		return {HostapdStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	std::string add_iface_param_str = StringPrintf(
+	    "%s config=%s", iface_params.ifaceName.c_str(),
+	    conf_file_path.c_str());
+	std::vector<char> add_iface_param_vec(
+	    add_iface_param_str.begin(), add_iface_param_str.end() + 1);
+	if (hostapd_add_iface(interfaces_, add_iface_param_vec.data()) < 0) {
+		wpa_printf(
+		    MSG_ERROR, "Adding interface %s failed",
+		    add_iface_param_str.c_str());
+		return {HostapdStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	struct hostapd_data* iface_hapd =
+	    hostapd_get_iface(interfaces_, iface_params.ifaceName.c_str());
+	WPA_ASSERT(iface_hapd != nullptr && iface_hapd->iface != nullptr);
+	if (hostapd_enable_iface(iface_hapd->iface) < 0) {
+		wpa_printf(
+		    MSG_ERROR, "Enabling interface %s failed",
+		    iface_params.ifaceName.c_str());
+		return {HostapdStatusCode::FAILURE_UNKNOWN, ""};
+	}
 	return {HostapdStatusCode::SUCCESS, ""};
 }
 
 HostapdStatus Hostapd::removeAccessPointInternal(const std::string& iface_name)
 {
+	std::vector<char> remove_iface_param_vec(
+	    iface_name.begin(), iface_name.end() + 1);
+	if (hostapd_remove_iface(interfaces_, remove_iface_param_vec.data()) <
+	    0) {
+		wpa_printf(
+		    MSG_ERROR, "Removing interface %s failed",
+		    iface_name.c_str());
+		return {HostapdStatusCode::FAILURE_UNKNOWN, ""};
+	}
 	return {HostapdStatusCode::SUCCESS, ""};
 }
 }  // namespace implementation
