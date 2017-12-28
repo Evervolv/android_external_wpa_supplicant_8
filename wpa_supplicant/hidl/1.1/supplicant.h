@@ -44,6 +44,10 @@ public:
 	bool isValid();
 
 	// Hidl methods exposed.
+	Return<void> addInterface(
+	    const IfaceInfo& iface_info, addInterface_cb _hidl_cb) override;
+	Return<void> removeInterface(
+	    const IfaceInfo& iface_info, removeInterface_cb _hidl_cb) override;
 	Return<void> getInterface(
 	    const IfaceInfo& iface_info, getInterface_cb _hidl_cb) override;
 	Return<void> listInterfaces(listInterfaces_cb _hidl_cb) override;
@@ -63,6 +67,9 @@ private:
 	// Corresponding worker functions for the HIDL methods.
 	std::pair<SupplicantStatus, sp<ISupplicantIface>> getInterfaceInternal(
 	    const IfaceInfo& iface_info);
+	std::pair<SupplicantStatus, sp<ISupplicantIface>> addInterfaceInternal(
+	    const IfaceInfo& iface_info);
+	SupplicantStatus removeInterfaceInternal(const IfaceInfo& iface_info);
 	std::pair<SupplicantStatus, std::vector<ISupplicant::IfaceInfo>>
 	listInterfacesInternal();
 	SupplicantStatus registerCallbackInternal(
