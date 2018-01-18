@@ -15,7 +15,7 @@
 
 #include <android-base/macros.h>
 
-#include <android/hardware/wifi/supplicant/1.0/ISupplicantStaNetwork.h>
+#include <android/hardware/wifi/supplicant/1.1/ISupplicantStaNetwork.h>
 #include <android/hardware/wifi/supplicant/1.0/ISupplicantStaNetworkCallback.h>
 
 extern "C" {
@@ -42,7 +42,7 @@ using namespace android::hardware::wifi::supplicant::V1_0;
  * object is used for control operations on a specific network
  * controlled by wpa_supplicant.
  */
-class StaNetwork : public ISupplicantStaNetwork
+class StaNetwork : public V1_1::ISupplicantStaNetwork
 {
 public:
 	StaNetwork(
@@ -109,6 +109,9 @@ public:
 	    const hidl_string& path, setEapClientCert_cb _hidl_cb) override;
 	Return<void> setEapPrivateKeyId(
 	    const hidl_string& id, setEapPrivateKeyId_cb _hidl_cb) override;
+        Return<void> setEapEncryptedImsiIdentity(
+            const EapSimEncryptedIdentity& identity,
+            setEapEncryptedImsiIdentity_cb _hidl_cb) override;
 	Return<void> setEapSubjectMatch(
 	    const hidl_string& match, setEapSubjectMatch_cb _hidl_cb) override;
 	Return<void> setEapAltSubjectMatch(
@@ -186,6 +189,10 @@ public:
 	Return<void> sendNetworkEapIdentityResponse(
 	    const hidl_vec<uint8_t>& identity,
 	    sendNetworkEapIdentityResponse_cb _hidl_cb) override;
+	Return<void> sendNetworkEapIdentityResponse_1_1(
+	    const EapSimIdentity& identity,
+	    const EapSimEncryptedIdentity& imsiIdentity,
+	    sendNetworkEapIdentityResponse_1_1_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -214,6 +221,8 @@ private:
 	SupplicantStatus setEapPhase2MethodInternal(
 	    ISupplicantStaNetwork::EapPhase2Method method);
 	SupplicantStatus setEapIdentityInternal(
+	    const std::vector<uint8_t>& identity);
+        SupplicantStatus setEapEncryptedImsiIdentityInternal(
 	    const std::vector<uint8_t>& identity);
 	SupplicantStatus setEapAnonymousIdentityInternal(
 	    const std::vector<uint8_t>& identity);
@@ -287,6 +296,9 @@ private:
 	SupplicantStatus sendNetworkEapSimUmtsAuthFailureInternal();
 	SupplicantStatus sendNetworkEapIdentityResponseInternal(
 	    const std::vector<uint8_t>& identity);
+	SupplicantStatus sendNetworkEapIdentityResponseInternal_1_1(
+	    const std::vector<uint8_t>& identity,
+	    const std::vector<uint8_t>& imsi_identity);
 
 	struct wpa_ssid* retrieveNetworkPtr();
 	struct wpa_supplicant* retrieveIfacePtr();

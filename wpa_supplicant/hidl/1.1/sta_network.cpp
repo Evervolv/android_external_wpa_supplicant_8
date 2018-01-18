@@ -249,6 +249,14 @@ Return<void> StaNetwork::setEapIdentity(
 	    &StaNetwork::setEapIdentityInternal, _hidl_cb, identity);
 }
 
+Return<void> StaNetwork::setEapEncryptedImsiIdentity(
+    const EapSimEncryptedIdentity &identity, setEapEncryptedImsiIdentity_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::setEapEncryptedImsiIdentityInternal, _hidl_cb, identity);
+}
+
 Return<void> StaNetwork::setEapAnonymousIdentity(
     const hidl_vec<uint8_t> &identity, setEapAnonymousIdentity_cb _hidl_cb)
 {
@@ -645,6 +653,17 @@ Return<void> StaNetwork::sendNetworkEapIdentityResponse(
 	    identity);
 }
 
+Return<void> StaNetwork::sendNetworkEapIdentityResponse_1_1(
+    const EapSimIdentity &identity,
+    const EapSimEncryptedIdentity &encrypted_imsi_identity,
+    sendNetworkEapIdentityResponse_1_1_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::sendNetworkEapIdentityResponseInternal_1_1, _hidl_cb,
+	    identity, encrypted_imsi_identity);
+}
+
 std::pair<SupplicantStatus, uint32_t> StaNetwork::getIdInternal()
 {
 	return {{SupplicantStatusCode::SUCCESS, ""}, network_id_};
@@ -973,6 +992,12 @@ SupplicantStatus StaNetwork::setEapIdentityInternal(
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaNetwork::setEapEncryptedImsiIdentityInternal(
+    const std::vector<uint8_t> &identity)
+{
+	return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 }
 
 SupplicantStatus StaNetwork::setEapAnonymousIdentityInternal(
@@ -1637,6 +1662,12 @@ SupplicantStatus StaNetwork::sendNetworkEapIdentityResponseInternal(
 	    MSG_DEBUG, "network identity response param",
 	    (const u8 *)ctrl_rsp_param.c_str(), ctrl_rsp_param.size());
 	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaNetwork::sendNetworkEapIdentityResponseInternal_1_1(
+    const std::vector<uint8_t> &identity, const std::vector<uint8_t> &encrypted_imsi_identity)
+{
+	return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 }
 
 /**
