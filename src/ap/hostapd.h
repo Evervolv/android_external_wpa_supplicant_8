@@ -372,6 +372,16 @@ struct hostapd_sta_info {
 #endif /* CONFIG_TAXONOMY */
 };
 
+enum hostapd_iface_state {
+	HAPD_IFACE_UNINITIALIZED,
+	HAPD_IFACE_DISABLED,
+	HAPD_IFACE_COUNTRY_UPDATE,
+	HAPD_IFACE_ACS,
+	HAPD_IFACE_HT_SCAN,
+	HAPD_IFACE_DFS,
+	HAPD_IFACE_ENABLED
+};
+
 /**
  * struct hostapd_iface - hostapd per-interface data structure
  */
@@ -382,16 +392,7 @@ struct hostapd_iface {
 	struct hostapd_config *conf;
 	char phy[16]; /* Name of the PHY (radio) */
 
-	enum hostapd_iface_state {
-		HAPD_IFACE_UNINITIALIZED,
-		HAPD_IFACE_DISABLED,
-		HAPD_IFACE_COUNTRY_UPDATE,
-		HAPD_IFACE_ACS,
-		HAPD_IFACE_HT_SCAN,
-		HAPD_IFACE_DFS,
-		HAPD_IFACE_ENABLED
-	} state;
-
+        enum hostapd_iface_state state;
 #ifdef CONFIG_MESH
 	struct mesh_conf *mconf;
 #endif /* CONFIG_MESH */

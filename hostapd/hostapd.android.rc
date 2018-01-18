@@ -7,13 +7,12 @@
 #
 
 on post-fs-data
-    mkdir /data/misc/wifi/hostapd 0770 wifi wifi
+    mkdir /data/vendor/wifi 0770 wifi wifi
+    mkdir /data/vendor/wifi/hostapd 0770 wifi wifi
 
-service hostapd /vendor/bin/hostapd \
-        /data/misc/wifi/hostapd.conf
+service hostapd /vendor/bin/hw/hostapd
     class main
     user wifi
     group wifi net_raw net_admin
-    writepid /data/misc/wifi/hostapd.pid
     disabled
     oneshot
