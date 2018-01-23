@@ -71,14 +71,15 @@ std::string CreateHostapdConfig(
 		    MSG_ERROR, "Invalid SSID size: %zu", nw_params.ssid.size());
 		return "";
 	}
-	if (nw_params.pskPassphrase.size() <
-		static_cast<uint32_t>(
-		    IHostapd::ParamSizeLimits::
-			WPA2_PSK_PASSPHRASE_MIN_LEN_IN_BYTES) ||
-	    nw_params.pskPassphrase.size() >
-		static_cast<uint32_t>(
-		    IHostapd::ParamSizeLimits::
-			WPA2_PSK_PASSPHRASE_MAX_LEN_IN_BYTES)) {
+	if ((nw_params.encryptionType != IHostapd::EncryptionType::NONE) &&
+	    (nw_params.pskPassphrase.size() <
+		 static_cast<uint32_t>(
+		     IHostapd::ParamSizeLimits::
+			 WPA2_PSK_PASSPHRASE_MIN_LEN_IN_BYTES) ||
+	     nw_params.pskPassphrase.size() >
+		 static_cast<uint32_t>(
+		     IHostapd::ParamSizeLimits::
+			 WPA2_PSK_PASSPHRASE_MAX_LEN_IN_BYTES))) {
 		wpa_printf(
 		    MSG_ERROR, "Invalid psk passphrase size: %zu",
 		    nw_params.pskPassphrase.size());
