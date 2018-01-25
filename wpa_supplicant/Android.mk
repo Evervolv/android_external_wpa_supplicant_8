@@ -65,11 +65,11 @@ L_CFLAGS += -DCONFIG_NO_ROAMING
 endif
 
 # Use Android specific directory for control interface sockets
-L_CFLAGS += -DCONFIG_CTRL_IFACE_CLIENT_DIR=\"/data/misc/wifi/sockets\"
-L_CFLAGS += -DCONFIG_CTRL_IFACE_DIR=\"/data/misc/wifi/sockets\"
+L_CFLAGS += -DCONFIG_CTRL_IFACE_CLIENT_DIR=\"/data/vendor/wifi/wpa/sockets\"
+L_CFLAGS += -DCONFIG_CTRL_IFACE_DIR=\"/data/vendor/wifi/wpa/sockets\"
 
 # Use Android specific directory for wpa_cli command completion history
-L_CFLAGS += -DCONFIG_WPA_CLI_HISTORY_DIR=\"/data/misc/wifi\"
+L_CFLAGS += -DCONFIG_WPA_CLI_HISTORY_DIR=\"/data/vendor/wifi/wpa\"
 
 # To force sizeof(enum) = 4
 ifeq ($(TARGET_ARCH),arm)
