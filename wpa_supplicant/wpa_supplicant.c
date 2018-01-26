@@ -6367,12 +6367,31 @@ int wpa_supplicant_ctrl_rsp_handle(struct wpa_supplicant *wpa_s,
 {
 #ifdef IEEE8021X_EAPOL
 	struct eap_peer_config *eap = &ssid->eap;
+	char *identity, *imsi_identity;
 
 	switch (rtype) {
 	case WPA_CTRL_REQ_EAP_IDENTITY:
 		os_free(eap->identity);
-		eap->identity = (u8 *) dup_binstr(value, value_len);
-		eap->identity_len = value_len;
+		os_free(eap->imsi_identity);
+		if (value == NULL)
+			return -1;
+		identity = os_strchr(value, ':');
+		if (identity == NULL) {
+			/* plain identity */
+			eap->identity = (u8 *)os_strdup(value);
+			eap->identity_len = os_strlen(value);
+		} else {
+			/* have both plain identity and encrypted identity */
+			imsi_identity = value;
+			*identity++ = '\0';
+			/* plain identity */
+			eap->imsi_identity = (u8 *)dup_binstr(imsi_identity, strlen(imsi_identity));
+			eap->imsi_identity_len = strlen(imsi_identity);
+			/* encrypted identity */
+			eap->identity = (u8 *)dup_binstr(identity,
+							 value_len - strlen(imsi_identity) - 1);
+			eap->identity_len = value_len - strlen(imsi_identity) - 1;
+		}
 		eap->pending_req_identity = 0;
 		if (ssid == wpa_s->current_ssid)
 			wpa_s->reassociate = 1;
