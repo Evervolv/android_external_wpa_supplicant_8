@@ -249,6 +249,14 @@ Return<void> StaNetwork::setEapIdentity(
 	    &StaNetwork::setEapIdentityInternal, _hidl_cb, identity);
 }
 
+Return<void> StaNetwork::setEapEncryptedImsiIdentity(
+    const EapSimEncryptedIdentity &identity, setEapEncryptedImsiIdentity_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::setEapEncryptedImsiIdentityInternal, _hidl_cb, identity);
+}
+
 Return<void> StaNetwork::setEapAnonymousIdentity(
     const hidl_vec<uint8_t> &identity, setEapAnonymousIdentity_cb _hidl_cb)
 {
@@ -645,6 +653,17 @@ Return<void> StaNetwork::sendNetworkEapIdentityResponse(
 	    identity);
 }
 
+Return<void> StaNetwork::sendNetworkEapIdentityResponse_1_1(
+    const EapSimIdentity &identity,
+    const EapSimEncryptedIdentity &encrypted_imsi_identity,
+    sendNetworkEapIdentityResponse_1_1_cb _hidl_cb)
+{
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+	    &StaNetwork::sendNetworkEapIdentityResponseInternal_1_1, _hidl_cb,
+	    identity, encrypted_imsi_identity);
+}
+
 std::pair<SupplicantStatus, uint32_t> StaNetwork::getIdInternal()
 {
 	return {{SupplicantStatusCode::SUCCESS, ""}, network_id_};
@@ -970,6 +989,25 @@ SupplicantStatus StaNetwork::setEapIdentityInternal(
 	if (setByteArrayFieldAndResetState(
 		identity.data(), identity.size(), &(wpa_ssid->eap.identity),
 		&(wpa_ssid->eap.identity_len), "eap identity")) {
+		return { SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	// plain IMSI identity
+	if (setByteArrayFieldAndResetState(
+		identity.data(), identity.size(), &(wpa_ssid->eap.imsi_identity),
+		&(wpa_ssid->eap.imsi_identity_len), "eap imsi identity")) {
+		return { SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaNetwork::setEapEncryptedImsiIdentityInternal(
+    const std::vector<uint8_t> &identity)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	// encrypted IMSI identity
+	if (setByteArrayFieldAndResetState(
+		identity.data(), identity.size(), &(wpa_ssid->eap.identity),
+		&(wpa_ssid->eap.identity_len), "eap encrypted imsi identity")) {
 		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
 	}
 	return {SupplicantStatusCode::SUCCESS, ""};
@@ -1625,6 +1663,28 @@ SupplicantStatus StaNetwork::sendNetworkEapIdentityResponseInternal(
 {
 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
 	std::string ctrl_rsp_param(identity.begin(), identity.end());
+	enum wpa_ctrl_req_type rtype = WPA_CTRL_REQ_EAP_IDENTITY;
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
+	if (wpa_supplicant_ctrl_rsp_handle(
+		wpa_s, wpa_ssid, rtype, ctrl_rsp_param.c_str(),
+		ctrl_rsp_param.size())) {
+		return {SupplicantStatusCode::FAILURE_UNKNOWN, ""};
+	}
+	eapol_sm_notify_ctrl_response(wpa_s->eapol);
+	wpa_hexdump_ascii_key(
+	    MSG_DEBUG, "network identity response param",
+	    (const u8 *)ctrl_rsp_param.c_str(), ctrl_rsp_param.size());
+	return {SupplicantStatusCode::SUCCESS, ""};
+}
+
+SupplicantStatus StaNetwork::sendNetworkEapIdentityResponseInternal_1_1(
+    const std::vector<uint8_t> &identity, const std::vector<uint8_t> &encrypted_imsi_identity)
+{
+	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+	// format: plain identity + ":" + encrypted identity(encrypted_imsi_identity)
+	std::string ctrl_rsp_param =
+		std::string(identity.begin(), identity.end()) + ":" +
+		std::string(encrypted_imsi_identity.begin(), encrypted_imsi_identity.end());
 	enum wpa_ctrl_req_type rtype = WPA_CTRL_REQ_EAP_IDENTITY;
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	if (wpa_supplicant_ctrl_rsp_handle(
