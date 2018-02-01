@@ -118,6 +118,12 @@ Return<bool> Supplicant::isDebugShowKeysEnabled()
 	return ((wpa_debug_show_keys != 0) ? true : false);
 }
 
+Return<void> Supplicant::terminate() {
+	wpa_printf(MSG_INFO, "Terminating...");
+	wpa_supplicant_terminate_proc(wpa_global_);
+	return Void();
+}
+
 std::pair<SupplicantStatus, sp<ISupplicantIface>>
 Supplicant::addInterfaceInternal(const IfaceInfo& iface_info)
 {
