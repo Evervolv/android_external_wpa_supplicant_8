@@ -49,6 +49,7 @@ public:
 	Return<void> removeAccessPoint(
 	    const hidl_string& iface_name,
 	    removeAccessPoint_cb _hidl_cb) override;
+	Return<void> terminate() override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.

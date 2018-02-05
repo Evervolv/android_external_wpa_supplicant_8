@@ -62,6 +62,7 @@ public:
 	Return<bool> isDebugShowKeysEnabled() override;
 	Return<void> setConcurrencyPriority(
 	    IfaceType type, setConcurrencyPriority_cb _hidl_cb) override;
+	Return<void> terminate() override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.

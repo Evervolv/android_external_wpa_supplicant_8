@@ -17,6 +17,11 @@
 #include "hostapd.h"
 #include "hidl_return_util.h"
 
+extern "C"
+{
+#include "utils/eloop.h"
+}
+
 // The HIDL implementation for hostapd creates a hostapd.conf dynamically for
 // each interface. This file can then be used to hook onto the normal config
 // file parsing logic in hostapd code.  Helps us to avoid duplication of code
@@ -196,6 +201,12 @@ Return<void> Hostapd::removeAccessPoint(
 {
 	return call(
 	    this, &Hostapd::removeAccessPointInternal, _hidl_cb, iface_name);
+}
+
+Return<void> Hostapd::terminate() {
+	wpa_printf(MSG_INFO, "Terminating...");
+	eloop_terminate();
+	return Void();
 }
 
 HostapdStatus Hostapd::addAccessPointInternal(
