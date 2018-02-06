@@ -342,21 +342,26 @@ int os_program_init(void)
 
 	if (!gid_wifi || !uid_wifi) return -1;
 #else /* ANDROID_SETGROUPS_OVERRIDE */
-	gid_t groups[3];
+	gid_t groups[4];
+	int group_idx = 0;
 
 	if (!gid_wifi || !uid_wifi) return -1;
-	groups[0] = gid_wifi;
+	groups[group_idx] = gid_wifi;
 
 	grp = getgrnam("inet");
-	groups[1] = grp ? grp->gr_gid : 0;
-	if (!groups[1]) return -1;
+	groups[++group_idx] = grp ? grp->gr_gid : 0;
+	if (!groups[group_idx]) return -1;
 
 	grp = getgrnam("keystore");
-	groups[2] = grp ? grp->gr_gid : 0;
-	if (!groups[2]) return -1;
+	groups[++group_idx] = grp ? grp->gr_gid : 0;
+	if (!groups[group_idx]) return -1;
+
+	grp = getgrnam("log");
+	groups[++group_idx] = grp ? grp->gr_gid : 0;
+	if (!groups[group_idx]) group_idx--;
 #endif /* ANDROID_SETGROUPS_OVERRIDE */
 
-	setgroups(ARRAY_SIZE(groups), groups);
+	setgroups(group_idx + 1, groups);
 
 	prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0);
 
