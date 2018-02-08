@@ -459,34 +459,31 @@ int HidlManager::unregisterInterface(struct wpa_supplicant *wpa_s)
 	if (!wpa_s)
 		return 1;
 
-	if (isP2pIface(wpa_s)) {
-		if (removeHidlObjectFromMap(
-			wpa_s->ifname, p2p_iface_object_map_)) {
-			wpa_printf(
-			    MSG_ERROR,
-			    "Failed to unregister P2P interface with HIDL "
-			    "control: %s",
-			    wpa_s->ifname);
-			return 1;
+	// Check if this interface is present in P2P map first, else check in
+	// STA map.
+	// Note: We can't use isP2pIface() here because interface
+	// pointers (wpa_s->global->p2p_init_wpa_s == wpa_s) used by the helper
+	// function is cleared by the core before notifying the HIDL interface.
+	bool success =
+	    !removeHidlObjectFromMap(wpa_s->ifname, p2p_iface_object_map_);
+	if (success) {  // assumed to be P2P
+		success = !removeAllIfaceCallbackHidlObjectsFromMap(
+		    wpa_s->ifname, p2p_iface_callbacks_map_);
+	} else {  // assumed to be STA
+		success = !removeHidlObjectFromMap(
+		    wpa_s->ifname, sta_iface_object_map_);
+		if (success) {
+			success = !removeAllIfaceCallbackHidlObjectsFromMap(
+			    wpa_s->ifname, sta_iface_callbacks_map_);
 		}
-		if (removeAllIfaceCallbackHidlObjectsFromMap(
-			wpa_s->ifname, p2p_iface_callbacks_map_)) {
-			return 1;
-		}
-	} else {
-		if (removeHidlObjectFromMap(
-			wpa_s->ifname, sta_iface_object_map_)) {
-			wpa_printf(
-			    MSG_ERROR,
-			    "Failed to unregister STA interface with HIDL "
-			    "control: %s",
-			    wpa_s->ifname);
-			return 1;
-		}
-		if (removeAllIfaceCallbackHidlObjectsFromMap(
-			wpa_s->ifname, sta_iface_callbacks_map_)) {
-			return 1;
-		}
+	}
+	if (!success) {
+		wpa_printf(
+		    MSG_ERROR,
+		    "Failed to unregister interface with HIDL "
+		    "control: %s",
+		    wpa_s->ifname);
+		return 1;
 	}
 
 	// Invoke the |onInterfaceRemoved| method on all registered callbacks.
