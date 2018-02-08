@@ -11,6 +11,7 @@ on post-fs-data
     mkdir /data/vendor/wifi/hostapd 0770 wifi wifi
 
 service hostapd /vendor/bin/hw/hostapd
+    interface android.hardware.wifi.hostapd@1.0::IHostapd default
     class main
     user wifi
     group wifi net_raw net_admin
