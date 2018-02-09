@@ -1724,7 +1724,7 @@ endif
 ifeq ($(WPA_SUPPLICANT_USE_HIDL), y)
 LOCAL_SHARED_LIBRARIES += android.hardware.wifi.supplicant@1.0
 LOCAL_SHARED_LIBRARIES += android.hardware.wifi.supplicant@1.1
-LOCAL_SHARED_LIBRARIES += libhidlbase libhidltransport libhwbinder libutils
+LOCAL_SHARED_LIBRARIES += libhidlbase libhidltransport libhwbinder libutils libbase
 LOCAL_STATIC_LIBRARIES += libwpa_hidl
 endif
 include $(BUILD_EXECUTABLE)
@@ -1787,6 +1787,7 @@ LOCAL_SRC_FILES := \
 LOCAL_SHARED_LIBRARIES := \
     android.hardware.wifi.supplicant@1.0 \
     android.hardware.wifi.supplicant@1.1 \
+    libbase \
     libhidlbase \
     libhidltransport \
     libutils \
