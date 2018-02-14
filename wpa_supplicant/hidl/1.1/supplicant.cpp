@@ -283,7 +283,10 @@ Supplicant::addInterfaceInternal(const IfaceInfo& iface_info)
 				{}};
 		}
 		iface_params.confname = kP2pIfaceConfPath;
-		iface_params.confanother = kP2pIfaceConfOverlayPath;
+		int ret = access(kP2pIfaceConfOverlayPath, R_OK);
+		if (ret == 0) {
+			iface_params.confanother = kP2pIfaceConfOverlayPath;
+		}
 	} else {
 		if (ensureConfigFileExists(
 			kStaIfaceConfPath, kOldStaIfaceConfPath) != 0) {
@@ -295,7 +298,10 @@ Supplicant::addInterfaceInternal(const IfaceInfo& iface_info)
 				{}};
 		}
 		iface_params.confname = kStaIfaceConfPath;
-		iface_params.confanother = kStaIfaceConfOverlayPath;
+		int ret = access(kStaIfaceConfOverlayPath, R_OK);
+		if (ret == 0) {
+			iface_params.confanother = kStaIfaceConfOverlayPath;
+		}
 	}
 	iface_params.ifname = iface_info.name.c_str();
 	struct wpa_supplicant* wpa_s =
