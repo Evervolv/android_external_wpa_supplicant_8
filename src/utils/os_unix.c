@@ -341,6 +341,7 @@ int os_program_init(void)
 	gid_t groups[] = { ANDROID_SETGROUPS_OVERRIDE };
 
 	if (!gid_wifi || !uid_wifi) return -1;
+	setgroups(ARRAY_SIZE(groups), groups);
 #else /* ANDROID_SETGROUPS_OVERRIDE */
 	gid_t groups[4];
 	int group_idx = 0;
@@ -359,9 +360,9 @@ int os_program_init(void)
 	grp = getgrnam("log");
 	groups[++group_idx] = grp ? grp->gr_gid : 0;
 	if (!groups[group_idx]) group_idx--;
-#endif /* ANDROID_SETGROUPS_OVERRIDE */
 
 	setgroups(group_idx + 1, groups);
+#endif /* ANDROID_SETGROUPS_OVERRIDE */
 
 	prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0);
 
