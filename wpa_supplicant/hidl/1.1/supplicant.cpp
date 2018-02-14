@@ -28,7 +28,9 @@ constexpr char kP2pIfaceConfPath[] =
 constexpr char kP2pIfaceConfOverlayPath[] =
     "/vendor/etc/wifi/p2p_supplicant_overlay.conf";
 // Migrate conf files for existing devices.
-constexpr char kTemplateConfPath[] =
+constexpr char kSystemTemplateConfPath[] =
+    "/system/etc/wifi/wpa_supplicant.conf";
+constexpr char kVendorTemplateConfPath[] =
     "/vendor/etc/wifi/wpa_supplicant.conf";
 constexpr char kOldStaIfaceConfPath[] =
     "/data/misc/wifi/wpa_supplicant.conf";
@@ -92,7 +94,6 @@ int copyFileIfItExists(
  */
 int ensureConfigFileExists(
     const std::string& config_file_path,
-    const std::string& template_config_file_path,
     const std::string& old_config_file_path)
 {
 	int ret = access(config_file_path.c_str(), R_OK | W_OK);
@@ -126,11 +127,21 @@ int ensureConfigFileExists(
 		unlink(config_file_path.c_str());
 		return -1;
 	}
-	ret = copyFileIfItExists(template_config_file_path, config_file_path);
+	ret = copyFileIfItExists(kVendorTemplateConfPath, config_file_path);
 	if (ret == 0) {
 		wpa_printf(
 		    MSG_INFO, "Copied template conf file from %s to %s",
-		    template_config_file_path.c_str(), config_file_path.c_str());
+		    kVendorTemplateConfPath, config_file_path.c_str());
+		return 0;
+	} else if (ret == -1) {
+		unlink(config_file_path.c_str());
+		return -1;
+	}
+	ret = copyFileIfItExists(kSystemTemplateConfPath, config_file_path);
+	if (ret == 0) {
+		wpa_printf(
+		    MSG_INFO, "Copied template conf file from %s to %s",
+		    kSystemTemplateConfPath, config_file_path.c_str());
 		return 0;
 	} else if (ret == -1) {
 		unlink(config_file_path.c_str());
@@ -263,8 +274,7 @@ Supplicant::addInterfaceInternal(const IfaceInfo& iface_info)
 	iface_params.driver = kIfaceDriverName;
 	if (iface_info.type == IfaceType::P2P) {
 		if (ensureConfigFileExists(
-			kP2pIfaceConfPath, kTemplateConfPath,
-			kOldP2pIfaceConfPath) != 0) {
+			kP2pIfaceConfPath, kOldP2pIfaceConfPath) != 0) {
 			wpa_printf(
 			    MSG_ERROR, "Conf file does not exists: %s",
 			    kP2pIfaceConfPath);
@@ -276,8 +286,7 @@ Supplicant::addInterfaceInternal(const IfaceInfo& iface_info)
 		iface_params.confanother = kP2pIfaceConfOverlayPath;
 	} else {
 		if (ensureConfigFileExists(
-			kStaIfaceConfPath, kTemplateConfPath,
-			kOldStaIfaceConfPath) != 0) {
+			kStaIfaceConfPath, kOldStaIfaceConfPath) != 0) {
 			wpa_printf(
 			    MSG_ERROR, "Conf file does not exists: %s",
 			    kStaIfaceConfPath);
