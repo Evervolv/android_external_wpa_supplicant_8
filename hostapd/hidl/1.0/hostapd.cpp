@@ -140,13 +140,17 @@ std::string CreateHostapdConfig(
 	std::string hw_mode_as_string;
 	switch (iface_params.channelParams.band) {
 	case IHostapd::Band::BAND_2_4_GHZ:
-		hw_mode_as_string = "g";
+		hw_mode_as_string = "hw_mode=g";
 		break;
 	case IHostapd::Band::BAND_5_GHZ:
-		hw_mode_as_string = "a";
+		hw_mode_as_string = "hw_mode=a\n"
+		    "ht_capab=[HT40+]\n"
+		    "vht_oper_chwidth=1";
 		break;
 	case IHostapd::Band::BAND_ANY:
-		hw_mode_as_string = "any";
+		hw_mode_as_string = "hw_mode=any\n"
+		    "ht_capab=[HT40+]\n"
+		    "vht_oper_chwidth=1";
 		break;
 	default:
 		wpa_printf(MSG_ERROR, "Invalid band");
@@ -163,7 +167,7 @@ std::string CreateHostapdConfig(
 	    "%s\n"
 	    "ieee80211n=%d\n"
 	    "ieee80211ac=%d\n"
-	    "hw_mode=%s\n"
+	    "%s\n"
 	    "ignore_broadcast_ssid=%d\n"
 	    "wowlan_triggers=any\n"
 	    "%s\n",
