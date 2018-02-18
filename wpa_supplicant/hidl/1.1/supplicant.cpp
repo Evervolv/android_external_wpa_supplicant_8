@@ -11,18 +11,145 @@
 #include "hidl_return_util.h"
 #include "supplicant.h"
 
+#include <android-base/file.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
 namespace {
 // Pre-populated interface params for interfaces controlled by wpa_supplicant.
 // Note: This may differ for other OEM's. So, modify this accordingly.
 constexpr char kIfaceDriverName[] = "nl80211";
 constexpr char kStaIfaceConfPath[] =
-		"/data/misc/wifi/wpa_supplicant.conf";
+    "/data/vendor/wifi/wpa/wpa_supplicant.conf";
 constexpr char kStaIfaceConfOverlayPath[] =
-		"/vendor/etc/wifi/wpa_supplicant_overlay.conf";
+    "/vendor/etc/wifi/wpa_supplicant_overlay.conf";
 constexpr char kP2pIfaceConfPath[] =
-		"/data/misc/wifi/p2p_supplicant.conf";
+    "/data/vendor/wifi/wpa/p2p_supplicant.conf";
 constexpr char kP2pIfaceConfOverlayPath[] =
-		"/vendor/etc/wifi/p2p_supplicant_overlay.conf";
+    "/vendor/etc/wifi/p2p_supplicant_overlay.conf";
+// Migrate conf files for existing devices.
+constexpr char kSystemTemplateConfPath[] =
+    "/system/etc/wifi/wpa_supplicant.conf";
+constexpr char kVendorTemplateConfPath[] =
+    "/vendor/etc/wifi/wpa_supplicant.conf";
+constexpr char kOldStaIfaceConfPath[] =
+    "/data/misc/wifi/wpa_supplicant.conf";
+constexpr char kOldP2pIfaceConfPath[] =
+    "/data/misc/wifi/p2p_supplicant.conf";
+constexpr mode_t kConfigFileMode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
+
+int copyFile(
+    const std::string& src_file_path, const std::string& dest_file_path)
+{
+	std::string file_contents;
+	if (!android::base::ReadFileToString(src_file_path, &file_contents)) {
+		wpa_printf(
+		    MSG_ERROR, "Failed to read from %s. Errno: %s",
+		    src_file_path.c_str(), strerror(errno));
+		return -1;
+	}
+	if (!android::base::WriteStringToFile(
+		file_contents, dest_file_path, kConfigFileMode, getuid(),
+		getgid())) {
+		wpa_printf(
+		    MSG_ERROR, "Failed to write to %s. Errno: %s",
+		    dest_file_path.c_str(), strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Copy |src_file_path| to |dest_file_path| if it exists.
+ *
+ * Returns 1 if |src_file_path| does not exists,
+ * Returns -1 if the copy fails.
+ * Returns 0 if the copy succeeds.
+ */
+int copyFileIfItExists(
+    const std::string& src_file_path, const std::string& dest_file_path)
+{
+	int ret = access(src_file_path.c_str(), R_OK);
+	if ((ret != 0) && (errno == ENOENT)) {
+		return 1;
+	}
+	ret = copyFile(src_file_path, dest_file_path);
+	if (ret != 0) {
+		wpa_printf(
+		    MSG_ERROR, "Failed copying %s to %s.",
+		    src_file_path.c_str(), dest_file_path.c_str());
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Ensure that the specified config file pointed by |config_file_path| exists.
+ * a) If the |config_file_path| exists with the correct permissions, return.
+ * b) If the |config_file_path| does not exist, but |old_config_file_path|
+ * exists, copy over the contents of the |old_config_file_path| to
+ * |config_file_path|.
+ * c) If the |config_file_path| & |old_config_file_path|
+ * does not exists, copy over the contents of |template_config_file_path|.
+ */
+int ensureConfigFileExists(
+    const std::string& config_file_path,
+    const std::string& old_config_file_path)
+{
+	int ret = access(config_file_path.c_str(), R_OK | W_OK);
+	if (ret == 0) {
+		return 0;
+	}
+	if (errno == EACCES) {
+		ret = chmod(config_file_path.c_str(), kConfigFileMode);
+		if (ret == 0) {
+			return 0;
+		} else {
+			wpa_printf(
+			    MSG_ERROR, "Cannot set RW to %s. Errno: %s",
+			    config_file_path.c_str(), strerror(errno));
+			return -1;
+		}
+	} else if (errno != ENOENT) {
+		wpa_printf(
+		    MSG_ERROR, "Cannot acces %s. Errno: %s",
+		    config_file_path.c_str(), strerror(errno));
+		return -1;
+	}
+	ret = copyFileIfItExists(old_config_file_path, config_file_path);
+	if (ret == 0) {
+		wpa_printf(
+		    MSG_INFO, "Migrated conf file from %s to %s",
+		    old_config_file_path.c_str(), config_file_path.c_str());
+		unlink(old_config_file_path.c_str());
+		return 0;
+	} else if (ret == -1) {
+		unlink(config_file_path.c_str());
+		return -1;
+	}
+	ret = copyFileIfItExists(kVendorTemplateConfPath, config_file_path);
+	if (ret == 0) {
+		wpa_printf(
+		    MSG_INFO, "Copied template conf file from %s to %s",
+		    kVendorTemplateConfPath, config_file_path.c_str());
+		return 0;
+	} else if (ret == -1) {
+		unlink(config_file_path.c_str());
+		return -1;
+	}
+	ret = copyFileIfItExists(kSystemTemplateConfPath, config_file_path);
+	if (ret == 0) {
+		wpa_printf(
+		    MSG_INFO, "Copied template conf file from %s to %s",
+		    kSystemTemplateConfPath, config_file_path.c_str());
+		return 0;
+	} else if (ret == -1) {
+		unlink(config_file_path.c_str());
+		return -1;
+	}
+	// Did not create the conf file.
+	return -1;
+}
 }  // namespace
 
 namespace android {
@@ -118,7 +245,8 @@ Return<bool> Supplicant::isDebugShowKeysEnabled()
 	return ((wpa_debug_show_keys != 0) ? true : false);
 }
 
-Return<void> Supplicant::terminate() {
+Return<void> Supplicant::terminate()
+{
 	wpa_printf(MSG_INFO, "Terminating...");
 	wpa_supplicant_terminate_proc(wpa_global_);
 	return Void();
@@ -145,11 +273,35 @@ Supplicant::addInterfaceInternal(const IfaceInfo& iface_info)
 	struct wpa_interface iface_params = {};
 	iface_params.driver = kIfaceDriverName;
 	if (iface_info.type == IfaceType::P2P) {
+		if (ensureConfigFileExists(
+			kP2pIfaceConfPath, kOldP2pIfaceConfPath) != 0) {
+			wpa_printf(
+			    MSG_ERROR, "Conf file does not exists: %s",
+			    kP2pIfaceConfPath);
+			return {{SupplicantStatusCode::FAILURE_UNKNOWN,
+				 "Conf file does not exist"},
+				{}};
+		}
 		iface_params.confname = kP2pIfaceConfPath;
-		iface_params.confanother = kP2pIfaceConfOverlayPath;
+		int ret = access(kP2pIfaceConfOverlayPath, R_OK);
+		if (ret == 0) {
+			iface_params.confanother = kP2pIfaceConfOverlayPath;
+		}
 	} else {
+		if (ensureConfigFileExists(
+			kStaIfaceConfPath, kOldStaIfaceConfPath) != 0) {
+			wpa_printf(
+			    MSG_ERROR, "Conf file does not exists: %s",
+			    kStaIfaceConfPath);
+			return {{SupplicantStatusCode::FAILURE_UNKNOWN,
+				 "Conf file does not exist"},
+				{}};
+		}
 		iface_params.confname = kStaIfaceConfPath;
-		iface_params.confanother = kStaIfaceConfOverlayPath;
+		int ret = access(kStaIfaceConfOverlayPath, R_OK);
+		if (ret == 0) {
+			iface_params.confanother = kStaIfaceConfOverlayPath;
+		}
 	}
 	iface_params.ifname = iface_info.name.c_str();
 	struct wpa_supplicant* wpa_s =
