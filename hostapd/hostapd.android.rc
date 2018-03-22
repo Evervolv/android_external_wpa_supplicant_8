@@ -12,6 +12,7 @@ on post-fs-data
 service hostapd /vendor/bin/hostapd \
         /data/misc/wifi/hostapd.conf
     class main
+    capabilities NET_ADMIN NET_RAW
     user wifi
     group wifi net_raw net_admin
     writepid /data/misc/wifi/hostapd.pid
