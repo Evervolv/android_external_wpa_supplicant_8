@@ -1723,7 +1723,7 @@ LOCAL_SHARED_LIBRARIES += libdbus
 endif
 ifeq ($(WPA_SUPPLICANT_USE_HIDL), y)
 LOCAL_SHARED_LIBRARIES += android.hardware.wifi.supplicant@1.0
-LOCAL_SHARED_LIBRARIES += libhidlbase libhidltransport libhwbinder libutils
+LOCAL_SHARED_LIBRARIES += libhidlbase libhidltransport libhwbinder libutils libbase
 LOCAL_STATIC_LIBRARIES += libwpa_hidl
 endif
 include $(BUILD_EXECUTABLE)
@@ -1785,6 +1785,7 @@ LOCAL_SRC_FILES := \
     hidl/$(HIDL_INTERFACE_VERSION)/supplicant.cpp
 LOCAL_SHARED_LIBRARIES := \
     android.hardware.wifi.supplicant@$(HIDL_INTERFACE_VERSION) \
+    libbase \
     libhidlbase \
     libhidltransport \
     libhwbinder \
