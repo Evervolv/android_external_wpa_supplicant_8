@@ -43,7 +43,6 @@ struct wpas_hidl_priv *wpas_hidl_init(struct wpa_global *global)
 	wpa_printf(MSG_DEBUG, "Initing hidl control");
 
 	configureRpcThreadpool(1, true /* callerWillJoin */);
-	IPCThreadState::self()->disableBackgroundScheduling(true);
 	IPCThreadState::self()->setupPolling(&priv->hidl_fd);
 	if (priv->hidl_fd < 0)
 		goto err;
