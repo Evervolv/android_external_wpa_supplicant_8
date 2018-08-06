@@ -23,7 +23,7 @@ extern "C" {
 using android::hardware::configureRpcThreadpool;
 using android::hardware::setupTransportPolling;
 using android::hardware::handleTransportPoll;
-using android::hardware::wifi::supplicant::V1_0::implementation::HidlManager;
+using android::hardware::wifi::supplicant::V1_1::implementation::HidlManager;
 
 void wpas_hidl_sock_handler(
     int sock, void * /* eloop_ctx */, void * /* sock_ctx */)
@@ -625,3 +625,21 @@ void wpas_hidl_notify_ap_sta_deauthorized(
 
 	hidl_manager->notifyApStaDeauthorized(wpa_s, sta, p2p_dev_addr);
 }
+
+void wpas_hidl_notify_eap_error(
+    struct wpa_supplicant *wpa_s, int error_code)
+{
+	if (!wpa_s)
+		return;
+
+	wpa_printf(
+	    MSG_DEBUG,
+            "Notifying EAP Error: %d ", error_code);
+
+	HidlManager *hidl_manager = HidlManager::getInstance();
+	if (!hidl_manager)
+		return;
+
+	hidl_manager->notifyEapError(wpa_s, error_code);
+}
+
