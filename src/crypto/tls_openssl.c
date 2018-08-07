@@ -116,6 +116,20 @@ static int RSA_bits(const RSA *r)
 #include <openssl/pem.h>
 #include <keystore/keystore_get.h>
 
+#include <log/log.h>
+#include <log/log_event_list.h>
+
+#define CERT_VALIDATION_FAILURE 210033
+
+static void log_cert_validation_failure(const char *reason)
+{
+	android_log_context ctx = create_android_logger(CERT_VALIDATION_FAILURE);
+	android_log_write_string8(ctx, reason);
+	android_log_write_list(ctx, LOG_ID_SECURITY);
+	android_log_destroy(&ctx);
+}
+
+
 static BIO * BIO_from_keystore(const char *key)
 {
 	BIO *bio = NULL;
@@ -1786,6 +1800,10 @@ static void openssl_tls_fail_event(struct tls_connection *conn,
 	union tls_event_data ev;
 	struct wpabuf *cert = NULL;
 	struct tls_context *context = conn->context;
+
+#ifdef ANDROID
+	log_cert_validation_failure(err_str);
+#endif
 
 	if (context->event_cb == NULL)
 		return;

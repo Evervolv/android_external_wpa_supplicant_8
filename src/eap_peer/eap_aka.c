@@ -56,6 +56,7 @@ struct eap_aka_data {
 	int kdf_negotiation;
 	u16 last_kdf_attrs[EAP_AKA_PRIME_KDF_MAX];
 	size_t last_kdf_count;
+	int error_code;
 };
 
 
@@ -98,6 +99,9 @@ static void * eap_aka_init(struct eap_sm *sm)
 		return NULL;
 
 	data->eap_method = EAP_TYPE_AKA;
+
+	/* Zero is a valid error code, so we need to initialize */
+	data->error_code = NO_EAP_METHOD_ERROR;
 
 	eap_aka_state(data, CONTINUE);
 	data->prev_id = -1;
@@ -1025,8 +1029,17 @@ static struct wpabuf * eap_aka_process_challenge(struct eap_sm *sm,
 	} else if (data->pseudonym) {
 		identity = data->pseudonym;
 		identity_len = data->pseudonym_len;
-	} else
-		identity = eap_get_config_identity(sm, &identity_len);
+	} else {
+		struct eap_peer_config *config;
+
+		config = eap_get_config(sm);
+		if (config && config->imsi_identity) {
+			identity = config->imsi_identity;
+			identity_len = config->imsi_identity_len;
+		} else {
+			identity = eap_get_config_identity(sm, &identity_len);
+		}
+	}
 	wpa_hexdump_ascii(MSG_DEBUG, "EAP-AKA: Selected identity for MK "
 			  "derivation", identity, identity_len);
 	if (data->eap_method == EAP_TYPE_AKA_PRIME) {
@@ -1171,6 +1184,7 @@ static struct wpabuf * eap_aka_process_notification(
 
 	eap_sim_report_notification(sm->msg_ctx, attr->notification, 1);
 	if (attr->notification >= 0 && attr->notification < 32768) {
+		data->error_code = attr->notification;
 		eap_aka_state(data, FAILURE);
 	} else if (attr->notification == EAP_SIM_SUCCESS &&
 		   data->state == RESULT_SUCCESS)
@@ -1514,6 +1528,20 @@ static u8 * eap_aka_get_emsk(struct eap_sm *sm, void *priv, size_t *len)
 	return key;
 }
 
+static int eap_aka_get_error_code(void *priv)
+{
+	struct eap_aka_data *data = priv;
+
+	if (!data)
+		return NO_EAP_METHOD_ERROR;
+
+	int current_data_error = data->error_code;
+
+	/* Now reset for next transaction */
+	data->error_code = NO_EAP_METHOD_ERROR;
+
+	return current_data_error;
+}
 
 int eap_peer_aka_register(void)
 {
@@ -1535,6 +1563,7 @@ int eap_peer_aka_register(void)
 	eap->init_for_reauth = eap_aka_init_for_reauth;
 	eap->get_identity = eap_aka_get_identity;
 	eap->get_emsk = eap_aka_get_emsk;
+	eap->get_error_code = eap_aka_get_error_code;
 
 	return eap_peer_method_register(eap);
 }
@@ -1562,6 +1591,7 @@ int eap_peer_aka_prime_register(void)
 	eap->init_for_reauth = eap_aka_init_for_reauth;
 	eap->get_identity = eap_aka_get_identity;
 	eap->get_emsk = eap_aka_get_emsk;
+	eap->get_error_code = eap_aka_get_error_code;
 
 	return eap_peer_method_register(eap);
 }
