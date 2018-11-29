@@ -1489,6 +1489,16 @@ struct wpa_config {
 	 */
 	char *p2p_device_persistent_mac_addr;
 
+	/**
+	 * p2p_interface_random_mac_addr - P2P Interface MAC address policy default
+	 *
+	 * 0 = use permanent MAC address
+	 * 1 = use random MAC address on creating the interface.
+	 *
+	 * By default, permanent MAC address is used.
+	 */
+	int p2p_interface_random_mac_addr;
+
 };
 
 

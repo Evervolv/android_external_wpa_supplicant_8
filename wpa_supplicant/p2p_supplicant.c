@@ -2075,6 +2075,17 @@ static int wpas_p2p_add_group_interface(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
+	if (wpa_s->conf->p2p_interface_random_mac_addr) {
+		if (random_mac_addr(wpa_s->pending_interface_addr) < 0) {
+			wpa_printf(MSG_ERROR, "P2P: Failed to generate random MAC address "
+					      "for the group interface");
+			return -1;
+		}
+		wpa_printf(MSG_DEBUG, "P2P: Generate random MAC address " MACSTR " for the group",
+			MAC2STR(wpa_s->pending_interface_addr));
+	}
+
+
 	if (force_ifname[0]) {
 		wpa_printf(MSG_DEBUG, "P2P: Driver forced interface name %s",
 			   force_ifname);
@@ -2152,6 +2163,25 @@ wpas_p2p_init_group_interface(struct wpa_supplicant *wpa_s, int go)
 	wpa_s->global->pending_group_iface_for_p2ps = 0;
 
 	wpas_p2p_clone_config(group_wpa_s, wpa_s);
+
+	if (wpa_s->conf->p2p_interface_random_mac_addr) {
+		if (wpa_drv_set_mac_addr(group_wpa_s, wpa_s->pending_interface_addr) < 0) {
+			wpa_msg(group_wpa_s, MSG_INFO,
+				"Failed to set random MAC address");
+			wpa_supplicant_remove_iface(wpa_s->global, group_wpa_s, 0);
+			return NULL;
+		}
+
+		if (wpa_supplicant_update_mac_addr(group_wpa_s) < 0) {
+			wpa_msg(group_wpa_s, MSG_INFO,
+				"Could not update MAC address information");
+			wpa_supplicant_remove_iface(wpa_s->global, group_wpa_s, 0);
+			return NULL;
+		}
+
+		wpa_printf(MSG_DEBUG, "P2P: Using random MAC address " MACSTR " for the group",
+			MAC2STR(wpa_s->pending_interface_addr));
+	}
 
 	return group_wpa_s;
 }
