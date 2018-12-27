@@ -1123,7 +1123,11 @@ StaIface::getKeyMgmtCapabilitiesInternal()
 		mask |= ISupplicantStaNetwork::KeyMgmtMask::SAE;
 	}
 #endif /* CONFIG_SAE */
-
+#ifdef CONFIG_DPP
+	if (capa.key_mgmt & WPA_DRIVER_CAPA_KEY_MGMT_DPP) {
+		mask |= ISupplicantStaNetwork::KeyMgmtMask::DPP;
+	}
+#endif
 	return {{SupplicantStatusCode::SUCCESS, ""}, mask};
 }
 
