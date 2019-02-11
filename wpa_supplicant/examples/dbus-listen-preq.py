@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-from __future__ import print_function
 import dbus
 import sys
 import time
@@ -13,24 +12,21 @@ WPAS_DBUS_OPATH = "/fi/w1/wpa_supplicant1"
 WPAS_DBUS_INTERFACES_INTERFACE = "fi.w1.wpa_supplicant1.Interface"
 
 def usage():
-	print("Usage: %s <ifname>" % sys.argv[0])
-	print("Press Ctrl-C to stop")
+	print "Usage: %s <ifname>" % sys.argv[0]
+	print "Press Ctrl-C to stop"
 
 def ProbeRequest(args):
 	if 'addr' in args:
-		print('%.2x:%.2x:%.2x:%.2x:%.2x:%.2x' % tuple(args['addr']),
-                      end=' ')
+		print '%.2x:%.2x:%.2x:%.2x:%.2x:%.2x' % tuple(args['addr']),
 	if 'dst' in args:
-		print('-> %.2x:%.2x:%.2x:%.2x:%.2x:%.2x' % tuple(args['dst']),
-                      end=' ')
+		print '-> %.2x:%.2x:%.2x:%.2x:%.2x:%.2x' % tuple(args['dst']),
 	if 'bssid' in args:
-		print('(bssid %.2x:%.2x:%.2x:%.2x:%.2x:%.2x)' % tuple(args['dst']),
-                      end=' ')
+		print '(bssid %.2x:%.2x:%.2x:%.2x:%.2x:%.2x)' % tuple(args['dst']),
 	if 'signal' in args:
-		print('signal:%d' % args['signal'], end=' ')
+		print 'signal:%d' % args['signal'],
 	if 'ies' in args:
-		print('have IEs (%d bytes)' % len(args['ies']), end=' ')
-        print('')
+		print 'have IEs (%d bytes)' % len(args['ies']),
+        print ''
 
 if __name__ == "__main__":
 	global bus

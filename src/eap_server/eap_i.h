@@ -160,7 +160,6 @@ struct eap_sm {
 	u8 *identity;
 	size_t identity_len;
 	char *serial_num;
-	char imsi[20];
 	/* Whether Phase 2 method should validate identity match */
 	int require_identity_match;
 	int lastId; /* Identifier used in the last EAP-Packet */

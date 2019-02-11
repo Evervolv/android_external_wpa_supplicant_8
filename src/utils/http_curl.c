@@ -31,14 +31,6 @@
 #endif /* EAP_TLS_OPENSSL */
 
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-static const unsigned char * ASN1_STRING_get0_data(const ASN1_STRING *x)
-{
-	return ASN1_STRING_data((ASN1_STRING *) x);
-}
-#endif /* OpenSSL < 1.1.0 */
-
-
 struct http_ctx {
 	void *ctx;
 	struct xml_node_ctx *xml;
@@ -454,7 +446,6 @@ sk_num(CHECKED_CAST(_STACK *, STACK_OF(ASN1_IA5STRING) *, (st)))
 #define sk_ASN1_IA5STRING_value(st, i) (ASN1_IA5STRING *) \
 sk_value(CHECKED_CAST(_STACK *, const STACK_OF(ASN1_IA5STRING) *, (st)), (i))
 #else /* OPENSSL_IS_BORINGSSL */
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
 #define sk_LogotypeInfo_num(st) SKM_sk_num(LogotypeInfo, (st))
 #define sk_LogotypeInfo_value(st, i) SKM_sk_value(LogotypeInfo, (st), (i))
 #define sk_LogotypeImage_num(st) SKM_sk_num(LogotypeImage, (st))
@@ -465,13 +456,6 @@ sk_value(CHECKED_CAST(_STACK *, const STACK_OF(ASN1_IA5STRING) *, (st)), (i))
 #define sk_HashAlgAndValue_value(st, i) SKM_sk_value(HashAlgAndValue, (st), (i))
 #define sk_ASN1_IA5STRING_num(st) SKM_sk_num(ASN1_IA5STRING, (st))
 #define sk_ASN1_IA5STRING_value(st, i) SKM_sk_value(ASN1_IA5STRING, (st), (i))
-#else
-DEFINE_STACK_OF(LogotypeInfo)
-DEFINE_STACK_OF(LogotypeImage)
-DEFINE_STACK_OF(LogotypeAudio)
-DEFINE_STACK_OF(HashAlgAndValue)
-DEFINE_STACK_OF(ASN1_IA5STRING)
-#endif
 #endif /* OPENSSL_IS_BORINGSSL */
 
 
@@ -502,8 +486,7 @@ static void add_logo(struct http_ctx *ctx, struct http_cert *hcert,
 		return;
 
 	n->hash_len = ASN1_STRING_length(hash->hashValue);
-	n->hash = os_memdup(ASN1_STRING_get0_data(hash->hashValue),
-			    n->hash_len);
+	n->hash = os_memdup(ASN1_STRING_data(hash->hashValue), n->hash_len);
 	if (n->hash == NULL) {
 		os_free(n->alg_oid);
 		return;
@@ -516,7 +499,7 @@ static void add_logo(struct http_ctx *ctx, struct http_cert *hcert,
 		os_free(n->hash);
 		return;
 	}
-	os_memcpy(n->uri, ASN1_STRING_get0_data(uri), len);
+	os_memcpy(n->uri, ASN1_STRING_data(uri), len);
 	n->uri[len] = '\0';
 
 	hcert->num_logo++;
@@ -831,9 +814,9 @@ static void add_logotype_ext(struct http_ctx *ctx, struct http_cert *hcert,
 	}
 
 	wpa_hexdump(MSG_DEBUG, "logotypeExtn",
-		    ASN1_STRING_get0_data(os), ASN1_STRING_length(os));
+		    ASN1_STRING_data(os), ASN1_STRING_length(os));
 
-	data = ASN1_STRING_get0_data(os);
+	data = ASN1_STRING_data(os);
 	logo = d2i_LogotypeExtn(NULL, &data, ASN1_STRING_length(os));
 	if (logo == NULL) {
 		wpa_printf(MSG_INFO, "Failed to parse logotypeExtn");
@@ -1153,7 +1136,7 @@ static int ocsp_resp_cb(SSL *s, void *arg)
 		return 0;
 	}
 
-	store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(s));
+	store = SSL_CTX_get_cert_store(s->ctx);
 	if (ctx->peer_issuer) {
 		wpa_printf(MSG_DEBUG, "OpenSSL: Add issuer");
 		debug_dump_cert("OpenSSL: Issuer certificate",
@@ -1289,13 +1272,12 @@ static int ocsp_resp_cb(SSL *s, void *arg)
 }
 
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
 static SSL_METHOD patch_ssl_method;
 static const SSL_METHOD *real_ssl_method;
 
 static int curl_patch_ssl_new(SSL *s)
 {
-	SSL_CTX *ssl = SSL_get_SSL_CTX(s);
+	SSL_CTX *ssl = s->ctx;
 	int ret;
 
 	ssl->method = real_ssl_method;
@@ -1306,7 +1288,6 @@ static int curl_patch_ssl_new(SSL *s)
 
 	return ret;
 }
-#endif /* OpenSSL < 1.1.0 */
 
 #endif /* HAVE_OCSP */
 
@@ -1325,7 +1306,6 @@ static CURLcode curl_cb_ssl(CURL *curl, void *sslctx, void *parm)
 		SSL_CTX_set_tlsext_status_cb(ssl, ocsp_resp_cb);
 		SSL_CTX_set_tlsext_status_arg(ssl, ctx);
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
 		/*
 		 * Use a temporary SSL_METHOD to get a callback on SSL_new()
 		 * from libcurl since there is no proper callback registration
@@ -1335,7 +1315,6 @@ static CURLcode curl_cb_ssl(CURL *curl, void *sslctx, void *parm)
 		patch_ssl_method.ssl_new = curl_patch_ssl_new;
 		real_ssl_method = ssl->method;
 		ssl->method = &patch_ssl_method;
-#endif /* OpenSSL < 1.1.0 */
 	}
 #endif /* HAVE_OCSP */
 
@@ -1372,7 +1351,7 @@ static CURL * setup_curl_post(struct http_ctx *ctx, const char *address,
 #ifdef EAP_TLS_OPENSSL
 		curl_easy_setopt(curl, CURLOPT_SSL_CTX_FUNCTION, curl_cb_ssl);
 		curl_easy_setopt(curl, CURLOPT_SSL_CTX_DATA, ctx);
-#if defined(OPENSSL_IS_BORINGSSL) || (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+#ifdef OPENSSL_IS_BORINGSSL
 		/* For now, using the CURLOPT_SSL_VERIFYSTATUS option only
 		 * with BoringSSL since the OpenSSL specific callback hack to
 		 * enable OCSP is not available with BoringSSL. The OCSP

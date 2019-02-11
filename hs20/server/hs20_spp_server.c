@@ -11,7 +11,6 @@
 #include <sqlite3.h>
 
 #include "common.h"
-#include "common/version.h"
 #include "xml-utils.h"
 #include "spp_server.h"
 
@@ -90,18 +89,6 @@ static int process(struct hs20_svc *ctx)
 		return -1;
 	}
 
-	ctx->imsi = getenv("HS20IMSI");
-	if (ctx->imsi)
-		debug_print(ctx, 1, "IMSI %s", ctx->imsi);
-
-	ctx->eap_method = getenv("HS20EAPMETHOD");
-	if (ctx->eap_method)
-		debug_print(ctx, 1, "EAP method %s", ctx->eap_method);
-
-	ctx->id_hash = getenv("HS20IDHASH");
-	if (ctx->id_hash)
-		debug_print(ctx, 1, "ID-HASH %s", ctx->id_hash);
-
 	soap = xml_node_from_buf(ctx->xml, post);
 	if (soap == NULL) {
 		debug_print(ctx, 1, "Could not parse SOAP data");
@@ -159,7 +146,7 @@ int main(int argc, char *argv[])
 
 	os_memset(&ctx, 0, sizeof(ctx));
 	for (;;) {
-		int c = getopt(argc, argv, "f:r:v");
+		int c = getopt(argc, argv, "f:r:");
 		if (c < 0)
 			break;
 		switch (c) {
@@ -175,9 +162,6 @@ int main(int argc, char *argv[])
 		case 'r':
 			ctx.root_dir = optarg;
 			break;
-		case 'v':
-			printf("hs20_spp_server v" VERSION_STR "\n");
-			return 0;
 		default:
 			usage();
 			return -1;

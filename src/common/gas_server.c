@@ -97,10 +97,8 @@ gas_server_send_resp(struct gas_server *gas, struct gas_server_handler *handler,
 		return;
 
 	response = os_zalloc(sizeof(*response));
-	if (!response) {
-		wpabuf_free(query_resp);
+	if (!response)
 		return;
-	}
 	wpa_printf(MSG_DEBUG, "DPP: Allocated GAS response @%p", response);
 	response->freq = freq;
 	response->handler = handler;
@@ -121,7 +119,6 @@ gas_server_send_resp(struct gas_server *gas, struct gas_server_handler *handler,
 				      handler->adv_proto_id_len +
 				      resp_frag_len);
 	if (!resp) {
-		wpabuf_free(query_resp);
 		gas_server_free_response(response);
 		return;
 	}
@@ -260,7 +257,6 @@ gas_server_handle_rx_comeback_req(struct gas_server_response *response)
 				       handler->adv_proto_id_len +
 				       resp_frag_len);
 	if (!resp) {
-		dl_list_del(&response->list);
 		gas_server_free_response(response);
 		return;
 	}

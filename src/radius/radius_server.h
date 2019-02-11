@@ -233,7 +233,6 @@ struct radius_server_conf {
 
 	char *subscr_remediation_url;
 	u8 subscr_remediation_method;
-	char *hs20_sim_provisioning_url;
 
 	char *t_c_server_url;
 };

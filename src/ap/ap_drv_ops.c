@@ -176,8 +176,7 @@ int hostapd_build_ap_extra_ies(struct hostapd_data *hapd,
 #endif /* CONFIG_HS20 */
 
 #ifdef CONFIG_MBO
-	if (hapd->conf->mbo_enabled ||
-	    OCE_STA_CFON_ENABLED(hapd) || OCE_AP_ENABLED(hapd)) {
+	if (hapd->conf->mbo_enabled || hapd->enable_oce) {
 		pos = hostapd_eid_mbo(hapd, buf, sizeof(buf));
 		if (add_buf_data(&beacon, buf, pos - buf) < 0 ||
 		    add_buf_data(&proberesp, buf, pos - buf) < 0 ||

@@ -187,7 +187,6 @@ struct hostapd_vlan * vlan_add_dynamic(struct hostapd_data *hapd,
 {
 	struct hostapd_vlan *n;
 	char ifname[IFNAMSIZ + 1], *pos;
-	int ret;
 
 	if (vlan == NULL || vlan->vlan_id != VLAN_ID_WILDCARD)
 		return NULL;
@@ -209,13 +208,8 @@ struct hostapd_vlan * vlan_add_dynamic(struct hostapd_data *hapd,
 		n->vlan_desc = *vlan_desc;
 	n->dynamic_vlan = 1;
 
-	ret = os_snprintf(n->ifname, sizeof(n->ifname), "%s%d%s",
-			  ifname, vlan_id, pos);
-	if (os_snprintf_error(sizeof(n->ifname), ret)) {
-		os_free(n);
-		return NULL;
-	}
-	os_strlcpy(n->bridge, vlan->bridge, sizeof(n->bridge));
+	os_snprintf(n->ifname, sizeof(n->ifname), "%s%d%s", ifname, vlan_id,
+		    pos);
 
 	n->next = hapd->conf->vlan;
 	hapd->conf->vlan = n;

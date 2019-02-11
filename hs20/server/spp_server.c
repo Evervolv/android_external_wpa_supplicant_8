@@ -41,8 +41,6 @@ enum hs20_session_operation {
 	POLICY_REMEDIATION,
 	POLICY_UPDATE,
 	FREE_REMEDIATION,
-	CLEAR_REMEDIATION,
-	CERT_REENROLL,
 };
 
 
@@ -53,11 +51,6 @@ static char * db_get_osu_config_val(struct hs20_svc *ctx, const char *realm,
 				    const char *field);
 static xml_node_t * build_policy(struct hs20_svc *ctx, const char *user,
 				 const char *realm, int use_dmacc);
-static xml_node_t * spp_exec_get_certificate(struct hs20_svc *ctx,
-					     const char *session_id,
-					     const char *user,
-					     const char *realm,
-					     int add_est_user);
 
 
 static int db_add_session(struct hs20_svc *ctx,
@@ -211,61 +204,6 @@ static void db_add_session_devdetail(struct hs20_svc *ctx,
 }
 
 
-static void db_add_session_dmacc(struct hs20_svc *ctx, const char *sessionid,
-				 const char *username, const char *password)
-{
-	char *sql;
-
-	sql = sqlite3_mprintf("UPDATE sessions SET osu_user=%Q, osu_password=%Q WHERE id=%Q",
-			      username, password, sessionid);
-	if (!sql)
-		return;
-	debug_print(ctx, 1, "DB: %s", sql);
-	if (sqlite3_exec(ctx->db, sql, NULL, NULL, NULL) != SQLITE_OK) {
-		debug_print(ctx, 1, "Failed to add session DMAcc: %s",
-			    sqlite3_errmsg(ctx->db));
-	}
-	sqlite3_free(sql);
-}
-
-
-static void db_add_session_eap_method(struct hs20_svc *ctx,
-				      const char *sessionid,
-				      const char *method)
-{
-	char *sql;
-
-	sql = sqlite3_mprintf("UPDATE sessions SET eap_method=%Q WHERE id=%Q",
-			      method, sessionid);
-	if (!sql)
-		return;
-	debug_print(ctx, 1, "DB: %s", sql);
-	if (sqlite3_exec(ctx->db, sql, NULL, NULL, NULL) != SQLITE_OK) {
-		debug_print(ctx, 1, "Failed to add session EAP method: %s",
-			    sqlite3_errmsg(ctx->db));
-	}
-	sqlite3_free(sql);
-}
-
-
-static void db_add_session_id_hash(struct hs20_svc *ctx, const char *sessionid,
-				   const char *id_hash)
-{
-	char *sql;
-
-	sql = sqlite3_mprintf("UPDATE sessions SET mobile_identifier_hash=%Q WHERE id=%Q",
-			      id_hash, sessionid);
-	if (!sql)
-		return;
-	debug_print(ctx, 1, "DB: %s", sql);
-	if (sqlite3_exec(ctx->db, sql, NULL, NULL, NULL) != SQLITE_OK) {
-		debug_print(ctx, 1, "Failed to add session ID hash: %s",
-			    sqlite3_errmsg(ctx->db));
-	}
-	sqlite3_free(sql);
-}
-
-
 static void db_remove_session(struct hs20_svc *ctx,
 			      const char *user, const char *realm,
 			      const char *sessionid)
@@ -352,7 +290,8 @@ static void db_update_mo_str(struct hs20_svc *ctx, const char *user,
 	char *sql;
 	if (user == NULL || realm == NULL || name == NULL)
 		return;
-	sql = sqlite3_mprintf("UPDATE users SET %s=%Q WHERE identity=%Q AND realm=%Q AND (phase2=1 OR methods='TLS')",
+	sql = sqlite3_mprintf("UPDATE users SET %s=%Q "
+		 "WHERE identity=%Q AND realm=%Q AND phase2=1",
 			      name, str, user, realm);
 	if (sql == NULL)
 		return;
@@ -474,7 +413,8 @@ static char * db_get_val(struct hs20_svc *ctx, const char *user,
 	char *cmd;
 	struct get_db_field_data data;
 
-	cmd = sqlite3_mprintf("SELECT %s FROM users WHERE %s=%Q AND realm=%Q AND (phase2=1 OR methods='TLS')",
+	cmd = sqlite3_mprintf("SELECT %s FROM users WHERE "
+			      "%s=%Q AND realm=%Q AND phase2=1",
 			      field, dmacc ? "osu_user" : "identity",
 			      user, realm);
 	if (cmd == NULL)
@@ -503,7 +443,8 @@ static int db_update_val(struct hs20_svc *ctx, const char *user,
 	char *cmd;
 	int ret;
 
-	cmd = sqlite3_mprintf("UPDATE users SET %s=%Q WHERE %s=%Q AND realm=%Q AND (phase2=1 OR methods='TLS')",
+	cmd = sqlite3_mprintf("UPDATE users SET %s=%Q WHERE "
+			      "%s=%Q AND realm=%Q AND phase2=1",
 			      field, val, dmacc ? "osu_user" : "identity", user,
 			      realm);
 	if (cmd == NULL)
@@ -583,27 +524,6 @@ static int update_password(struct hs20_svc *ctx, const char *user,
 }
 
 
-static int clear_remediation(struct hs20_svc *ctx, const char *user,
-			     const char *realm, int dmacc)
-{
-	char *cmd;
-
-	cmd = sqlite3_mprintf("UPDATE users SET remediation='' WHERE %s=%Q",
-			      dmacc ? "osu_user" : "identity",
-			      user);
-	if (cmd == NULL)
-		return -1;
-	debug_print(ctx, 1, "DB: %s", cmd);
-	if (sqlite3_exec(ctx->db, cmd, NULL, NULL, NULL) != SQLITE_OK) {
-		debug_print(ctx, 1, "Failed to update database for user '%s'",
-			    user);
-	}
-	sqlite3_free(cmd);
-
-	return 0;
-}
-
-
 static int add_eap_ttls(struct hs20_svc *ctx, xml_node_t *parent)
 {
 	xml_node_t *node;
@@ -625,7 +545,6 @@ static xml_node_t * build_username_password(struct hs20_svc *ctx,
 {
 	xml_node_t *node;
 	char *b64;
-	size_t len;
 
 	node = xml_node_create(ctx->xml, parent, NULL, "UsernamePassword");
 	if (node == NULL)
@@ -636,9 +555,6 @@ static xml_node_t * build_username_password(struct hs20_svc *ctx,
 	b64 = (char *) base64_encode((unsigned char *) pw, strlen(pw), NULL);
 	if (b64 == NULL)
 		return NULL;
-	len = os_strlen(b64);
-	if (len > 0 && b64[len - 1] == '\n')
-		b64[len - 1] = '\0';
 	add_text_node(ctx, node, "Password", b64);
 	free(b64);
 
@@ -790,45 +706,6 @@ static int add_update_node(struct hs20_svc *ctx, xml_node_t *spp_node,
 }
 
 
-static xml_node_t * read_subrem_file(struct hs20_svc *ctx,
-				     const char *subrem_id,
-				     char *uri, size_t uri_size)
-{
-	char fname[200];
-	char *buf, *buf2, *pos;
-	size_t len;
-	xml_node_t *node;
-
-	os_snprintf(fname, sizeof(fname), "%s/spp/subrem/%s",
-		    ctx->root_dir, subrem_id);
-	debug_print(ctx, 1, "Use subrem file %s", fname);
-
-	buf = os_readfile(fname, &len);
-	if (!buf)
-		return NULL;
-	buf2 = os_realloc(buf, len + 1);
-	if (!buf2) {
-		os_free(buf);
-		return NULL;
-	}
-	buf = buf2;
-	buf[len] = '\0';
-
-	pos = os_strchr(buf, '\n');
-	if (!pos) {
-		os_free(buf);
-		return NULL;
-	}
-	*pos++ = '\0';
-	os_strlcpy(uri, buf, uri_size);
-
-	node = xml_node_from_buf(ctx->xml, pos);
-	os_free(buf);
-
-	return node;
-}
-
-
 static xml_node_t * build_sub_rem_resp(struct hs20_svc *ctx,
 				       const char *user, const char *realm,
 				       const char *session_id,
@@ -838,47 +715,27 @@ static xml_node_t * build_sub_rem_resp(struct hs20_svc *ctx,
 	xml_node_t *spp_node, *cred;
 	char buf[400];
 	char new_pw[33];
+	char *real_user = NULL;
 	char *status;
 	char *cert;
 
-	cert = db_get_val(ctx, user, realm, "cert", dmacc);
-	if (cert && cert[0] == '\0') {
-		os_free(cert);
-		cert = NULL;
+	if (dmacc) {
+		real_user = db_get_val(ctx, user, realm, "identity", dmacc);
+		if (real_user == NULL) {
+			debug_print(ctx, 1, "Could not find user identity for "
+				    "dmacc user '%s'", user);
+			return NULL;
+		}
 	}
+
+	cert = db_get_val(ctx, user, realm, "cert", dmacc);
+	if (cert && cert[0] == '\0')
+		cert = NULL;
 	if (cert) {
-		char *subrem;
-
-		/* No change needed in PPS MO unless specifically asked to */
-		cred = NULL;
-		buf[0] = '\0';
-
-		subrem = db_get_val(ctx, user, realm, "subrem", dmacc);
-		if (subrem && subrem[0]) {
-			cred = read_subrem_file(ctx, subrem, buf, sizeof(buf));
-			if (!cred) {
-				debug_print(ctx, 1,
-					    "Could not create updateNode from subrem file");
-				os_free(subrem);
-				os_free(cert);
-				return NULL;
-			}
-		}
-		os_free(subrem);
+		cred = build_credential_cert(ctx, real_user ? real_user : user,
+					     realm, cert);
 	} else {
-		char *real_user = NULL;
 		char *pw;
-
-		if (dmacc) {
-			real_user = db_get_val(ctx, user, realm, "identity",
-					       dmacc);
-			if (!real_user) {
-				debug_print(ctx, 1,
-					    "Could not find user identity for dmacc user '%s'",
-					    user);
-				return NULL;
-			}
-		}
 
 		pw = db_get_session_val(ctx, user, realm, session_id,
 					"password");
@@ -895,17 +752,11 @@ static xml_node_t * build_sub_rem_resp(struct hs20_svc *ctx,
 						real_user ? real_user : user,
 						realm, new_pw, sizeof(new_pw));
 		}
-
-		free(real_user);
-		if (!cred) {
-			debug_print(ctx, 1, "Could not build credential");
-			os_free(cert);
-			return NULL;
-		}
-
-		snprintf(buf, sizeof(buf),
-			 "./Wi-Fi/%s/PerProviderSubscription/Cred01/Credential",
-			 realm);
+	}
+	free(real_user);
+	if (!cred) {
+		debug_print(ctx, 1, "Could not build credential");
+		return NULL;
 	}
 
 	status = "Remediation complete, request sppUpdateResponse";
@@ -913,15 +764,16 @@ static xml_node_t * build_sub_rem_resp(struct hs20_svc *ctx,
 						NULL);
 	if (spp_node == NULL) {
 		debug_print(ctx, 1, "Could not build sppPostDevDataResponse");
-		os_free(cert);
 		return NULL;
 	}
 
-	if ((cred && add_update_node(ctx, spp_node, ns, buf, cred) < 0) ||
-	    (!cred && !xml_node_create(ctx->xml, spp_node, ns, "noMOUpdate"))) {
+	snprintf(buf, sizeof(buf),
+		 "./Wi-Fi/%s/PerProviderSubscription/Cred01/Credential",
+		 realm);
+
+	if (add_update_node(ctx, spp_node, ns, buf, cred) < 0) {
 		debug_print(ctx, 1, "Could not add update node");
 		xml_node_free(ctx->xml, spp_node);
-		os_free(cert);
 		return NULL;
 	}
 
@@ -931,16 +783,14 @@ static xml_node_t * build_sub_rem_resp(struct hs20_svc *ctx,
 	xml_node_free(ctx->xml, cred);
 
 	if (cert) {
-		debug_print(ctx, 1, "Request DB remediation clearing on success notification (certificate credential)");
-		db_add_session(ctx, user, realm, session_id, NULL, NULL,
-			       CLEAR_REMEDIATION, NULL);
+		debug_print(ctx, 1, "Certificate credential - no need for DB "
+			    "password update on success notification");
 	} else {
 		debug_print(ctx, 1, "Request DB password update on success "
 			    "notification");
 		db_add_session(ctx, user, realm, session_id, new_pw, NULL,
 			       UPDATE_PASSWORD, NULL);
 	}
-	os_free(cert);
 
 	return spp_node;
 }
@@ -952,17 +802,6 @@ static xml_node_t * machine_remediation(struct hs20_svc *ctx,
 					const char *session_id, int dmacc)
 {
 	return build_sub_rem_resp(ctx, user, realm, session_id, 1, dmacc);
-}
-
-
-static xml_node_t * cert_reenroll(struct hs20_svc *ctx,
-				  const char *user,
-				  const char *realm,
-				  const char *session_id)
-{
-	db_add_session(ctx, user, realm, session_id, NULL, NULL,
-		       CERT_REENROLL, NULL);
-	return spp_exec_get_certificate(ctx, session_id, user, realm, 0);
 }
 
 
@@ -1150,8 +989,6 @@ static xml_node_t * hs20_subscription_remediation(struct hs20_svc *ctx,
 		ret = policy_remediation(ctx, user, realm, session_id, dmacc);
 	else if (type && strcmp(type, "machine") == 0)
 		ret = machine_remediation(ctx, user, realm, session_id, dmacc);
-	else if (type && strcmp(type, "reenroll") == 0)
-		ret = cert_reenroll(ctx, user, realm, session_id);
 	else
 		ret = no_sub_rem(ctx, user, realm, session_id);
 	free(type);
@@ -1160,41 +997,11 @@ static xml_node_t * hs20_subscription_remediation(struct hs20_svc *ctx,
 }
 
 
-static xml_node_t * read_policy_file(struct hs20_svc *ctx,
-				     const char *policy_id)
-{
-	char fname[200];
-
-	snprintf(fname, sizeof(fname), "%s/spp/policy/%s.xml",
-		 ctx->root_dir, policy_id);
-	debug_print(ctx, 1, "Use policy file %s", fname);
-
-	return node_from_file(ctx->xml, fname);
-}
-
-
-static void update_policy_update_uri(struct hs20_svc *ctx, const char *realm,
-				     xml_node_t *policy)
-{
-	xml_node_t *node;
-	char *url;
-
-	node = get_node_uri(ctx->xml, policy, "Policy/PolicyUpdate/URI");
-	if (!node)
-		return;
-
-	url = db_get_osu_config_val(ctx, realm, "policy_url");
-	if (!url)
-		return;
-	xml_node_set_text(ctx->xml, node, url);
-	free(url);
-}
-
-
 static xml_node_t * build_policy(struct hs20_svc *ctx, const char *user,
 				 const char *realm, int use_dmacc)
 {
 	char *policy_id;
+	char fname[200];
 	xml_node_t *policy, *node;
 
 	policy_id = db_get_val(ctx, user, realm, "policy", use_dmacc);
@@ -1204,12 +1011,27 @@ static xml_node_t * build_policy(struct hs20_svc *ctx, const char *user,
 		if (policy_id == NULL)
 			return NULL;
 	}
-	policy = read_policy_file(ctx, policy_id);
+
+	snprintf(fname, sizeof(fname), "%s/spp/policy/%s.xml",
+		 ctx->root_dir, policy_id);
 	free(policy_id);
+	debug_print(ctx, 1, "Use policy file %s", fname);
+
+	policy = node_from_file(ctx->xml, fname);
 	if (policy == NULL)
 		return NULL;
 
-	update_policy_update_uri(ctx, realm, policy);
+	node = get_node_uri(ctx->xml, policy, "Policy/PolicyUpdate/URI");
+	if (node) {
+		char *url;
+		url = db_get_osu_config_val(ctx, realm, "policy_url");
+		if (url == NULL) {
+			xml_node_free(ctx->xml, policy);
+			return NULL;
+		}
+		xml_node_set_text(ctx->xml, node, url);
+		free(url);
+	}
 
 	node = get_node_uri(ctx->xml, policy, "Policy/PolicyUpdate");
 	if (node && use_dmacc) {
@@ -1442,20 +1264,15 @@ static char * db_get_osu_config_val(struct hs20_svc *ctx, const char *realm,
 static xml_node_t * build_pps(struct hs20_svc *ctx,
 			      const char *user, const char *realm,
 			      const char *pw, const char *cert,
-			      int machine_managed, const char *test,
-			      const char *imsi, const char *dmacc_username,
-			      const char *dmacc_password,
-			      xml_node_t *policy_node)
+			      int machine_managed, const char *test)
 {
 	xml_node_t *pps, *c, *trust, *aaa, *aaa1, *upd, *homesp, *p;
 	xml_node_t *cred, *eap, *userpw;
 
 	pps = xml_node_create_root(ctx->xml, NULL, NULL, NULL,
 				   "PerProviderSubscription");
-	if (!pps) {
-		xml_node_free(ctx->xml, policy_node);
+	if (pps == NULL)
 		return NULL;
-	}
 
 	add_text_node(ctx, pps, "UpdateIdentifier", "1");
 
@@ -1463,8 +1280,6 @@ static xml_node_t * build_pps(struct hs20_svc *ctx,
 
 	add_text_node(ctx, c, "CredentialPriority", "1");
 
-	if (imsi)
-		goto skip_aaa_trust_root;
 	aaa = xml_node_create(ctx->xml, c, NULL, "AAAServerTrustRoot");
 	aaa1 = xml_node_create(ctx->xml, aaa, NULL, "AAA1");
 	add_text_node_conf(ctx, realm, aaa1, "CertURL",
@@ -1496,7 +1311,6 @@ static xml_node_t * build_pps(struct hs20_svc *ctx,
 					   "CertSHA256Fingerprint",
 					   "policy_trust_root_cert_fingerprint");
 	}
-skip_aaa_trust_root:
 
 	upd = xml_node_create(ctx->xml, c, NULL, "SubscriptionUpdate");
 	add_text_node(ctx, upd, "UpdateInterval", "4294967295");
@@ -1516,17 +1330,6 @@ skip_aaa_trust_root:
 				   "trust_root_cert_fingerprint");
 	}
 
-	if (dmacc_username &&
-	    !build_username_password(ctx, upd, dmacc_username,
-				     dmacc_password)) {
-		xml_node_free(ctx->xml, pps);
-		xml_node_free(ctx->xml, policy_node);
-		return NULL;
-	}
-
-	if (policy_node)
-		xml_node_add_child(ctx->xml, c, policy_node);
-
 	homesp = xml_node_create(ctx->xml, c, NULL, "HomeSP");
 	add_text_node_conf(ctx, realm, homesp, "FriendlyName", "friendly_name");
 	add_text_node_conf(ctx, realm, homesp, "FQDN", "fqdn");
@@ -1535,19 +1338,7 @@ skip_aaa_trust_root:
 
 	cred = xml_node_create(ctx->xml, c, NULL, "Credential");
 	add_creation_date(ctx, cred);
-	if (imsi) {
-		xml_node_t *sim;
-		const char *type = "18"; /* default to EAP-SIM */
-
-		sim = xml_node_create(ctx->xml, cred, NULL, "SIM");
-		add_text_node(ctx, sim, "IMSI", imsi);
-		if (ctx->eap_method && os_strcmp(ctx->eap_method, "AKA") == 0)
-			type = "23";
-		else if (ctx->eap_method &&
-			 os_strcmp(ctx->eap_method, "AKA'") == 0)
-			type = "50";
-		add_text_node(ctx, sim, "EAPType", type);
-	} else if (cert) {
+	if (cert) {
 		xml_node_t *dc;
 		dc = xml_node_create(ctx->xml, cred, NULL,
 				     "DigitalCertificate");
@@ -1570,8 +1361,7 @@ skip_aaa_trust_root:
 static xml_node_t * spp_exec_get_certificate(struct hs20_svc *ctx,
 					     const char *session_id,
 					     const char *user,
-					     const char *realm,
-					     int add_est_user)
+					     const char *realm)
 {
 	xml_namespace_t *ns;
 	xml_node_t *spp_node, *enroll, *exec_node;
@@ -1579,7 +1369,7 @@ static xml_node_t * spp_exec_get_certificate(struct hs20_svc *ctx,
 	char password[11];
 	char *b64;
 
-	if (add_est_user && new_password(password, sizeof(password)) < 0)
+	if (new_password(password, sizeof(password)) < 0)
 		return NULL;
 
 	spp_node = build_post_dev_data_response(ctx, &ns, session_id, "OK",
@@ -1596,10 +1386,6 @@ static xml_node_t * spp_exec_get_certificate(struct hs20_svc *ctx,
 	xml_node_create_text(ctx->xml, enroll, ns, "enrollmentServerURI",
 			     val ? val : "");
 	os_free(val);
-
-	if (!add_est_user)
-		return spp_node;
-
 	xml_node_create_text(ctx->xml, enroll, ns, "estUserID", user);
 
 	b64 = (char *) base64_encode((unsigned char *) password,
@@ -1659,7 +1445,7 @@ static xml_node_t * hs20_user_input_registration(struct hs20_svc *ctx,
 		xml_node_t *ret;
 		hs20_eventlog(ctx, user, realm, session_id,
 			      "request client certificate enrollment", NULL);
-		ret = spp_exec_get_certificate(ctx, session_id, user, realm, 1);
+		ret = spp_exec_get_certificate(ctx, session_id, user, realm);
 		free(user);
 		free(realm);
 		free(pw);
@@ -1691,7 +1477,7 @@ static xml_node_t * hs20_user_input_registration(struct hs20_svc *ctx,
 			    test);
 	pps = build_pps(ctx, user, realm, pw,
 			fingerprint ? fingerprint : NULL, machine_managed,
-			test, NULL, NULL, NULL, NULL);
+			test);
 	free(fingerprint);
 	free(test);
 	if (!pps) {
@@ -1832,72 +1618,6 @@ static xml_node_t * hs20_user_input_complete(struct hs20_svc *ctx,
 }
 
 
-static xml_node_t * hs20_cert_reenroll_complete(struct hs20_svc *ctx,
-						 const char *session_id)
-{
-	char *user, *realm, *cert;
-	char *status;
-	xml_namespace_t *ns;
-	xml_node_t *spp_node, *cred;
-	char buf[400];
-
-	user = db_get_session_val(ctx, NULL, NULL, session_id, "user");
-	realm = db_get_session_val(ctx, NULL, NULL, session_id, "realm");
-	cert = db_get_session_val(ctx, NULL, NULL, session_id, "cert");
-	if (!user || !realm || !cert) {
-		debug_print(ctx, 1,
-			    "Could not find session info from DB for certificate reenrollment");
-		free(user);
-		free(realm);
-		free(cert);
-		return NULL;
-	}
-
-	cred = build_credential_cert(ctx, user, realm, cert);
-	if (!cred) {
-		debug_print(ctx, 1, "Could not build credential");
-		free(user);
-		free(realm);
-		free(cert);
-		return NULL;
-	}
-
-	status = "Remediation complete, request sppUpdateResponse";
-	spp_node = build_post_dev_data_response(ctx, &ns, session_id, status,
-						NULL);
-	if (spp_node == NULL) {
-		debug_print(ctx, 1, "Could not build sppPostDevDataResponse");
-		free(user);
-		free(realm);
-		free(cert);
-		xml_node_free(ctx->xml, cred);
-		return NULL;
-	}
-
-	snprintf(buf, sizeof(buf),
-		 "./Wi-Fi/%s/PerProviderSubscription/Cred01/Credential",
-		 realm);
-
-	if (add_update_node(ctx, spp_node, ns, buf, cred) < 0) {
-		debug_print(ctx, 1, "Could not add update node");
-		xml_node_free(ctx->xml, spp_node);
-		free(user);
-		free(realm);
-		free(cert);
-		return NULL;
-	}
-
-	hs20_eventlog_node(ctx, user, realm, session_id,
-			   "certificate reenrollment", cred);
-	xml_node_free(ctx->xml, cred);
-
-	free(user);
-	free(realm);
-	free(cert);
-	return spp_node;
-}
-
-
 static xml_node_t * hs20_cert_enroll_completed(struct hs20_svc *ctx,
 					       const char *user,
 					       const char *realm, int dmacc,
@@ -1906,7 +1626,7 @@ static xml_node_t * hs20_cert_enroll_completed(struct hs20_svc *ctx,
 	char *val;
 	enum hs20_session_operation oper;
 
-	val = db_get_session_val(ctx, NULL, NULL, session_id, "operation");
+	val = db_get_session_val(ctx, user, realm, session_id, "operation");
 	if (val == NULL) {
 		debug_print(ctx, 1, "No session %s found to continue",
 			    session_id);
@@ -1917,8 +1637,6 @@ static xml_node_t * hs20_cert_enroll_completed(struct hs20_svc *ctx,
 
 	if (oper == SUBSCRIPTION_REGISTRATION)
 		return hs20_user_input_registration(ctx, session_id, 1);
-	if (oper == CERT_REENROLL)
-		return hs20_cert_reenroll_complete(ctx, session_id);
 
 	debug_print(ctx, 1, "User session %s not in state for certificate "
 		    "enrollment completion", session_id);
@@ -1961,103 +1679,6 @@ static xml_node_t * hs20_cert_enroll_failed(struct hs20_svc *ctx,
 	xml_node_add_attr(ctx->xml, node, NULL, "errorCode",
 			  "Credentials cannot be provisioned at this time");
 	db_remove_session(ctx, user, realm, session_id);
-
-	return spp_node;
-}
-
-
-static xml_node_t * hs20_sim_provisioning(struct hs20_svc *ctx,
-					  const char *user,
-					  const char *realm, int dmacc,
-					  const char *session_id)
-{
-	xml_namespace_t *ns;
-	xml_node_t *spp_node, *node = NULL;
-	xml_node_t *pps, *tnds;
-	char buf[400];
-	char *str;
-	const char *status;
-	char dmacc_username[32];
-	char dmacc_password[32];
-	char *policy;
-	xml_node_t *policy_node = NULL;
-
-	if (!ctx->imsi) {
-		debug_print(ctx, 1, "IMSI not available for SIM provisioning");
-		return NULL;
-	}
-
-	if (new_password(dmacc_username, sizeof(dmacc_username)) < 0 ||
-	    new_password(dmacc_password, sizeof(dmacc_password)) < 0) {
-		debug_print(ctx, 1,
-			    "Failed to generate DMAcc username/password");
-		return NULL;
-	}
-
-	status = "Provisioning complete, request sppUpdateResponse";
-	spp_node = build_post_dev_data_response(ctx, &ns, session_id, status,
-						NULL);
-	if (!spp_node)
-		return NULL;
-
-	policy = db_get_osu_config_val(ctx, realm, "sim_policy");
-	if (policy) {
-		policy_node = read_policy_file(ctx, policy);
-		os_free(policy);
-		if (!policy_node) {
-			xml_node_free(ctx->xml, spp_node);
-			return NULL;
-		}
-		update_policy_update_uri(ctx, realm, policy_node);
-		node = get_node_uri(ctx->xml, policy_node,
-				    "Policy/PolicyUpdate");
-		if (node)
-			build_username_password(ctx, node, dmacc_username,
-						dmacc_password);
-	}
-
-	pps = build_pps(ctx, NULL, realm, NULL, NULL, 0, NULL, ctx->imsi,
-			dmacc_username, dmacc_password, policy_node);
-	if (!pps) {
-		xml_node_free(ctx->xml, spp_node);
-		return NULL;
-	}
-
-	debug_print(ctx, 1,
-		    "Request DB subscription registration on success notification");
-	if (!user || !user[0])
-		user = ctx->imsi;
-	db_add_session(ctx, user, realm, session_id, NULL, NULL,
-		       SUBSCRIPTION_REGISTRATION, NULL);
-	db_add_session_dmacc(ctx, session_id, dmacc_username, dmacc_password);
-	if (ctx->eap_method)
-		db_add_session_eap_method(ctx, session_id, ctx->eap_method);
-	if (ctx->id_hash)
-		db_add_session_id_hash(ctx, session_id, ctx->id_hash);
-	db_add_session_pps(ctx, user, realm, session_id, pps);
-
-	hs20_eventlog_node(ctx, user, realm, session_id,
-			   "new subscription", pps);
-
-	tnds = mo_to_tnds(ctx->xml, pps, 0, URN_HS20_PPS, NULL);
-	xml_node_free(ctx->xml, pps);
-	if (!tnds) {
-		xml_node_free(ctx->xml, spp_node);
-		return NULL;
-	}
-
-	str = xml_node_to_str(ctx->xml, tnds);
-	xml_node_free(ctx->xml, tnds);
-	if (!str) {
-		xml_node_free(ctx->xml, spp_node);
-		return NULL;
-	}
-
-	node = xml_node_create_text(ctx->xml, spp_node, ns, "addMO", str);
-	free(str);
-	snprintf(buf, sizeof(buf), "./Wi-Fi/%s/PerProviderSubscription", realm);
-	xml_node_add_attr(ctx->xml, node, ns, "managementTreeURI", buf);
-	xml_node_add_attr(ctx->xml, node, ns, "moURN", URN_HS20_PPS);
 
 	return spp_node;
 }
@@ -2343,15 +1964,6 @@ static xml_node_t * hs20_spp_post_dev_data(struct hs20_svc *ctx,
 		goto out;
 	}
 
-	if (strcasecmp(req_reason, "Subscription provisioning") == 0) {
-		ret = hs20_sim_provisioning(ctx, user, realm, dmacc,
-					    session_id);
-		hs20_eventlog_node(ctx, user, realm, session_id,
-				   "subscription provisioning response",
-				   ret);
-		goto out;
-	}
-
 	debug_print(ctx, 1, "Unsupported requestReason '%s' user '%s'",
 		    req_reason, user);
 out:
@@ -2394,8 +2006,6 @@ static xml_node_t * build_spp_exchange_complete(struct hs20_svc *ctx,
 static int add_subscription(struct hs20_svc *ctx, const char *session_id)
 {
 	char *user, *realm, *pw, *pw_mm, *pps, *str;
-	char *osu_user, *osu_password, *eap_method;
-	char *policy = NULL;
 	char *sql;
 	int ret = -1;
 	char *free_account;
@@ -2403,7 +2013,6 @@ static int add_subscription(struct hs20_svc *ctx, const char *session_id)
 	char *type;
 	int cert = 0;
 	char *cert_pem, *fingerprint;
-	const char *method;
 
 	user = db_get_session_val(ctx, NULL, NULL, session_id, "user");
 	realm = db_get_session_val(ctx, NULL, NULL, session_id, "realm");
@@ -2417,11 +2026,6 @@ static int add_subscription(struct hs20_svc *ctx, const char *session_id)
 	if (type && strcmp(type, "cert") == 0)
 		cert = 1;
 	free(type);
-	osu_user = db_get_session_val(ctx, NULL, NULL, session_id, "osu_user");
-	osu_password = db_get_session_val(ctx, NULL, NULL, session_id,
-					  "osu_password");
-	eap_method = db_get_session_val(ctx, NULL, NULL, session_id,
-					"eap_method");
 
 	if (!user || !realm || !pw) {
 		debug_print(ctx, 1, "Could not find session info from DB for "
@@ -2432,8 +2036,6 @@ static int add_subscription(struct hs20_svc *ctx, const char *session_id)
 	free_account = db_get_osu_config_val(ctx, realm, "free_account");
 	free_acc = free_account && strcmp(free_account, user) == 0;
 	free(free_account);
-
-	policy = db_get_osu_config_val(ctx, realm, "sim_policy");
 
 	debug_print(ctx, 1,
 		    "New subscription: user='%s' realm='%s' free_acc=%d",
@@ -2463,20 +2065,12 @@ static int add_subscription(struct hs20_svc *ctx, const char *session_id)
 
 	str = db_get_session_val(ctx, NULL, NULL, session_id, "mac_addr");
 
-	if (eap_method && eap_method[0])
-		method = eap_method;
-	else
-		method = cert ? "TLS" : "TTLS-MSCHAPV2";
-	sql = sqlite3_mprintf("INSERT INTO users(identity,realm,phase2,methods,cert,cert_pem,machine_managed,mac_addr,osu_user,osu_password,policy) VALUES (%Q,%Q,%d,%Q,%Q,%Q,%d,%Q,%Q,%Q,%Q)",
-			      user, realm, cert ? 0 : 1,
-			      method,
+	sql = sqlite3_mprintf("INSERT INTO users(identity,realm,phase2,methods,cert,cert_pem,machine_managed,mac_addr) VALUES (%Q,%Q,1,%Q,%Q,%Q,%d,%Q)",
+			      user, realm, cert ? "TLS" : "TTLS-MSCHAPV2",
 			      fingerprint ? fingerprint : "",
 			      cert_pem ? cert_pem : "",
 			      pw_mm && atoi(pw_mm) ? 1 : 0,
-			      str ? str : "",
-			      osu_user ? osu_user : "",
-			      osu_password ? osu_password : "",
-			      policy ? policy : "");
+			      str ? str : "");
 	free(str);
 	if (sql == NULL)
 		goto out;
@@ -2494,7 +2088,8 @@ static int add_subscription(struct hs20_svc *ctx, const char *session_id)
 	else
 		ret = update_password(ctx, user, realm, pw, 0);
 	if (ret < 0) {
-		sql = sqlite3_mprintf("DELETE FROM users WHERE identity=%Q AND realm=%Q AND (phase2=1 OR methods='TLS')",
+		sql = sqlite3_mprintf("DELETE FROM users WHERE identity=%Q AND "
+				      "realm=%Q AND phase2=1",
 				      user, realm);
 		if (sql) {
 			debug_print(ctx, 1, "DB: %s", sql);
@@ -2544,24 +2139,6 @@ static int add_subscription(struct hs20_svc *ctx, const char *session_id)
 		}
 	}
 
-	str = db_get_session_val(ctx, NULL, NULL, session_id,
-				 "mobile_identifier_hash");
-	if (str) {
-		sql = sqlite3_mprintf("DELETE FROM sim_provisioning WHERE mobile_identifier_hash=%Q",
-				      str);
-		if (sql) {
-			debug_print(ctx, 1, "DB: %s", sql);
-			if (sqlite3_exec(ctx->db, sql, NULL, NULL, NULL) !=
-			    SQLITE_OK) {
-				debug_print(ctx, 1,
-					    "Failed to delete pending sim_provisioning entry: %s",
-					    sqlite3_errmsg(ctx->db));
-			}
-			sqlite3_free(sql);
-		}
-		os_free(str);
-	}
-
 	if (ret == 0) {
 		hs20_eventlog(ctx, user, realm, session_id,
 			      "completed subscription registration", NULL);
@@ -2575,10 +2152,6 @@ out:
 	free(pps);
 	free(cert_pem);
 	free(fingerprint);
-	free(osu_user);
-	free(osu_password);
-	free(eap_method);
-	os_free(policy);
 	return ret;
 }
 
@@ -2605,11 +2178,11 @@ static xml_node_t * hs20_spp_update_response(struct hs20_svc *ctx,
 	debug_print(ctx, 1, "sppUpdateResponse: sppStatus: %s  sessionID: %s",
 		    status, session_id);
 
-	val = db_get_session_val(ctx, NULL, NULL, session_id, "operation");
+	val = db_get_session_val(ctx, user, realm, session_id, "operation");
 	if (!val) {
 		debug_print(ctx, 1,
-			    "No session active for sessionID: %s",
-			    session_id);
+			    "No session active for user: %s  sessionID: %s",
+			    user, session_id);
 		oper = NO_OPERATION;
 	} else
 		oper = atoi(val);
@@ -2666,29 +2239,6 @@ static xml_node_t * hs20_spp_update_response(struct hs20_svc *ctx,
 				      session_id, "Updated user password "
 				      "in database", NULL);
 		}
-		if (oper == CLEAR_REMEDIATION) {
-			debug_print(ctx, 1,
-				    "Clear remediation requirement for user '%s' in DB",
-				    user);
-			if (clear_remediation(ctx, user, realm, dmacc) < 0) {
-				debug_print(ctx, 1,
-					    "Failed to clear remediation requirement for user '%s' in DB",
-					    user);
-				ret = build_spp_exchange_complete(
-					ctx, session_id, "Error occurred",
-					"Other");
-				hs20_eventlog_node(ctx, user, realm,
-						   session_id,
-						   "Failed to update database",
-						   ret);
-				db_remove_session(ctx, user, realm, session_id);
-				return ret;
-			}
-			hs20_eventlog(ctx, user, realm,
-				      session_id,
-				      "Cleared remediation requirement in database",
-				      NULL);
-		}
 		if (oper == SUBSCRIPTION_REGISTRATION) {
 			if (add_subscription(ctx, session_id) < 0) {
 				debug_print(ctx, 1, "Failed to add "
@@ -2715,60 +2265,12 @@ static xml_node_t * hs20_spp_update_response(struct hs20_svc *ctx,
 		if (oper == POLICY_UPDATE)
 			db_update_val(ctx, user, realm, "polupd_done", "1",
 				      dmacc);
-		if (oper == CERT_REENROLL) {
-			char *new_user;
-			char event[200];
-
-			new_user = db_get_session_val(ctx, NULL, NULL,
-						      session_id, "user");
-			if (!new_user) {
-				debug_print(ctx, 1,
-					    "Failed to find new user name (cert-serialnum)");
-				ret = build_spp_exchange_complete(
-					ctx, session_id, "Error occurred",
-					"Other");
-				hs20_eventlog_node(ctx, user, realm,
-						   session_id,
-						   "Failed to find new user name (cert reenroll)",
-						   ret);
-				db_remove_session(ctx, NULL, NULL, session_id);
-				return ret;
-			}
-
-			debug_print(ctx, 1,
-				    "Update certificate user entry to use the new serial number (old=%s new=%s)",
-				    user, new_user);
-			os_snprintf(event, sizeof(event), "renamed user to: %s",
-				    new_user);
-			hs20_eventlog(ctx, user, realm, session_id, event,
-				      NULL);
-
-			if (db_update_val(ctx, user, realm, "identity",
-					  new_user, 0) < 0 ||
-			    db_update_val(ctx, new_user, realm, "remediation",
-					  "", 0) < 0) {
-				debug_print(ctx, 1,
-					    "Failed to update user name (cert-serialnum)");
-				ret = build_spp_exchange_complete(
-					ctx, session_id, "Error occurred",
-					"Other");
-				hs20_eventlog_node(ctx, user, realm,
-						   session_id,
-						   "Failed to update user name (cert reenroll)",
-						   ret);
-				db_remove_session(ctx, NULL, NULL, session_id);
-				os_free(new_user);
-				return ret;
-			}
-
-			os_free(new_user);
-		}
 		ret = build_spp_exchange_complete(
 			ctx, session_id,
 			"Exchange complete, release TLS connection", NULL);
 		hs20_eventlog_node(ctx, user, realm, session_id,
 				   "Exchange completed", ret);
-		db_remove_session(ctx, NULL, NULL, session_id);
+		db_remove_session(ctx, user, realm, session_id);
 		return ret;
 	}
 

@@ -60,8 +60,7 @@ int wps_build_public_key(struct wps_data *wps, struct wpabuf *msg)
 		}
 		wps->dh_privkey = wpabuf_dup(wps->wps->ap_nfc_dh_privkey);
 		pubkey = wpabuf_dup(wps->wps->ap_nfc_dh_pubkey);
-		if (wps->dh_privkey && pubkey)
-			wps->dh_ctx = dh5_init_fixed(wps->dh_privkey, pubkey);
+		wps->dh_ctx = dh5_init_fixed(wps->dh_privkey, pubkey);
 #endif /* CONFIG_WPS_NFC */
 	} else {
 		wpa_printf(MSG_DEBUG, "WPS: Generate new DH keys");

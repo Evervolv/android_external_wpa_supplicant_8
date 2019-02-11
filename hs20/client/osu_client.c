@@ -117,8 +117,8 @@ static int android_update_permission(const char *path, mode_t mode)
 
 	/* Allow processes running with Group ID as AID_WIFI,
 	 * to read files from SP, SP/<fqdn>, Cert and osu-info directories */
-	if (lchown(path, -1, AID_WIFI)) {
-		wpa_printf(MSG_INFO, "CTRL: Could not lchown directory: %s",
+	if (chown(path, -1, AID_WIFI)) {
+		wpa_printf(MSG_INFO, "CTRL: Could not chown directory: %s",
 			   strerror(errno));
 		return -1;
 	}
@@ -3068,17 +3068,24 @@ static int init_ctx(struct hs20_osu_client *ctx)
 		return -1;
 
 	devinfo = node_from_file(ctx->xml, "devinfo.xml");
-	if (devinfo) {
-		devid = get_node(ctx->xml, devinfo, "DevId");
-		if (devid) {
-			char *tmp = xml_node_get_text(ctx->xml, devid);
+	if (!devinfo) {
+		wpa_printf(MSG_ERROR, "devinfo.xml not found");
+		return -1;
+	}
 
-			if (tmp) {
-				ctx->devid = os_strdup(tmp);
-				xml_node_get_text_free(ctx->xml, tmp);
-			}
+	devid = get_node(ctx->xml, devinfo, "DevId");
+	if (devid) {
+		char *tmp = xml_node_get_text(ctx->xml, devid);
+		if (tmp) {
+			ctx->devid = os_strdup(tmp);
+			xml_node_get_text_free(ctx->xml, tmp);
 		}
-		xml_node_free(ctx->xml, devinfo);
+	}
+	xml_node_free(ctx->xml, devinfo);
+
+	if (ctx->devid == NULL) {
+		wpa_printf(MSG_ERROR, "Could not fetch DevId from devinfo.xml");
+		return -1;
 	}
 
 	ctx->http = http_init_ctx(ctx, ctx->xml);

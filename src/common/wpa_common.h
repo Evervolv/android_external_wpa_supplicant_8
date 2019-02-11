@@ -110,7 +110,6 @@ WPA_CIPHER_BIP_CMAC_256)
 #define RSN_KEY_DATA_KEYID RSN_SELECTOR(0x00, 0x0f, 0xac, 10)
 #define RSN_KEY_DATA_MULTIBAND_GTK RSN_SELECTOR(0x00, 0x0f, 0xac, 11)
 #define RSN_KEY_DATA_MULTIBAND_KEYID RSN_SELECTOR(0x00, 0x0f, 0xac, 12)
-#define RSN_KEY_DATA_OCI RSN_SELECTOR(0x00, 0x0f, 0xac, 13)
 
 #define WFA_KEY_DATA_IP_ADDR_REQ RSN_SELECTOR(0x50, 0x6f, 0x9a, 4)
 #define WFA_KEY_DATA_IP_ADDR_ALLOC RSN_SELECTOR(0x50, 0x6f, 0x9a, 5)
@@ -149,8 +148,7 @@ WPA_CIPHER_BIP_CMAC_256)
 #define WPA_CAPABILITY_SPP_A_MSDU_REQUIRED BIT(11)
 #define WPA_CAPABILITY_PBAC BIT(12)
 #define WPA_CAPABILITY_EXT_KEY_ID_FOR_UNICAST BIT(13)
-#define WPA_CAPABILITY_OCVC BIT(14)
-/* B15: Reserved */
+/* B14-B15: Reserved */
 
 
 /* IEEE 802.11r */
@@ -328,7 +326,6 @@ struct rsn_ftie_sha384 {
 #define FTIE_SUBELEM_GTK 2
 #define FTIE_SUBELEM_R0KH_ID 3
 #define FTIE_SUBELEM_IGTK 4
-#define FTIE_SUBELEM_OCI 5
 
 struct rsn_rdie {
 	u8 id;
@@ -454,10 +451,6 @@ struct wpa_ft_ies {
 	size_t tie_len;
 	const u8 *igtk;
 	size_t igtk_len;
-#ifdef CONFIG_OCV
-	const u8 *oci;
-	size_t oci_len;
-#endif /* CONFIG_OCV */
 	const u8 *ric;
 	size_t ric_len;
 	int key_mgmt;

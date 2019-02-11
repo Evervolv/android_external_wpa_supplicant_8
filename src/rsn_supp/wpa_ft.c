@@ -14,8 +14,6 @@
 #include "crypto/random.h"
 #include "common/ieee802_11_defs.h"
 #include "common/ieee802_11_common.h"
-#include "common/ocv.h"
-#include "drivers/driver.h"
 #include "wpa.h"
 #include "wpa_i.h"
 
@@ -244,8 +242,6 @@ static u8 * wpa_ft_gen_req_ies(struct wpa_sm *sm, size_t *len,
 	    sm->mgmt_group_cipher == WPA_CIPHER_BIP_CMAC_256)
 		capab |= WPA_CAPABILITY_MFPC;
 #endif /* CONFIG_IEEE80211W */
-	if (sm->ocv)
-		capab |= WPA_CAPABILITY_OCVC;
 	WPA_PUT_LE16(pos, capab);
 	pos += 2;
 
@@ -327,26 +323,6 @@ static u8 * wpa_ft_gen_req_ies(struct wpa_sm *sm, size_t *len,
 	*pos++ = sm->r0kh_id_len;
 	os_memcpy(pos, sm->r0kh_id, sm->r0kh_id_len);
 	pos += sm->r0kh_id_len;
-#ifdef CONFIG_OCV
-	if (kck && wpa_sm_ocv_enabled(sm)) {
-		/* OCI sub-element in the third FT message */
-		struct wpa_channel_info ci;
-
-		if (wpa_sm_channel_info(sm, &ci) != 0) {
-			wpa_printf(MSG_WARNING,
-				   "Failed to get channel info for OCI element in FTE");
-			os_free(buf);
-			return NULL;
-		}
-
-		*pos++ = FTIE_SUBELEM_OCI;
-		*pos++ = OCV_OCI_LEN;
-		if (ocv_insert_oci(&ci, &pos) < 0) {
-			os_free(buf);
-			return NULL;
-		}
-	}
-#endif /* CONFIG_OCV */
 	*ftie_len = pos - ftie_len - 1;
 
 	if (ric_ies) {
@@ -984,25 +960,6 @@ int wpa_ft_validate_reassoc_resp(struct wpa_sm *sm, const u8 *ies,
 		wpa_hexdump(MSG_MSGDUMP, "FT: Calculated MIC", mic, 16);
 		return -1;
 	}
-
-#ifdef CONFIG_OCV
-	if (wpa_sm_ocv_enabled(sm)) {
-		struct wpa_channel_info ci;
-
-		if (wpa_sm_channel_info(sm, &ci) != 0) {
-			wpa_printf(MSG_WARNING,
-				   "Failed to get channel info to validate received OCI in (Re)Assoc Response");
-			return -1;
-		}
-
-		if (ocv_verify_tx_params(parse.oci, parse.oci_len, &ci,
-					 channel_width_to_int(ci.chanwidth),
-					 ci.seg1_idx) != 0) {
-			wpa_printf(MSG_WARNING, "%s", ocv_errorstr);
-			return -1;
-		}
-	}
-#endif /* CONFIG_OCV */
 
 	sm->ft_reassoc_completed = 1;
 

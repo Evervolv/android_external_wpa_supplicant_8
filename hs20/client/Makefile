@@ -8,16 +8,11 @@ ifndef LDO
 LDO=$(CC)
 endif
 
-ifeq ($(QUIET), 1)
-Q=@
-E=true
-else
 Q=@
 E=echo
 ifeq ($(V), 1)
 Q=
 E=true
-endif
 endif
 
 ifndef CFLAGS
