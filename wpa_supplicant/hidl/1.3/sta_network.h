@@ -15,7 +15,7 @@
 
 #include <android-base/macros.h>
 
-#include <android/hardware/wifi/supplicant/1.2/ISupplicantStaNetwork.h>
+#include <android/hardware/wifi/supplicant/1.3/ISupplicantStaNetwork.h>
 #include <android/hardware/wifi/supplicant/1.0/ISupplicantStaNetworkCallback.h>
 
 extern "C"
@@ -38,13 +38,14 @@ namespace V1_3 {
 namespace implementation {
 using namespace android::hardware::wifi::supplicant::V1_0;
 using namespace android::hardware::wifi::supplicant::V1_1;
+using namespace android::hardware::wifi::supplicant::V1_2;
 
 /**
  * Implementation of StaNetwork hidl object. Each unique hidl
  * object is used for control operations on a specific network
  * controlled by wpa_supplicant.
  */
-class StaNetwork : public V1_2::ISupplicantStaNetwork
+class StaNetwork : public V1_3::ISupplicantStaNetwork
 {
 public:
 	StaNetwork(
@@ -225,6 +226,10 @@ public:
 	Return<void> setSaePasswordId(
 	    const hidl_string& sae_password_id,
 	    setSaePasswordId_cb _hidl_cb) override;
+	Return<void> setOcsp(
+	    OcspType ocspType, setOcsp_cb _hidl_cb) override;
+	Return<void> getOcsp(
+	    getOcsp_cb _hidl_cb) override;
 
 private:
 	// Corresponding worker functions for the HIDL methods.
@@ -341,6 +346,8 @@ private:
 	    const std::string& sae_password_id);
 	SupplicantStatus setGroupMgmtCipherInternal(uint32_t group_mgmt_cipher_mask);
 	std::pair<SupplicantStatus, uint32_t> getGroupMgmtCipherInternal();
+	SupplicantStatus setOcspInternal(OcspType ocspType);
+	std::pair<SupplicantStatus, OcspType> getOcspInternal();
 
 	struct wpa_ssid* retrieveNetworkPtr();
 	struct wpa_supplicant* retrieveIfacePtr();
