@@ -89,7 +89,7 @@ namespace android {
 namespace hardware {
 namespace wifi {
 namespace supplicant {
-namespace V1_2 {
+namespace V1_3 {
 namespace implementation {
 using hidl_return_util::validateAndCall;
 
@@ -2162,7 +2162,7 @@ void StaNetwork::resetFastTransitionKeyMgmt(uint32_t &key_mgmt_mask)
 	}
 }
 }  // namespace implementation
-}  // namespace V1_2
+}  // namespace V1_3
 }  // namespace supplicant
 }  // namespace wifi
 }  // namespace hardware
