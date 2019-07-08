@@ -40,6 +40,9 @@
 #include "driver_nl80211.h"
 
 
+#ifndef NETLINK_CAP_ACK
+#define NETLINK_CAP_ACK 10
+#endif /* NETLINK_CAP_ACK */
 #ifndef CONFIG_LIBNL20
 /*
  * libnl 1.1 has a bug, it tries to allocate socket numbers densely
@@ -339,6 +342,7 @@ static int send_and_recv(struct nl80211_global *global,
 {
 	struct nl_cb *cb;
 	int err = -ENOMEM;
+	int opt;
 
 	if (!msg)
 		return -ENOMEM;
@@ -346,6 +350,11 @@ static int send_and_recv(struct nl80211_global *global,
 	cb = nl_cb_clone(global->nl_cb);
 	if (!cb)
 		goto out;
+
+	/* try to set NETLINK_CAP_ACK to 1, ignoring errors */
+	opt = 1;
+	setsockopt(nl_socket_get_fd(nl_handle), SOL_NETLINK,
+		   NETLINK_CAP_ACK, &opt, sizeof(opt));
 
 	err = nl_send_auto_complete(nl_handle, msg);
 	if (err < 0)
@@ -5420,7 +5429,8 @@ skip_auth_type:
 	if (ret)
 		goto fail;
 
-	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
+	ret = send_and_recv_msgs(drv, msg, NULL, (void *) -1);
+
 	msg = NULL;
 	if (ret) {
 		wpa_printf(MSG_DEBUG, "nl80211: MLME connect failed: ret=%d "
@@ -5431,6 +5441,7 @@ skip_auth_type:
 	}
 
 fail:
+	nl80211_nlmsg_clear(msg);
 	nlmsg_free(msg);
 	return ret;
 
@@ -7576,11 +7587,12 @@ static int nl80211_pmkid(struct i802_bss *bss, int cmd,
 		     params->fils_cache_id)) ||
 	    (params->pmk_len &&
 	     nla_put(msg, NL80211_ATTR_PMK, params->pmk_len, params->pmk))) {
+		nl80211_nlmsg_clear(msg);
 		nlmsg_free(msg);
 		return -ENOBUFS;
 	}
 
-	return send_and_recv_msgs(bss->drv, msg, NULL, NULL);
+	return send_and_recv_msgs(bss->drv, msg, NULL, (void *) -1);
 }
 
 
