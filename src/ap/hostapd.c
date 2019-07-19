@@ -50,8 +50,6 @@
 #include "fils_hlp.h"
 #include "acs.h"
 #include "hs20.h"
-#include "airtime_policy.h"
-#include "wpa_auth_kay.h"
 
 
 static int hostapd_flush_old_stations(struct hostapd_data *hapd, u16 reason);
@@ -262,14 +260,11 @@ int hostapd_reload_config(struct hostapd_iface *iface)
 		hapd->iconf->ieee80211ac = oldconf->ieee80211ac;
 		hapd->iconf->ht_capab = oldconf->ht_capab;
 		hapd->iconf->vht_capab = oldconf->vht_capab;
-		hostapd_set_oper_chwidth(hapd->iconf,
-					 hostapd_get_oper_chwidth(oldconf));
-		hostapd_set_oper_centr_freq_seg0_idx(
-			hapd->iconf,
-			hostapd_get_oper_centr_freq_seg0_idx(oldconf));
-		hostapd_set_oper_centr_freq_seg1_idx(
-			hapd->iconf,
-			hostapd_get_oper_centr_freq_seg1_idx(oldconf));
+		hapd->iconf->vht_oper_chwidth = oldconf->vht_oper_chwidth;
+		hapd->iconf->vht_oper_centr_freq_seg0_idx =
+			oldconf->vht_oper_centr_freq_seg0_idx;
+		hapd->iconf->vht_oper_centr_freq_seg1_idx =
+			oldconf->vht_oper_centr_freq_seg1_idx;
 		hapd->conf = newconf->bss[j];
 		hostapd_reload_bss(hapd);
 	}
@@ -374,7 +369,6 @@ static void hostapd_free_hapd_data(struct hostapd_data *hapd)
 #endif /* CONFIG_NO_RADIUS */
 
 	hostapd_deinit_wps(hapd);
-	ieee802_1x_dealloc_kay_sm_hapd(hapd);
 #ifdef CONFIG_DPP
 	hostapd_dpp_deinit(hapd);
 	gas_query_ap_deinit(hapd->gas);
@@ -497,7 +491,6 @@ static void hostapd_cleanup_iface_partial(struct hostapd_iface *iface)
 	iface->basic_rates = NULL;
 	ap_list_deinit(iface);
 	sta_track_deinit(iface);
-	airtime_policy_update_deinit(iface);
 }
 
 
@@ -1870,13 +1863,10 @@ static int hostapd_setup_interface_complete_sync(struct hostapd_iface *iface,
 				     hapd->iconf->channel,
 				     hapd->iconf->ieee80211n,
 				     hapd->iconf->ieee80211ac,
-				     hapd->iconf->ieee80211ax,
 				     hapd->iconf->secondary_channel,
-				     hostapd_get_oper_chwidth(hapd->iconf),
-				     hostapd_get_oper_centr_freq_seg0_idx(
-					     hapd->iconf),
-				     hostapd_get_oper_centr_freq_seg1_idx(
-					     hapd->iconf))) {
+				     hapd->iconf->vht_oper_chwidth,
+				     hapd->iconf->vht_oper_centr_freq_seg0_idx,
+				     hapd->iconf->vht_oper_centr_freq_seg1_idx)) {
 			wpa_printf(MSG_ERROR, "Could not set channel for "
 				   "kernel driver");
 			goto fail;
@@ -1986,7 +1976,6 @@ dfs_offload:
 
 	hostapd_set_state(iface, HAPD_IFACE_ENABLED);
 	hostapd_owe_update_trans(iface);
-	airtime_policy_update_init(iface);
 	wpa_msg(iface->bss[0]->msg_ctx, MSG_INFO, AP_EVENT_ENABLED);
 	if (hapd->setup_complete_cb)
 		hapd->setup_complete_cb(hapd->setup_complete_cb_ctx);
@@ -3007,8 +2996,6 @@ void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 #endif /* CONFIG_P2P */
 
-	airtime_policy_new_sta(hapd, sta);
-
 	/* Start accounting here, if IEEE 802.1X and WPA are not used.
 	 * IEEE 802.1X/WPA code will start accounting after the station has
 	 * been authorized. */
@@ -3049,14 +3036,6 @@ void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 		eloop_register_timeout(hapd->conf->ap_max_inactivity, 0,
 				       ap_handle_timer, hapd, sta);
 	}
-
-#ifdef CONFIG_MACSEC
-	if (hapd->conf->wpa_key_mgmt == WPA_KEY_MGMT_NONE &&
-	    hapd->conf->mka_psk_set)
-		ieee802_1x_create_preshared_mka_hapd(hapd, sta);
-	else
-		ieee802_1x_alloc_kay_sm_hapd(hapd, sta);
-#endif /* CONFIG_MACSEC */
 }
 
 
@@ -3216,8 +3195,6 @@ static int hostapd_change_config_freq(struct hostapd_data *hapd,
 				      struct hostapd_freq_params *old_params)
 {
 	int channel;
-	u8 seg0, seg1;
-	struct hostapd_hw_modes *mode;
 
 	if (!params->channel) {
 		/* check if the new channel is supported by hw */
@@ -3228,37 +3205,33 @@ static int hostapd_change_config_freq(struct hostapd_data *hapd,
 	if (!channel)
 		return -1;
 
-	mode = hapd->iface->current_mode;
-
 	/* if a pointer to old_params is provided we save previous state */
 	if (old_params &&
 	    hostapd_set_freq_params(old_params, conf->hw_mode,
 				    hostapd_hw_get_freq(hapd, conf->channel),
 				    conf->channel, conf->ieee80211n,
-				    conf->ieee80211ac, conf->ieee80211ax,
+				    conf->ieee80211ac,
 				    conf->secondary_channel,
-				    hostapd_get_oper_chwidth(conf),
-				    hostapd_get_oper_centr_freq_seg0_idx(conf),
-				    hostapd_get_oper_centr_freq_seg1_idx(conf),
-				    conf->vht_capab,
-				    mode ? &mode->he_capab[IEEE80211_MODE_AP] :
-				    NULL))
+				    conf->vht_oper_chwidth,
+				    conf->vht_oper_centr_freq_seg0_idx,
+				    conf->vht_oper_centr_freq_seg1_idx,
+				    conf->vht_capab))
 		return -1;
 
 	switch (params->bandwidth) {
 	case 0:
 	case 20:
 	case 40:
-		hostapd_set_oper_chwidth(conf, CHANWIDTH_USE_HT);
+		conf->vht_oper_chwidth = VHT_CHANWIDTH_USE_HT;
 		break;
 	case 80:
 		if (params->center_freq2)
-			hostapd_set_oper_chwidth(conf, CHANWIDTH_80P80MHZ);
+			conf->vht_oper_chwidth = VHT_CHANWIDTH_80P80MHZ;
 		else
-			hostapd_set_oper_chwidth(conf, CHANWIDTH_80MHZ);
+			conf->vht_oper_chwidth = VHT_CHANWIDTH_80MHZ;
 		break;
 	case 160:
-		hostapd_set_oper_chwidth(conf, CHANWIDTH_160MHZ);
+		conf->vht_oper_chwidth = VHT_CHANWIDTH_160MHZ;
 		break;
 	default:
 		return -1;
@@ -3268,11 +3241,9 @@ static int hostapd_change_config_freq(struct hostapd_data *hapd,
 	conf->ieee80211n = params->ht_enabled;
 	conf->secondary_channel = params->sec_channel_offset;
 	ieee80211_freq_to_chan(params->center_freq1,
-			       &seg0);
+			       &conf->vht_oper_centr_freq_seg0_idx);
 	ieee80211_freq_to_chan(params->center_freq2,
-			       &seg1);
-	hostapd_set_oper_centr_freq_seg0_idx(conf, seg0);
-	hostapd_set_oper_centr_freq_seg1_idx(conf, seg1);
+			       &conf->vht_oper_centr_freq_seg1_idx);
 
 	/* TODO: maybe call here hostapd_config_check here? */
 
@@ -3286,7 +3257,7 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 	struct hostapd_iface *iface = hapd->iface;
 	struct hostapd_freq_params old_freq;
 	int ret;
-	u8 chan, bandwidth;
+	u8 chan, vht_bandwidth;
 
 	os_memset(&old_freq, 0, sizeof(old_freq));
 	if (!iface || !iface->freq || hapd->csa_in_progress)
@@ -3295,30 +3266,29 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 	switch (settings->freq_params.bandwidth) {
 	case 80:
 		if (settings->freq_params.center_freq2)
-			bandwidth = CHANWIDTH_80P80MHZ;
+			vht_bandwidth = VHT_CHANWIDTH_80P80MHZ;
 		else
-			bandwidth = CHANWIDTH_80MHZ;
+			vht_bandwidth = VHT_CHANWIDTH_80MHZ;
 		break;
 	case 160:
-		bandwidth = CHANWIDTH_160MHZ;
+		vht_bandwidth = VHT_CHANWIDTH_160MHZ;
 		break;
 	default:
-		bandwidth = CHANWIDTH_USE_HT;
+		vht_bandwidth = VHT_CHANWIDTH_USE_HT;
 		break;
 	}
 
 	if (ieee80211_freq_to_channel_ext(
 		    settings->freq_params.freq,
 		    settings->freq_params.sec_channel_offset,
-		    bandwidth,
+		    vht_bandwidth,
 		    &hapd->iface->cs_oper_class,
 		    &chan) == NUM_HOSTAPD_MODES) {
 		wpa_printf(MSG_DEBUG,
-			   "invalid frequency for channel switch (freq=%d, sec_channel_offset=%d, vht_enabled=%d, he_enabled=%d)",
+			   "invalid frequency for channel switch (freq=%d, sec_channel_offset=%d, vht_enabled=%d)",
 			   settings->freq_params.freq,
 			   settings->freq_params.sec_channel_offset,
-			   settings->freq_params.vht_enabled,
-			   settings->freq_params.he_enabled);
+			   settings->freq_params.vht_enabled);
 		return -1;
 	}
 
@@ -3418,29 +3388,29 @@ void
 hostapd_switch_channel_fallback(struct hostapd_iface *iface,
 				const struct hostapd_freq_params *freq_params)
 {
-	int seg0_idx = 0, seg1_idx = 0, bw = CHANWIDTH_USE_HT;
+	int vht_seg0_idx = 0, vht_seg1_idx = 0, vht_bw = VHT_CHANWIDTH_USE_HT;
 
 	wpa_printf(MSG_DEBUG, "Restarting all CSA-related BSSes");
 
 	if (freq_params->center_freq1)
-		seg0_idx = 36 + (freq_params->center_freq1 - 5180) / 5;
+		vht_seg0_idx = 36 + (freq_params->center_freq1 - 5180) / 5;
 	if (freq_params->center_freq2)
-		seg1_idx = 36 + (freq_params->center_freq2 - 5180) / 5;
+		vht_seg1_idx = 36 + (freq_params->center_freq2 - 5180) / 5;
 
 	switch (freq_params->bandwidth) {
 	case 0:
 	case 20:
 	case 40:
-		bw = CHANWIDTH_USE_HT;
+		vht_bw = VHT_CHANWIDTH_USE_HT;
 		break;
 	case 80:
 		if (freq_params->center_freq2)
-			bw = CHANWIDTH_80P80MHZ;
+			vht_bw = VHT_CHANWIDTH_80P80MHZ;
 		else
-			bw = CHANWIDTH_80MHZ;
+			vht_bw = VHT_CHANWIDTH_80MHZ;
 		break;
 	case 160:
-		bw = CHANWIDTH_160MHZ;
+		vht_bw = VHT_CHANWIDTH_160MHZ;
 		break;
 	default:
 		wpa_printf(MSG_WARNING, "Unknown CSA bandwidth: %d",
@@ -3451,12 +3421,11 @@ hostapd_switch_channel_fallback(struct hostapd_iface *iface,
 	iface->freq = freq_params->freq;
 	iface->conf->channel = freq_params->channel;
 	iface->conf->secondary_channel = freq_params->sec_channel_offset;
-	hostapd_set_oper_centr_freq_seg0_idx(iface->conf, seg0_idx);
-	hostapd_set_oper_centr_freq_seg1_idx(iface->conf, seg1_idx);
-	hostapd_set_oper_chwidth(iface->conf, bw);
+	iface->conf->vht_oper_centr_freq_seg0_idx = vht_seg0_idx;
+	iface->conf->vht_oper_centr_freq_seg1_idx = vht_seg1_idx;
+	iface->conf->vht_oper_chwidth = vht_bw;
 	iface->conf->ieee80211n = freq_params->ht_enabled;
 	iface->conf->ieee80211ac = freq_params->vht_enabled;
-	iface->conf->ieee80211ax = freq_params->he_enabled;
 
 	/*
 	 * cs_params must not be cleared earlier because the freq_params

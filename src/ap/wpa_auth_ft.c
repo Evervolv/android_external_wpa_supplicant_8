@@ -25,7 +25,6 @@
 #include "wmm.h"
 #include "wpa_auth.h"
 #include "wpa_auth_i.h"
-#include "pmksa_cache_auth.h"
 
 
 #ifdef CONFIG_IEEE80211R_AP
@@ -2075,7 +2074,8 @@ int wpa_ft_store_pmk_fils(struct wpa_state_machine *sm,
 }
 
 
-int wpa_auth_derive_ptk_ft(struct wpa_state_machine *sm, struct wpa_ptk *ptk)
+int wpa_auth_derive_ptk_ft(struct wpa_state_machine *sm, const u8 *pmk,
+			   struct wpa_ptk *ptk)
 {
 	u8 pmk_r0[PMK_LEN_MAX], pmk_r0_name[WPA_PMK_NAME_LEN];
 	size_t pmk_r0_len = wpa_key_mgmt_sha384(sm->wpa_key_mgmt) ?
@@ -2095,16 +2095,8 @@ int wpa_auth_derive_ptk_ft(struct wpa_state_machine *sm, struct wpa_ptk *ptk)
 	const u8 *identity, *radius_cui;
 	size_t identity_len, radius_cui_len;
 	int session_timeout;
-	const u8 *mpmk;
-	size_t mpmk_len;
 
-	if (sm->xxkey_len > 0) {
-		mpmk = sm->xxkey;
-		mpmk_len = sm->xxkey_len;
-	} else if (sm->pmksa) {
-		mpmk = sm->pmksa->pmk;
-		mpmk_len = sm->pmksa->pmk_len;
-	} else {
+	if (sm->xxkey_len == 0) {
 		wpa_printf(MSG_DEBUG, "FT: XXKey not available for key "
 			   "derivation");
 		return -1;
@@ -2121,7 +2113,7 @@ int wpa_auth_derive_ptk_ft(struct wpa_state_machine *sm, struct wpa_ptk *ptk)
 					       &radius_cui);
 	session_timeout = wpa_ft_get_session_timeout(sm->wpa_auth, sm->addr);
 
-	if (wpa_derive_pmk_r0(mpmk, mpmk_len, ssid, ssid_len, mdid,
+	if (wpa_derive_pmk_r0(sm->xxkey, sm->xxkey_len, ssid, ssid_len, mdid,
 			      r0kh, r0kh_len, sm->addr,
 			      pmk_r0, pmk_r0_name,
 			      wpa_key_mgmt_sha384(sm->wpa_key_mgmt)) < 0)
@@ -2226,7 +2218,6 @@ static u8 * wpa_ft_gtk_subelem(struct wpa_state_machine *sm, size_t *len)
 		return NULL;
 	}
 
-	forced_memzero(keybuf, sizeof(keybuf));
 	*len = subelem_len;
 	return subelem;
 }
@@ -2993,8 +2984,6 @@ pmk_r1_derived:
 	wpa_hexdump_key(MSG_DEBUG, "FT: Selected PMK-R1", pmk_r1, pmk_r1_len);
 	sm->pmk_r1_name_valid = 1;
 	os_memcpy(sm->pmk_r1_name, pmk_r1_name, WPA_PMK_NAME_LEN);
-	os_memcpy(sm->pmk_r1, pmk_r1, pmk_r1_len);
-	sm->pmk_r1_len = pmk_r1_len;
 
 	if (random_get_bytes(sm->ANonce, WPA_NONCE_LEN)) {
 		wpa_printf(MSG_DEBUG, "FT: Failed to get random data for "
@@ -3100,9 +3089,8 @@ void wpa_ft_process_auth(struct wpa_state_machine *sm, const u8 *bssid,
 	status = res;
 
 	wpa_printf(MSG_DEBUG, "FT: FT authentication response: dst=" MACSTR
-		   " auth_transaction=%d status=%u (%s)",
-		   MAC2STR(sm->addr), auth_transaction + 1, status,
-		   status2str(status));
+		   " auth_transaction=%d status=%d",
+		   MAC2STR(sm->addr), auth_transaction + 1, status);
 	wpa_hexdump(MSG_DEBUG, "FT: Response IEs", resp_ies, resp_ies_len);
 	cb(ctx, sm->addr, bssid, auth_transaction + 1, status,
 	   resp_ies, resp_ies_len);
@@ -3460,9 +3448,8 @@ static int wpa_ft_send_rrb_auth_resp(struct wpa_state_machine *sm,
 	u8 *pos;
 
 	wpa_printf(MSG_DEBUG, "FT: RRB authentication response: STA=" MACSTR
-		   " CurrentAP=" MACSTR " status=%u (%s)",
-		   MAC2STR(sm->addr), MAC2STR(current_ap), status,
-		   status2str(status));
+		   " CurrentAP=" MACSTR " status=%d",
+		   MAC2STR(sm->addr), MAC2STR(current_ap), status);
 	wpa_hexdump(MSG_DEBUG, "FT: Response IEs", resp_ies, resp_ies_len);
 
 	/* RRB - Forward action frame response to the Current AP */
@@ -3568,7 +3555,7 @@ static int wpa_ft_rrb_build_r0(const u8 *key, const size_t key_len,
 			       pmk_r0->vlan, src_addr, type,
 			       packet, packet_len);
 
-	forced_memzero(pmk_r1, sizeof(pmk_r1));
+	os_memset(pmk_r1, 0, sizeof(pmk_r1));
 
 	return ret;
 }
@@ -3894,7 +3881,10 @@ static int wpa_ft_rrb_rx_r1(struct wpa_authenticator *wpa_auth,
 
 	ret = 0;
 out:
-	bin_clear_free(plain, plain_len);
+	if (plain) {
+		os_memset(plain, 0, plain_len);
+		os_free(plain);
+	}
 
 	return ret;
 

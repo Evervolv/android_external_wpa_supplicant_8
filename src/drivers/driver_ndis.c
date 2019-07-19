@@ -719,7 +719,7 @@ static int wpa_driver_ndis_disconnect(struct wpa_driver_ndis_data *drv)
 
 
 static int wpa_driver_ndis_deauthenticate(void *priv, const u8 *addr,
-					  u16 reason_code)
+					  int reason_code)
 {
 	struct wpa_driver_ndis_data *drv = priv;
 	return wpa_driver_ndis_disconnect(drv);
