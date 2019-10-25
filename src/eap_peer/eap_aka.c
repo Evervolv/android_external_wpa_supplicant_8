@@ -57,7 +57,6 @@ struct eap_aka_data {
 	u16 last_kdf_attrs[EAP_AKA_PRIME_KDF_MAX];
 	size_t last_kdf_count;
 	int error_code;
-	int anonymous_flag;
 };
 
 
@@ -94,7 +93,6 @@ static void * eap_aka_init(struct eap_sm *sm)
 	struct eap_aka_data *data;
 	const char *phase1 = eap_get_config_phase1(sm);
 	struct eap_peer_config *config = eap_get_config(sm);
-	static const char *anonymous_id_prefix = "anonymous@";
 
 	data = os_zalloc(sizeof(*data));
 	if (data == NULL)
@@ -109,7 +107,6 @@ static void * eap_aka_init(struct eap_sm *sm)
 	data->prev_id = -1;
 
 	data->result_ind = phase1 && os_strstr(phase1, "result_ind=1") != NULL;
-	data->anonymous_flag = 0;
 
 	data->use_pseudonym = !sm->init_phase2;
 	if (config && config->anonymous_identity && data->use_pseudonym) {
@@ -118,13 +115,6 @@ static void * eap_aka_init(struct eap_sm *sm)
 			os_memcpy(data->pseudonym, config->anonymous_identity,
 				  config->anonymous_identity_len);
 			data->pseudonym_len = config->anonymous_identity_len;
-			if (data->pseudonym_len > os_strlen(anonymous_id_prefix) &&
-					!os_memcmp(data->pseudonym, anonymous_id_prefix,
-					os_strlen(anonymous_id_prefix))) {
-				data->anonymous_flag = 1;
-				wpa_printf(MSG_DEBUG,
-					   "EAP-AKA: Setting anonymous@realm flag");
-			}
 		}
 	}
 
@@ -427,7 +417,6 @@ static int eap_aka_learn_ids(struct eap_sm *sm, struct eap_aka_data *data,
 		if (data->use_pseudonym)
 			eap_set_anon_id(sm, data->pseudonym,
 					data->pseudonym_len);
-		data->anonymous_flag = 0;
 	}
 
 	if (attr->next_reauth_id) {
@@ -633,15 +622,22 @@ static struct wpabuf * eap_aka_response_identity(struct eap_sm *sm,
 		identity_len = data->reauth_id_len;
 		data->reauth = 1;
 	} else if ((id_req == ANY_ID || id_req == FULLAUTH_ID) &&
-		   data->pseudonym && !data->anonymous_flag) {
+		   data->pseudonym &&
+		   !eap_sim_anonymous_username(data->pseudonym,
+					       data->pseudonym_len)) {
 		identity = data->pseudonym;
 		identity_len = data->pseudonym_len;
 		eap_aka_clear_identities(sm, data, CLEAR_REAUTH_ID);
 	} else if (id_req != NO_ID_REQ) {
 		identity = eap_get_config_identity(sm, &identity_len);
 		if (identity) {
-			eap_aka_clear_identities(sm, data, CLEAR_PSEUDONYM |
-						 CLEAR_REAUTH_ID);
+			int ids = CLEAR_PSEUDONYM | CLEAR_REAUTH_ID;
+
+			if (data->pseudonym &&
+			    eap_sim_anonymous_username(data->pseudonym,
+						       data->pseudonym_len))
+				ids &= ~CLEAR_PSEUDONYM;
+			eap_aka_clear_identities(sm, data, ids);
 		}
 	}
 	if (id_req != NO_ID_REQ)
@@ -1037,7 +1033,9 @@ static struct wpabuf * eap_aka_process_challenge(struct eap_sm *sm,
 	if (data->last_eap_identity) {
 		identity = data->last_eap_identity;
 		identity_len = data->last_eap_identity_len;
-	} else if (data->pseudonym && !data->anonymous_flag) {
+	} else if (data->pseudonym &&
+		   !eap_sim_anonymous_username(data->pseudonym,
+					       data->pseudonym_len)) {
 		identity = data->pseudonym;
 		identity_len = data->pseudonym_len;
 	} else {
