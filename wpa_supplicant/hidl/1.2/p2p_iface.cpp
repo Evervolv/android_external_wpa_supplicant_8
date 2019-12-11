@@ -1634,6 +1634,10 @@ SupplicantStatus P2pIface::addGroup_1_2Internal(
 	int vht = wpa_s->conf->p2p_go_vht;
 	int ht40 = wpa_s->conf->p2p_go_ht40 || vht;
 
+	if (wpa_s->global->p2p == NULL) {
+		return {SupplicantStatusCode::FAILURE_IFACE_DISABLED, ""};
+	}
+
 	if (!isSsidValid(ssid)) {
 		return {SupplicantStatusCode::FAILURE_ARGS_INVALID, "SSID is invalid."};
 	}
@@ -1643,10 +1647,6 @@ SupplicantStatus P2pIface::addGroup_1_2Internal(
 	}
 
 	if (!joinExistingGroup) {
-		if (wpa_s->global->p2p == NULL) {
-			return {SupplicantStatusCode::FAILURE_IFACE_DISABLED, ""};
-		}
-
 		struct p2p_data *p2p = wpa_s->global->p2p;
 		os_memcpy(p2p->ssid, ssid.data(), ssid.size());
 		p2p->ssid_len = ssid.size();
