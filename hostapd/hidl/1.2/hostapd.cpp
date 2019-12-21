@@ -126,37 +126,42 @@ std::string CreateHostapdConfig(
 	}
 
 	std::string channel_config_as_string;
+	bool isFirst = true;
 	if (iface_params.V1_1.V1_0.channelParams.enableAcs) {
-		std::string chanlist_as_string;
+		std::string freqList_as_string;
 		for (const auto &range :
-		     iface_params.V1_1.channelParams.acsChannelRanges) {
+		    iface_params.channelParams.acsChannelFreqRangesMhz) {
+			if (!isFirst) {
+				freqList_as_string += ",";
+			}
+			isFirst = false;
+
 			if (range.start != range.end) {
-				chanlist_as_string +=
-				    StringPrintf("%d-%d ", range.start, range.end);
+				freqList_as_string +=
+				    StringPrintf("%d-%d", range.start, range.end);
 			} else {
-				chanlist_as_string += StringPrintf("%d ", range.start);
+				freqList_as_string += StringPrintf("%d", range.start);
 			}
 		}
 		channel_config_as_string = StringPrintf(
 		    "channel=0\n"
 		    "acs_exclude_dfs=%d\n"
-		    "chanlist=%s",
+		    "freqlist=%s",
 		    iface_params.V1_1.V1_0.channelParams.acsShouldExcludeDfs,
-		    chanlist_as_string.c_str());
+		    freqList_as_string.c_str());
 	} else {
 		channel_config_as_string = StringPrintf(
 		    "channel=%d", iface_params.V1_1.V1_0.channelParams.channel);
 	}
 
-	// Hw Mode String
-	// TODO: b/146186687 Still missing the handling when 6GHz band is included
 	std::string hw_mode_as_string;
 	std::string ht_cap_vht_oper_chwidth_as_string;
 	unsigned int band = 0;
 	band |= iface_params.channelParams.bandMask;
 
 	if ((band & IHostapd::BandMask::BAND_2_GHZ) != 0) {
-		if ((band & IHostapd::BandMask::BAND_5_GHZ) != 0) {
+		if (((band & IHostapd::BandMask::BAND_5_GHZ) != 0)
+		    || ((band & IHostapd::BandMask::BAND_6_GHZ) != 0)) {
 			hw_mode_as_string = "hw_mode=any";
 			if (iface_params.V1_1.V1_0.channelParams.enableAcs) {
 				ht_cap_vht_oper_chwidth_as_string =
@@ -167,7 +172,8 @@ std::string CreateHostapdConfig(
 			hw_mode_as_string = "hw_mode=g";
 		}
 	} else {
-		if ((band & IHostapd::BandMask::BAND_5_GHZ) != 0) {
+		if (((band & IHostapd::BandMask::BAND_5_GHZ) != 0)
+		    || ((band & IHostapd::BandMask::BAND_6_GHZ) != 0)) {
 			hw_mode_as_string = "hw_mode=a";
 			if (iface_params.V1_1.V1_0.channelParams.enableAcs) {
 				ht_cap_vht_oper_chwidth_as_string =
