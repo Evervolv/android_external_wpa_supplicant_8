@@ -153,11 +153,7 @@ std::string CreateHostapdConfig(
 	std::string hw_mode_as_string;
 	std::string ht_cap_vht_oper_chwidth_as_string;
 	unsigned int band = 0;
-	if (iface_params.V1_1.V1_0.channelParams.enableAcs) {
-		band |= iface_params.channelParams.bandMask;
-	} else {
-		band |= iface_params.V1_1.V1_0.channelParams.band;
-	}
+	band |= iface_params.channelParams.bandMask;
 
 	if ((band & IHostapd::BandMask::BAND_2_GHZ) != 0) {
 		if ((band & IHostapd::BandMask::BAND_5_GHZ) != 0) {
