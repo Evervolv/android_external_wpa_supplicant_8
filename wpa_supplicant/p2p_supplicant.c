@@ -2496,7 +2496,7 @@ static void wpas_dev_found(void *ctx, const u8 *addr,
 	u8 *wfd_dev_info = NULL;
 	u8 wfd_dev_info_len = 0;
 	u8 *wfd_r2_dev_info = NULL;
-	u8 wfd_r2_dev_info_len = 0
+	u8 wfd_r2_dev_info_len = 0;
 #ifndef CONFIG_NO_STDOUT_DEBUG
 	struct wpa_supplicant *wpa_s = ctx;
 	char devtype[WPS_DEV_TYPE_BUFSIZE];
