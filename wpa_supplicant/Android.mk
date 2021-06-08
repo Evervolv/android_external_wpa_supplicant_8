@@ -18,6 +18,10 @@ ifeq ($(BOARD_WLAN_DEVICE), qcwcn)
   CONFIG_DRIVER_NL80211_QCA=y
 endif
 
+ifneq ($(BOARD_WLAN_BCMDHD_SAE),)
+  CONFIG_BRCM_SAE=y
+endif
+
 ifneq ($(SUPPLICANT_CUSTOM_DEF_CONFIG_FILE_PATH),)
   include $(SUPPLICANT_CUSTOM_DEF_CONFIG_FILE_PATH)
 else
@@ -83,6 +87,11 @@ endif
 # source way after the multiple AKMs is fully supported by driver and verified.
 ifeq ($(WIFI_BRCM_OPEN_SOURCE_MULTI_AKM), enabled)
 L_CFLAGS += -DWIFI_BRCM_OPEN_SOURCE_MULTI_AKM
+endif
+
+# BCMDHD SAE authentication offload
+ifdef CONFIG_BRCM_SAE
+L_CFLAGS += -DCONFIG_BRCM_SAE
 endif
 
 # Use Android specific directory for control interface sockets
