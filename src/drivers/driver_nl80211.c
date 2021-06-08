@@ -39,7 +39,7 @@
 #include "radiotap_iter.h"
 #include "rfkill.h"
 #include "driver_nl80211.h"
-#if defined(CONFIG_DRIVER_NL80211_BRCM) || defined(CONFIG_DRIVER_NL80211_SYNA)
+#if defined(CONFIG_DRIVER_NL80211_BRCM) || defined(CONFIG_DRIVER_NL80211_SYNA) || defined(CONFIG_BRCM_SAE)
 #include "common/brcm_vendor.h"
 #endif /* CONFIG_DRIVER_NL80211_BRCM || CONFIG_DRIVER_NL80211_SYNA */
 
@@ -3425,6 +3425,32 @@ static int issue_key_mgmt_set_key(struct wpa_driver_nl80211_data *drv,
 }
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 
+#ifdef CONFIG_BRCM_SAE
+static int bcmdhd_set_sae_password(struct wpa_driver_nl80211_data *drv,
+				   const void *data, int len)
+{
+	struct nl_msg *msg;
+	int ret;
+
+	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_VENDOR)) ||
+	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_BRCM) ||
+	    nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD,
+			BRCM_VENDOR_SCMD_BCM_PSK) ||
+	    nla_put(msg, NL80211_ATTR_VENDOR_DATA, len, data)) {
+		nl80211_nlmsg_clear(msg);
+		nlmsg_free(msg);
+		return -1;
+	}
+	ret = send_and_recv_msgs(drv, msg, NULL, (void *) -1, NULL, NULL);
+	if (ret) {
+		wpa_printf(MSG_DEBUG,
+			   "nl80211: Set SAE password failed: ret=%d (%s)",
+			   ret, strerror(-ret));
+	}
+
+	return ret;
+}
+#endif /* CONFIG_BRCM_SAE */
 
 #if defined(CONFIG_DRIVER_NL80211_BRCM) || defined(CONFIG_DRIVER_NL80211_SYNA)
 static int key_mgmt_set_key(struct wpa_driver_nl80211_data *drv,
@@ -7215,6 +7241,10 @@ static int wpa_driver_nl80211_try_connect(
 		wpa_printf(MSG_DEBUG, "  * SAE password");
 		if (nla_put(msg, NL80211_ATTR_SAE_PASSWORD, pwd_len, password))
 			goto fail;
+#ifdef CONFIG_BRCM_SAE
+		if (bcmdhd_set_sae_password(drv, password, pwd_len))
+			goto fail;
+#endif
 	}
 #endif /* CONFIG_SAE */
 
