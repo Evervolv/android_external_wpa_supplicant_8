@@ -1137,8 +1137,8 @@ int wpa_supplicant_reload_configuration(struct wpa_supplicant *wpa_s)
 		    os_strcmp(conf->ctrl_interface,
 			      wpa_s->conf->ctrl_interface) != 0);
 
-	if (reconf_ctrl && wpa_s->ctrl_iface) {
-		wpa_supplicant_ctrl_iface_deinit(wpa_s->ctrl_iface);
+	if (reconf_ctrl) {
+		wpa_supplicant_ctrl_iface_deinit(wpa_s, wpa_s->ctrl_iface);
 		wpa_s->ctrl_iface = NULL;
 	}
 
@@ -6493,8 +6493,12 @@ static void wpa_supplicant_deinit_iface(struct wpa_supplicant *wpa_s,
 
 	wpa_s->disconnected = 1;
 	if (wpa_s->drv_priv) {
-		/* Don't deauthenticate if WoWLAN is enabled */
-		if (!wpa_drv_get_wowlan(wpa_s)) {
+		/*
+		 * Don't deauthenticate if WoWLAN is enabled and not explicitly
+		 * been configured to disconnect.
+		 */
+		if (!wpa_drv_get_wowlan(wpa_s) ||
+		    wpa_s->conf->wowlan_disconnect_on_deinit) {
 			wpa_supplicant_deauthenticate(
 				wpa_s, WLAN_REASON_DEAUTH_LEAVING);
 
@@ -6532,10 +6536,8 @@ static void wpa_supplicant_deinit_iface(struct wpa_supplicant *wpa_s,
 	if (terminate)
 		wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_TERMINATING);
 
-	if (wpa_s->ctrl_iface) {
-		wpa_supplicant_ctrl_iface_deinit(wpa_s->ctrl_iface);
-		wpa_s->ctrl_iface = NULL;
-	}
+	wpa_supplicant_ctrl_iface_deinit(wpa_s, wpa_s->ctrl_iface);
+	wpa_s->ctrl_iface = NULL;
 
 #ifdef CONFIG_MESH
 	if (wpa_s->ifmsh) {
