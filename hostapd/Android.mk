@@ -1125,9 +1125,9 @@ OBJS_c += src/utils/edit_simple.c
 endif
 
 ifeq ($(filter gce_x86 gce_x86_64 calypso, $(TARGET_DEVICE)),)
-ifdef CONFIG_CTRL_IFACE_HIDL
-HOSTAPD_USE_HIDL=y
-L_CFLAGS += -DCONFIG_CTRL_IFACE_HIDL
+ifdef CONFIG_CTRL_IFACE_AIDL
+HOSTAPD_USE_AIDL=y
+L_CFLAGS += -DCONFIG_CTRL_IFACE_AIDL
 L_CPPFLAGS = -Wall -Werror
 endif
 endif
@@ -1170,13 +1170,11 @@ else
 LOCAL_STATIC_LIBRARIES += libnl_2
 endif
 endif
-ifeq ($(HOSTAPD_USE_HIDL), y)
-LOCAL_SHARED_LIBRARIES += android.hardware.wifi.hostapd@1.0
-LOCAL_SHARED_LIBRARIES += android.hardware.wifi.hostapd@1.1
-LOCAL_SHARED_LIBRARIES += android.hardware.wifi.hostapd@1.2
-LOCAL_SHARED_LIBRARIES += android.hardware.wifi.hostapd@1.3
-LOCAL_SHARED_LIBRARIES += libbase libhidlbase libutils
-LOCAL_STATIC_LIBRARIES += libhostapd_hidl
+ifeq ($(HOSTAPD_USE_AIDL), y)
+LOCAL_SHARED_LIBRARIES += android.hardware.wifi.hostapd-V1-ndk_platform
+LOCAL_SHARED_LIBRARIES += libbase libutils
+LOCAL_SHARED_LIBRARIES += libbinder_ndk
+LOCAL_STATIC_LIBRARIES += libhostapd_aidl
 endif
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_SRC_FILES := $(OBJS)
@@ -1186,7 +1184,7 @@ include $(BUILD_EXECUTABLE)
 
 ########################
 include $(CLEAR_VARS)
-LOCAL_MODULE := hostapd_nohidl
+LOCAL_MODULE := hostapd_noaidl
 LOCAL_LICENSE_KINDS := SPDX-license-identifier-BSD SPDX-license-identifier-BSD-3-Clause SPDX-license-identifier-ISC legacy_unencumbered
 LOCAL_LICENSE_CONDITIONS := notice unencumbered
 LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../COPYING $(LOCAL_PATH)/../NOTICE
@@ -1206,16 +1204,16 @@ else
 LOCAL_STATIC_LIBRARIES += libnl_2
 endif
 endif
-LOCAL_CFLAGS := $(patsubst -DCONFIG_CTRL_IFACE_HIDL,,$(L_CFLAGS))
+LOCAL_CFLAGS := $(patsubst -DCONFIG_CTRL_IFACE_AIDL,,$(L_CFLAGS))
 LOCAL_SRC_FILES := $(OBJS)
 LOCAL_C_INCLUDES := $(INCLUDES)
 include $(BUILD_EXECUTABLE)
 
-ifeq ($(HOSTAPD_USE_HIDL), y)
-### Hidl service library ###
+ifeq ($(HOSTAPD_USE_AIDL), y)
+### Aidl service library ###
 ########################
 include $(CLEAR_VARS)
-LOCAL_MODULE := libhostapd_hidl
+LOCAL_MODULE := libhostapd_aidl
 LOCAL_LICENSE_KINDS := SPDX-license-identifier-BSD SPDX-license-identifier-BSD-3-Clause SPDX-license-identifier-ISC legacy_unencumbered
 LOCAL_LICENSE_CONDITIONS := notice unencumbered
 LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../COPYING $(LOCAL_PATH)/../NOTICE
@@ -1223,21 +1221,17 @@ LOCAL_VENDOR_MODULE := true
 LOCAL_CPPFLAGS := $(L_CPPFLAGS)
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_C_INCLUDES := $(INCLUDES)
-HIDL_INTERFACE_VERSION = 1.3
 LOCAL_SRC_FILES := \
-    hidl/$(HIDL_INTERFACE_VERSION)/hidl.cpp \
-    hidl/$(HIDL_INTERFACE_VERSION)/hostapd.cpp
+    aidl/aidl.cpp \
+    aidl/hostapd.cpp
 LOCAL_SHARED_LIBRARIES := \
-    android.hardware.wifi.hostapd@1.0 \
-    android.hardware.wifi.hostapd@1.1 \
-    android.hardware.wifi.hostapd@1.2 \
-    android.hardware.wifi.hostapd@1.3 \
+    android.hardware.wifi.hostapd-V1-ndk_platform \
+    libbinder_ndk \
     libbase \
-    libhidlbase \
     libutils \
     liblog
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
-    $(LOCAL_PATH)/hidl/$(HIDL_INTERFACE_VERSION)
+    $(LOCAL_PATH)/aidl
 include $(BUILD_STATIC_LIBRARY)
-endif # HOSTAPD_USE_HIDL == y
+endif # HOSTAPD_USE_AIDL == y
 endif # ifeq ($(WPA_BUILD_HOSTAPD),true)
