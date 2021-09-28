@@ -1129,6 +1129,7 @@ SupplicantStatus P2pIface::flushInternal()
 	wpa_s->force_long_sd = 0;
 	wpas_p2p_stop_find(wpa_s);
 	wpa_s->parent->p2ps_method_config_any = 0;
+	wpa_bss_flush(wpa_s);
 	if (wpa_s->global->p2p)
 		p2p_flush(wpa_s->global->p2p);
 	return {SupplicantStatusCode::SUCCESS, ""};
