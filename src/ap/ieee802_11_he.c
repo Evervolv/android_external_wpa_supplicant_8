@@ -304,6 +304,11 @@ u8 * hostapd_eid_spatial_reuse(struct hostapd_data *hapd, u8 *eid)
 	if (spr->sr_ctrl & SPATIAL_REUSE_SRG_INFORMATION_PRESENT) {
 		*spr_param++ = hapd->iface->conf->spr.srg_obss_pd_min_offset;
 		*spr_param++ = hapd->iface->conf->spr.srg_obss_pd_max_offset;
+		os_memcpy(spr_param,
+			  hapd->iface->conf->spr.srg_bss_color_bitmap, 8);
+		spr_param += 8;
+		os_memcpy(spr_param,
+			  hapd->iface->conf->spr.srg_partial_bssid_bitmap, 8);
 		pos += 18;
 	}
 
@@ -313,46 +318,38 @@ u8 * hostapd_eid_spatial_reuse(struct hostapd_data *hapd, u8 *eid)
 
 u8 * hostapd_eid_he_6ghz_band_cap(struct hostapd_data *hapd, u8 *eid)
 {
+	struct hostapd_config *conf = hapd->iface->conf;
 	struct hostapd_hw_modes *mode = hapd->iface->current_mode;
+	struct he_capabilities *he_cap;
 	struct ieee80211_he_6ghz_band_cap *cap;
-	u32 vht_cap;
-	u8 ht_info;
-	u8 params;
+	u16 capab;
 	u8 *pos;
 
-	if (!mode || !is_6ghz_op_class(hapd->iconf->op_class))
+	if (!mode || !is_6ghz_op_class(hapd->iconf->op_class) ||
+	    !is_6ghz_freq(hapd->iface->freq))
 		return eid;
 
-	vht_cap = hapd->iface->conf->vht_capab;
-	ht_info = mode->a_mpdu_params;
+	he_cap = &mode->he_capab[IEEE80211_MODE_AP];
+	capab = he_cap->he_6ghz_capa & HE_6GHZ_BAND_CAP_MIN_MPDU_START;
+	capab |= (conf->he_6ghz_max_ampdu_len_exp <<
+		  HE_6GHZ_BAND_CAP_MAX_AMPDU_LEN_EXP_SHIFT) &
+		HE_6GHZ_BAND_CAP_MAX_AMPDU_LEN_EXP_MASK;
+	capab |= (conf->he_6ghz_max_mpdu <<
+		  HE_6GHZ_BAND_CAP_MAX_MPDU_LEN_SHIFT) &
+		HE_6GHZ_BAND_CAP_MAX_MPDU_LEN_MASK;
+	capab |= HE_6GHZ_BAND_CAP_SMPS_DISABLED;
+	if (conf->he_6ghz_rx_ant_pat)
+		capab |= HE_6GHZ_BAND_CAP_RX_ANTPAT_CONS;
+	if (conf->he_6ghz_tx_ant_pat)
+		capab |= HE_6GHZ_BAND_CAP_TX_ANTPAT_CONS;
 
 	pos = eid;
 	*pos++ = WLAN_EID_EXTENSION;
 	*pos++ = 1 + sizeof(*cap);
 	*pos++ = WLAN_EID_EXT_HE_6GHZ_BAND_CAP;
 
-	/* Minimum MPDU Start Spacing B0..B2 */
-	params = (ht_info >> 2) & HE_6GHZ_BAND_CAP_MIN_MPDU_START_SPACE_MASK;
-
-	/* Maximum A-MPDU Length Exponent B3..B5 */
-	params |= ((((vht_cap & VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MAX) >>
-		     VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MAX_SHIFT) &
-		    HE_6GHZ_BAND_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK) <<
-		   HE_6GHZ_BAND_CAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT);
-
-	/* Maximum MPDU Length B6..B7 */
-	params |= ((((vht_cap & VHT_CAP_MAX_MPDU_LENGTH_MASK) >>
-		     VHT_CAP_MAX_MPDU_LENGTH_MASK_SHIFT) &
-		    HE_6GHZ_BAND_CAP_MAX_MPDU_LENGTH_MASK) <<
-		   HE_6GHZ_BAND_CAP_MAX_MPDU_LENGTH_SHIFT);
-
 	cap = (struct ieee80211_he_6ghz_band_cap *) pos;
-	cap->a_mpdu_params = params;
-	cap->info = HE_6GHZ_BAND_CAP_SMPS_DISABLED;
-	if (vht_cap & VHT_CAP_RX_ANTENNA_PATTERN)
-		cap->info |= HE_6GHZ_BAND_CAP_RX_ANTENNA_PATTERN;
-	if (vht_cap & VHT_CAP_TX_ANTENNA_PATTERN)
-		cap->info |= HE_6GHZ_BAND_CAP_TX_ANTENNA_PATTERN;
+	cap->capab = host_to_le16(capab);
 	pos += sizeof(*cap);
 
 	return pos;
@@ -438,6 +435,7 @@ u16 copy_sta_he_capab(struct hostapd_data *hapd, struct sta_info *sta,
 		      size_t he_capab_len)
 {
 	if (!he_capab || !hapd->iconf->ieee80211ax ||
+	    hapd->conf->disable_11ax ||
 	    !check_valid_he_mcs(hapd, he_capab, opmode) ||
 	    ieee80211_invalid_he_cap_size(he_capab, he_capab_len) ||
 	    he_capab_len > sizeof(struct ieee80211_he_capabilities)) {
@@ -467,6 +465,7 @@ u16 copy_sta_he_6ghz_capab(struct hostapd_data *hapd, struct sta_info *sta,
 			   const u8 *he_6ghz_capab)
 {
 	if (!he_6ghz_capab || !hapd->iconf->ieee80211ax ||
+	    hapd->conf->disable_11ax ||
 	    !is_6ghz_op_class(hapd->iconf->op_class)) {
 		sta->flags &= ~WLAN_STA_6GHZ;
 		os_free(sta->he_6ghz_capab);

@@ -197,6 +197,7 @@ struct he_capabilities {
 	u8 mac_cap[HE_MAX_MAC_CAPAB_SIZE];
 	u8 mcs[HE_MAX_MCS_CAPAB_SIZE];
 	u8 ppet[HE_MAX_PPET_CAPAB_SIZE];
+	u16 he_6ghz_capa;
 };
 
 #define HOSTAPD_MODE_FLAG_HT_INFO_KNOWN BIT(0)
@@ -1188,6 +1189,14 @@ struct wpa_driver_associate_params {
 	 * fils_erp_rrk_len - Length of fils_erp_rrk in bytes
 	 */
 	size_t fils_erp_rrk_len;
+
+	/**
+	 * sae_pwe - SAE mechanism for PWE derivation
+	 * 0 = hunting-and-pecking loop only
+	 * 1 = hash-to-element only
+	 * 2 = both hunting-and-pecking loop and hash-to-element enabled
+	 */
+	int sae_pwe;
 };
 
 enum hide_ssid {
@@ -1255,14 +1264,14 @@ struct wpa_driver_ap_params {
 	 *
 	 * This parameter can be used to set a specific Beacon frame data rate
 	 * for the BSS. The interpretation of this value depends on the
-	 * rate_type (legacy: in 100 kbps units, HT: HT-MCS, VHT: VHT-MCS). If
-	 * beacon_rate == 0 and rate_type == 0 (BEACON_RATE_LEGACY), the default
-	 * Beacon frame data rate is used.
+	 * rate_type (legacy: in 100 kbps units, HT: HT-MCS, VHT: VHT-MCS,
+	 * HE: HE-MCS). If beacon_rate == 0 and rate_type == 0
+	 * (BEACON_RATE_LEGACY), the default Beacon frame data rate is used.
 	 */
 	unsigned int beacon_rate;
 
 	/**
-	 * beacon_rate_type: Beacon data rate type (legacy/HT/VHT)
+	 * beacon_rate_type: Beacon data rate type (legacy/HT/VHT/HE)
 	 */
 	enum beacon_rate_type rate_type;
 
@@ -1474,19 +1483,36 @@ struct wpa_driver_ap_params {
 	const struct wpabuf *civic;
 
 	/**
-	 * he_spr - Whether Spatial Reuse is enabled
+	 * he_spr_ctrl - Spatial Reuse control field of SPR element
 	 */
-	 int he_spr;
+	u8 he_spr_ctrl;
+
+	/**
+	 * he_spr_non_srg_obss_pd_max_offset - Non-SRG Maximum TX power offset
+	 */
+	u8 he_spr_non_srg_obss_pd_max_offset;
 
 	/**
 	 * he_spr_srg_obss_pd_min_offset - Minimum TX power offset
 	 */
-	 int he_spr_srg_obss_pd_min_offset;
+	u8 he_spr_srg_obss_pd_min_offset;
 
 	/**
 	 * he_spr_srg_obss_pd_max_offset - Maximum TX power offset
 	 */
-	 int he_spr_srg_obss_pd_max_offset;
+	u8 he_spr_srg_obss_pd_max_offset;
+
+	/**
+	 * he_spr_bss_color_bitmap - BSS color values used by members of the
+	 * SRG.
+	 */
+	u8 he_spr_bss_color_bitmap[8];
+
+	/**
+	 * he_spr_partial_bssid_bitmap - Partial BSSID values used by members
+	 * of the SRG.
+	 */
+	u8 he_spr_partial_bssid_bitmap[8];
 
 	/**
 	 * he_bss_color - Whether the BSS Color is disabled
@@ -1507,6 +1533,49 @@ struct wpa_driver_ap_params {
 	 * twt_responder - Whether Target Wait Time responder is enabled
 	 */
 	int twt_responder;
+
+	/**
+	 * sae_pwe - SAE mechanism for PWE derivation
+	 * 0 = hunting-and-pecking loop only
+	 * 1 = hash-to-element only
+	 * 2 = both hunting-and-pecking loop and hash-to-element enabled
+	 */
+	int sae_pwe;
+
+	/**
+	 * FILS Discovery frame minimum interval in TUs
+	 */
+	u32 fd_min_int;
+
+	/**
+	 * FILS Discovery frame maximum interval in TUs (0 = FD frame disabled)
+	 */
+	u32 fd_max_int;
+
+	/**
+	 * FILS Discovery frame template data
+	 */
+	u8 *fd_frame_tmpl;
+
+	/**
+	 * FILS Discovery frame template length
+	 */
+	size_t fd_frame_tmpl_len;
+
+	/**
+	 * Unsolicited broadcast Probe Response interval in TUs
+	 */
+	unsigned int unsol_bcast_probe_resp_interval;
+
+	/**
+	 * Unsolicited broadcast Probe Response template data
+	 */
+	u8 *unsol_bcast_probe_resp_tmpl;
+
+	/**
+	 * Unsolicited broadcast Probe Response template length
+	 */
+	size_t unsol_bcast_probe_resp_tmpl_len;
 };
 
 struct wpa_driver_mesh_bss_params {
@@ -1542,6 +1611,7 @@ struct wpa_driver_mesh_join_params {
 #define WPA_DRIVER_MESH_FLAG_SAE_AUTH	0x00000004
 #define WPA_DRIVER_MESH_FLAG_AMPE	0x00000008
 	unsigned int flags;
+	bool handle_dfs;
 };
 
 struct wpa_driver_set_key_params {
@@ -1930,6 +2000,25 @@ struct wpa_driver_capa {
 
 /** Driver supports a separate control port RX for EAPOL frames */
 #define WPA_DRIVER_FLAGS2_CONTROL_PORT_RX	0x0000000000000001ULL
+/** Driver supports TX status reports for EAPOL frames through control port */
+#define WPA_DRIVER_FLAGS2_CONTROL_PORT_TX_STATUS 0x0000000000000002ULL
+/** Driver supports secure LTF */
+#define WPA_DRIVER_FLAGS2_SEC_LTF		0x0000000000000004ULL
+/** Driver supports secure RTT measurement exchange */
+#define WPA_DRIVER_FLAGS2_SEC_RTT		0x0000000000000008ULL
+/**
+ * Driver supports protection of range negotiation and measurement management
+ * frames
+ */
+#define WPA_DRIVER_FLAGS2_PROT_RANGE_NEG	0x0000000000000010ULL
+/** Driver supports Beacon frame TX rate configuration (HE rates) */
+#define WPA_DRIVER_FLAGS2_BEACON_RATE_HE	0x0000000000000020ULL
+/** Driver supports Beacon protection only in client mode */
+#define WPA_DRIVER_FLAGS2_BEACON_PROTECTION_CLIENT 0x0000000000000040ULL
+/** Driver supports Operating Channel Validation */
+#define WPA_DRIVER_FLAGS2_OCV			0x0000000000000080ULL
+/** Driver expects user space implementation of SME in AP mode */
+#define WPA_DRIVER_FLAGS2_AP_SME		0x0000000000000100ULL
 	u64 flags2;
 
 #define FULL_AP_CLIENT_STATE_SUPP(drv_flags) \
@@ -2427,6 +2516,13 @@ struct external_auth {
 	unsigned int key_mgmt_suite;
 	u16 status;
 	const u8 *pmkid;
+};
+
+/* enum nested_attr - Used to specify if subcommand uses nested attributes */
+enum nested_attr {
+	NESTED_ATTR_NOT_USED = 0,
+	NESTED_ATTR_USED = 1,
+	NESTED_ATTR_UNSPECIFIED = 2,
 };
 
 /**
@@ -3714,6 +3810,8 @@ struct wpa_driver_ops {
 	 * @priv: Private driver interface data
 	 * @vendor_id: Vendor id
 	 * @subcmd: Vendor command id
+	 * @nested_attr_flag: Specifies if vendor subcommand uses nested
+	 *	attributes or not
 	 * @data: Vendor command parameters (%NULL if no parameters)
 	 * @data_len: Data length
 	 * @buf: Return buffer (%NULL to ignore reply)
@@ -3721,9 +3819,10 @@ struct wpa_driver_ops {
 	 *
 	 * This function handles vendor specific commands that are passed to
 	 * the driver/device. The command is identified by vendor id and
-	 * command id. Parameters can be passed as argument to the command
-	 * in the data buffer. Reply (if any) will be filled in the supplied
-	 * return buffer.
+	 * command id. The nested_attr_flag specifies whether the subcommand
+	 * uses nested attributes or not. Parameters can be passed
+	 * as argument to the command in the data buffer. Reply (if any) will be
+	 * filled in the supplied return buffer.
 	 *
 	 * The exact driver behavior is driver interface and vendor specific. As
 	 * an example, this will be converted to a vendor specific cfg80211
@@ -3731,6 +3830,7 @@ struct wpa_driver_ops {
 	 */
 	int (*vendor_cmd)(void *priv, unsigned int vendor_id,
 			  unsigned int subcmd, const u8 *data, size_t data_len,
+			  enum nested_attr nested_attr_flag,
 			  struct wpabuf *buf);
 
 	/**
@@ -4246,12 +4346,12 @@ struct wpa_driver_ops {
 	int (*do_acs)(void *priv, struct drv_acs_params *params);
 
 	/**
-	 * set_band - Notify driver of band selection
+	 * set_band - Notify driver of band(s) selection
 	 * @priv: Private driver interface data
-	 * @band: The selected band(s)
+	 * @band_mask: The selected band(s) bit mask (from enum set_band)
 	 * Returns 0 on success, -1 on failure
 	 */
-	int (*set_band)(void *priv, enum set_band band);
+	int (*set_band)(void *priv, u32 band_mask);
 
 	/**
 	 * get_pref_freq_list - Get preferred frequency list for an interface
@@ -4384,13 +4484,13 @@ struct wpa_driver_ops {
 	int (*ignore_assoc_disallow)(void *priv, int ignore_disallow);
 
 	/**
-	 * set_bssid_blacklist - Set blacklist of BSSIDs to the driver
+	 * set_bssid_tmp_disallow - Set disallowed BSSIDs to the driver
 	 * @priv: Private driver interface data
-	 * @num_bssid: Number of blacklist BSSIDs
-	 * @bssids: List of blacklisted BSSIDs
+	 * @num_bssid: Number of temporarily disallowed BSSIDs
+	 * @bssids: List of temporarily disallowed BSSIDs
 	 */
-	int (*set_bssid_blacklist)(void *priv, unsigned int num_bssid,
-				   const u8 *bssid);
+	int (*set_bssid_tmp_disallow)(void *priv, unsigned int num_bssid,
+				      const u8 *bssid);
 
 	/**
 	 * update_connect_params - Update the connection parameters
@@ -5048,6 +5148,34 @@ struct freq_survey {
 #define SURVEY_HAS_CHAN_TIME_RX BIT(3)
 #define SURVEY_HAS_CHAN_TIME_TX BIT(4)
 
+/**
+ * enum sta_connect_fail_reason_codes - STA connect failure reason code values
+ * @STA_CONNECT_FAIL_REASON_UNSPECIFIED: No reason code specified for
+ *	connection failure.
+ * @STA_CONNECT_FAIL_REASON_NO_BSS_FOUND: No Probe Response frame received
+ *	for unicast Probe Request frame.
+ * @STA_CONNECT_FAIL_REASON_AUTH_TX_FAIL: STA failed to send auth request.
+ * @STA_CONNECT_FAIL_REASON_AUTH_NO_ACK_RECEIVED: AP didn't send ACK for
+ *	auth request.
+ * @STA_CONNECT_FAIL_REASON_AUTH_NO_RESP_RECEIVED: Auth response is not
+ *	received from AP.
+ * @STA_CONNECT_FAIL_REASON_ASSOC_REQ_TX_FAIL: STA failed to send
+ *	Association Request frame.
+ * @STA_CONNECT_FAIL_REASON_ASSOC_NO_ACK_RECEIVED: AP didn't send ACK for
+ *	Association Request frame.
+ * @STA_CONNECT_FAIL_REASON_ASSOC_NO_RESP_RECEIVED: Association Response
+ *	frame is not received from AP.
+ */
+enum sta_connect_fail_reason_codes {
+	STA_CONNECT_FAIL_REASON_UNSPECIFIED = 0,
+	STA_CONNECT_FAIL_REASON_NO_BSS_FOUND = 1,
+	STA_CONNECT_FAIL_REASON_AUTH_TX_FAIL = 2,
+	STA_CONNECT_FAIL_REASON_AUTH_NO_ACK_RECEIVED = 3,
+	STA_CONNECT_FAIL_REASON_AUTH_NO_RESP_RECEIVED = 4,
+	STA_CONNECT_FAIL_REASON_ASSOC_REQ_TX_FAIL = 5,
+	STA_CONNECT_FAIL_REASON_ASSOC_NO_ACK_RECEIVED = 6,
+	STA_CONNECT_FAIL_REASON_ASSOC_NO_RESP_RECEIVED = 7,
+};
 
 /**
  * union wpa_event_data - Additional data for wpa_supplicant_event() calls
@@ -5449,6 +5577,11 @@ union wpa_event_data {
 		 * FILS ERP messages
 		 */
 		u16 fils_erp_next_seq_num;
+
+		/**
+		 * reason_code - Connection failure reason code from the driver
+		 */
+		enum sta_connect_fail_reason_codes reason_code;
 	} assoc_reject;
 
 	struct timeout_event {
