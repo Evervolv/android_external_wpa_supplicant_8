@@ -141,12 +141,60 @@ static int setBandScanFreqsList(
 	return 0;
 }
 
-static int setP2pCliOptimizedScanFreqsList(struct wpa_supplicant *wpa_s,
-    struct wpa_driver_scan_params *params, int freq)
+static int setScanFreq(struct wpa_supplicant *wpa_s, struct wpa_driver_scan_params *params,
+    int freq, int operating_freq)
 {
-	if (freq == 2 || freq == 5) {
+	int frequency = operating_freq ? operating_freq : freq;
+	if (disabled_freq(wpa_s, frequency)) {
+		wpa_printf(MSG_ERROR,
+			    "P2P: freq %d is not supported for a client.", frequency);
+		return -1;
+	}
+	/*
+	 * Allocate memory for frequency array, allocate one extra
+	 * slot for the zero-terminator.
+	 */
+	params->freqs = (int *) os_calloc(2, sizeof(int));
+	if (params->freqs) {
+		params->freqs[0] = frequency;
+	} else {
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+/**
+ * setP2pCliOptimizedScanFreqsList - Fill the frequencies to scan in Scan
+ * parameters.
+ * @wpa_s: Pointer to wpa_supplicant data
+ * @params: Pointer to Scan parameters.
+ * @freq: Frequency/Band requested to scan by the application, possible values are,
+ *        0 - All the frequencies - full scan
+ *        2 - Frequencies in 2.4GHz
+ *        5 - Frequencies in 5GHz
+ *        - Valid frequency
+ * @operating_freq: Frequency of BSS if found in scan cache
+ * Returns: Pointer to the BSS entry or %NULL if not found
+ */
+static int setP2pCliOptimizedScanFreqsList(struct wpa_supplicant *wpa_s,
+    struct wpa_driver_scan_params *params, int freq, int operating_freq)
+{
+	int ret;
+	/* If BSS is found in scan cache, first scan its operating frequency */
+	if (!wpa_s->p2p_join_scan_count && operating_freq) {
+		ret = setScanFreq(wpa_s, params, freq, operating_freq);
+		if (!ret) {
+			return ret;
+		}
+	}
+
+	/* Empty freq params means scan all the frequencies */
+	if (freq == 0) {
+		return 0;
+	}
+	else if (freq == 2 || freq == 5) {
+	      /* Scan the frequencies in the band */
 		enum hostapd_hw_mode mode;
-		int ret;
 		if (wpa_s->hw.modes == NULL) {
 			wpa_printf(MSG_DEBUG,
 				   "P2P: Unknown what %dG channels the driver supports.", freq);
@@ -166,21 +214,9 @@ static int setP2pCliOptimizedScanFreqsList(struct wpa_supplicant *wpa_s,
 		}
 		return ret;
 	} else {
-		if (disabled_freq(wpa_s, freq)) {
-			wpa_printf(MSG_ERROR,
-				   "P2P: freq %d is not supported for a client.", freq);
-			return -1;
-		}
-		/*
-		 * Allocate memory for frequency array, allocate one extra
-		 * slot for the zero-terminator.
-		 */
-		params->freqs = (int *) os_calloc(2, sizeof(int));
-		if (params->freqs) {
-			params->freqs[0] = freq;
-		} else {
-			return -ENOMEM;
-		}
+		/* Scan the frequency requested by the application */
+		ret = setScanFreq(wpa_s, params, freq, 0);
+		return ret;
 	}
 	return 0;
 }
@@ -229,6 +265,30 @@ struct wpa_bss* findBssBySsid(
 			return bss;
 	}
 	return NULL;
+}
+
+/**
+ * findBssBySsidFromAnyInterface - Fetch a BSS table entry based on SSID and optional BSSID
+ * by iterating through all the interfaces.
+ * @head: Head of Pointer to wpa_supplicant data
+ * @bssid: BSSID, 02:00:00:00:00:00 matches any bssid
+ * @ssid: SSID
+ * @ssid_len: Length of @ssid
+ * Returns: Pointer to the BSS entry or %NULL if not found
+ */
+struct wpa_bss* findBssBySsidFromAnyInterface(
+    struct wpa_supplicant *head, const u8 *bssid,
+    const u8 *ssid, size_t ssid_len)
+{
+	struct wpa_supplicant *wpa_s;
+	struct wpa_bss *bss = NULL;
+	for (wpa_s = head; wpa_s; wpa_s = wpa_s->next) {
+		bss = findBssBySsid(wpa_s, bssid, ssid, ssid_len);
+		if (bss != NULL) {
+			return bss;
+		}
+	}
+	return bss;
 }
 
 struct wpa_ssid* addGroupClientNetwork(
@@ -306,7 +366,7 @@ void scanResJoinWrapper(
 int joinScanReq(
     struct wpa_supplicant* wpa_s,
     const std::vector<uint8_t>& ssid,
-    int freq)
+    int freq, int operating_freq)
 {
 	int ret;
 	struct wpa_driver_scan_params params;
@@ -328,17 +388,16 @@ int joinScanReq(
 		params.ssids[0].ssid = (u8 *) P2P_WILDCARD_SSID;
 		params.ssids[0].ssid_len = P2P_WILDCARD_SSID_LEN;
 	}
-	wpa_printf(MSG_DEBUG, "Scan SSID %s for join with frequency %d (reinvoke)",
-	    wpa_ssid_txt(params.ssids[0].ssid, params.ssids[0].ssid_len), freq);
+	wpa_printf(MSG_DEBUG, "Scan SSID %s for join with frequency %d"
+	    "BSS operating_freq from scan cache %d",
+	    wpa_ssid_txt(params.ssids[0].ssid, params.ssids[0].ssid_len), freq, operating_freq);
 
 	/* Construct an optimized p2p scan channel list */
-	if (freq > 0) {
-		ret = setP2pCliOptimizedScanFreqsList(wpa_s, &params, freq);
-		if (ret < 0) {
-			wpa_printf(MSG_ERROR,
-				   "Failed to set frequency in p2p scan params, error = %d", ret);
-			return -1;
-		}
+	ret = setP2pCliOptimizedScanFreqsList(wpa_s, &params, freq, operating_freq);
+	if (ret < 0) {
+		wpa_printf(MSG_ERROR,
+                   "Failed to set frequency in p2p scan params, error = %d", ret);
+		return -1;
 	}
 
 	ielen = p2p_scan_ie_buf_len(wpa_s->global->p2p);
@@ -1774,40 +1833,32 @@ SupplicantStatus P2pIface::addGroup_1_2Internal(
 	wpa_printf(MSG_DEBUG, "P2P: Stop any on-going P2P FIND before group join.");
 	wpas_p2p_stop_find(wpa_s);
 
-	struct wpa_bss *bss = findBssBySsid(
-	    wpa_s, peer_address.data(),
-	    ssid.data(), ssid.size());
-	if (bss != NULL) {
-		wpa_printf(MSG_DEBUG, "P2P: Join group with Group Owner " MACSTR,
-		    MAC2STR(bss->bssid));
-		if (0 != joinGroup(wpa_s, bss->bssid, ssid, passphrase)) {
-			// no need to notify group join failure here,
-			// it will be handled by wpas_p2p_group_add_persistent
-			// called in joinGroup.
-			return {SupplicantStatusCode::FAILURE_UNKNOWN, "Failed to join a group."};
-		}
-		return {SupplicantStatusCode::SUCCESS, ""};
-	}
-
-	wpa_printf(MSG_INFO, "No matched BSS exists, try to find it by scan");
-
 	if (pending_scan_res_join_callback != NULL) {
 		wpa_printf(MSG_WARNING, "P2P: Renew scan result callback with new request.");
 	}
 
 	pending_join_scan_callback =
-	    [wpa_s, ssid, freq]() {
+	    [wpa_s, ssid, peer_address, freq]() {
 		if (wpa_s->global->p2p == NULL || wpa_s->global->p2p_disabled) {
 			return;
 		}
-		int ret = joinScanReq(wpa_s, ssid, freq);
+		int operating_freq = 0;
+		struct wpa_bss *bss = findBssBySsidFromAnyInterface(
+			wpa_s->global->ifaces, peer_address.data(), ssid.data(), ssid.size());
+		if (bss != NULL) {
+			wpa_printf(MSG_DEBUG, "P2P: Found Group owner " MACSTR "in scan cache",
+			    MAC2STR(bss->bssid));
+			operating_freq = bss->freq;
+		}
+
+		int ret = joinScanReq(wpa_s, ssid, freq, operating_freq);
 		// for BUSY case, the scan might be occupied by WiFi.
 		// Do not give up immediately, but try again later.
 		if (-EBUSY == ret) {
-			// re-schedule this join scan and don't consume retry count.
-			if (pending_scan_res_join_callback) {
-				pending_scan_res_join_callback();
-			}
+			// re-schedule this join scan
+			eloop_cancel_timeout(joinScanWrapper, wpa_s, NULL);
+			eloop_register_timeout(0, P2P_JOIN_SINGLE_CHANNEL_SCAN_INTERVAL_USECS,
+				    joinScanWrapper, wpa_s, NULL);
 		} else if (0 != ret) {
 			notifyGroupJoinFailure(wpa_s);
 			pending_scan_res_join_callback = NULL;
