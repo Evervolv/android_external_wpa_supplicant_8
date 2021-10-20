@@ -1915,6 +1915,52 @@ void AidlManager::notifyBssFreqChanged(struct wpa_supplicant *wpa_group_s)
 	callWithEachP2pIfaceCallback(misc_utils::charBufToString(wpa_s->ifname), func);
 }
 
+void AidlManager::notifyCertification(struct wpa_supplicant *wpa_s,
+		int depth, const char *subject,
+		const char *altsubject[],
+		int num_altsubject,
+		const char *cert_hash,
+		const struct wpabuf *cert)
+{
+	if (!wpa_s->current_ssid) {
+		wpa_printf(MSG_ERROR, "Current network NULL. Drop Certification event!");
+		return;
+	}
+	struct wpa_ssid *current_ssid = wpa_s->current_ssid;
+	if (NULL == subject || NULL == cert_hash || NULL == cert) {
+		wpa_printf(MSG_ERROR,
+				"Incomplete certificate information. Drop Certification event!");
+		return;
+	}
+	if (!wpa_key_mgmt_wpa_ieee8021x(current_ssid->key_mgmt)) {
+		wpa_printf(MSG_ERROR, "Not 802.1x configuration, Drop Certification event!");
+		return;
+	}
+	if (current_ssid->eap.cert.ca_path || current_ssid->eap.cert.ca_cert) {
+		wpa_printf(MSG_DEBUG, "Already has CA certificate. Drop Certification event!");
+		return;
+	}
+
+	wpa_printf(MSG_DEBUG, "notifyCertification: depth=%d subject=%s hash=%s cert-size=%zu",
+			depth, subject, cert_hash, cert->used);
+	std::vector<uint8_t> subjectBlob(subject, subject + strlen(subject));
+	std::vector<uint8_t> certHashBlob(cert_hash, cert_hash + strlen(cert_hash));
+	std::vector<uint8_t> certBlob(cert->buf, cert->buf + cert->used);
+
+	const std::function<
+		ndk::ScopedAStatus(std::shared_ptr<ISupplicantStaNetworkCallback>)>
+		func = std::bind(
+		&ISupplicantStaNetworkCallback::onServerCertificateAvailable,
+		std::placeholders::_1,
+		depth,
+		subjectBlob,
+		certHashBlob,
+		certBlob);
+
+	callWithEachStaNetworkCallback(
+		misc_utils::charBufToString(wpa_s->ifname), current_ssid->id, func);
+}
+
 /**
  * Retrieve the |ISupplicantP2pIface| aidl object reference using the provided
  * ifname.

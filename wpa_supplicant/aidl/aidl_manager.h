@@ -144,6 +144,12 @@ public:
 			u8 bitmap);
 	void notifyNetworkNotFound(struct wpa_supplicant *wpa_s);
 	void notifyBssFreqChanged(struct wpa_supplicant *wpa_s);
+	void notifyCertification(struct wpa_supplicant *wpa_s,
+			int depth, const char *subject,
+			const char *altsubject[],
+			int num_altsubject,
+			const char *cert_hash,
+			const struct wpabuf *cert);
 
 	// Methods called from aidl objects.
 	void notifyExtRadioWorkStart(struct wpa_supplicant *wpa_s, uint32_t id);
