@@ -6101,7 +6101,25 @@ static int wpas_p2p_select_go_freq(struct wpa_supplicant *wpa_s, int freq)
 		} else {
 			if (os_get_random((u8 *) &r, sizeof(r)) < 0)
 				return -1;
-			freq = 2412 + (r % 3) * 25;
+			int possible_2g_freqs[] = {
+				/* operating class 81 */
+				2412, 2437, 2462,
+			};
+			int possible_2g_freqs_num =
+			    sizeof(possible_2g_freqs)/sizeof(possible_2g_freqs[0]);
+			int i;
+			for (i = 0; i < possible_2g_freqs_num; i++, r++) {
+				freq = possible_2g_freqs[r % possible_2g_freqs_num];
+				if (p2p_supported_freq_go(wpa_s->global->p2p, freq)) {
+					break;
+				}
+			}
+
+			if (i >= possible_2g_freqs_num) {
+				wpa_printf(MSG_DEBUG, "P2P: Could not select "
+					   "2.4 GHz channel for P2P group");
+				return -1;
+			}
 			wpa_printf(MSG_DEBUG, "P2P: Use random 2.4 GHz band "
 				   "channel: %d MHz", freq);
 		}
