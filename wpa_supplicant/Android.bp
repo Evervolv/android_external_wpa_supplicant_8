@@ -135,7 +135,7 @@ wpa_supplicant_cflags_cc_defaults {
         "-DCONFIG_FILS",
         "-DCONFIG_GAS",
         "-DCONFIG_GAS_SERVER",
-        "-DCONFIG_HIDL",
+        "-DCONFIG_AIDL",
         "-DCONFIG_HMAC_SHA256_KDF",
         "-DCONFIG_HMAC_SHA384_KDF",
         "-DCONFIG_HMAC_SHA512_KDF",
