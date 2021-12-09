@@ -143,6 +143,7 @@ public:
 			struct wpa_ssid *ssid,
 			u8 bitmap);
 	void notifyNetworkNotFound(struct wpa_supplicant *wpa_s);
+	void notifyBssFreqChanged(struct wpa_supplicant *wpa_s);
 
 	// Methods called from aidl objects.
 	void notifyExtRadioWorkStart(struct wpa_supplicant *wpa_s, uint32_t id);

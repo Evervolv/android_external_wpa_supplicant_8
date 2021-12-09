@@ -1892,6 +1892,29 @@ void AidlManager::notifyNetworkNotFound(struct wpa_supplicant *wpa_s)
 	callWithEachStaIfaceCallback(misc_utils::charBufToString(wpa_s->ifname), func);
 }
 
+void AidlManager::notifyBssFreqChanged(struct wpa_supplicant *wpa_group_s)
+{
+	if (!wpa_group_s || !wpa_group_s->parent)
+		return;
+
+	// For group notifications, need to use the parent iface for callbacks.
+	struct wpa_supplicant *wpa_s = getTargetP2pIfaceForGroup(wpa_group_s);
+	if (!wpa_s) {
+		wpa_printf(MSG_INFO, "Drop BSS frequency changed event");
+		return;
+	}
+
+	uint32_t aidl_freq = wpa_group_s->current_bss
+				? wpa_group_s->current_bss->freq
+				: wpa_group_s->assoc_freq;
+
+	const std::function<
+		ndk::ScopedAStatus(std::shared_ptr<ISupplicantP2pIfaceCallback>)>
+		func = std::bind(&ISupplicantP2pIfaceCallback::onGroupFrequencyChanged,
+		std::placeholders::_1, misc_utils::charBufToString(wpa_group_s->ifname), aidl_freq);
+	callWithEachP2pIfaceCallback(misc_utils::charBufToString(wpa_s->ifname), func);
+}
+
 /**
  * Retrieve the |ISupplicantP2pIface| aidl object reference using the provided
  * ifname.
