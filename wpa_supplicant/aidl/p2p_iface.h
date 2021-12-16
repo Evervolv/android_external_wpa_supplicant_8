@@ -164,6 +164,8 @@ public:
 	::ndk::ScopedAStatus getEdmg(bool* _aidl_return) override;
 	::ndk::ScopedAStatus setWfdR2DeviceInfo(
 		const std::vector<uint8_t>& in_info) override;
+	::ndk::ScopedAStatus removeClient(
+		const std::vector<uint8_t>& peer_address, bool isLegacyClient) override;
 
 private:
 	// Corresponding worker functions for the AIDL methods.
@@ -276,6 +278,8 @@ private:
 	std::pair<bool, ndk::ScopedAStatus> getEdmgInternal();
 	ndk::ScopedAStatus setWfdR2DeviceInfoInternal(
 		const std::vector<uint8_t>& info);
+	ndk::ScopedAStatus removeClientInternal(
+		const std::vector<uint8_t>& peer_address, bool isLegacyClient);
 
 	struct wpa_supplicant* retrieveIfacePtr();
 	struct wpa_supplicant* retrieveGroupIfacePtr(

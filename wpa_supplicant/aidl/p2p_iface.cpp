@@ -1018,6 +1018,14 @@ ndk::ScopedAStatus P2pIface::addGroup(
 		&P2pIface::setWfdR2DeviceInfoInternal, in_info);
 }
 
+::ndk::ScopedAStatus P2pIface::removeClient(
+        const std::vector<uint8_t>& peer_address, bool isLegacyClient)
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+		&P2pIface::removeClientInternal, peer_address, isLegacyClient);
+}
+
 std::pair<std::string, ndk::ScopedAStatus> P2pIface::getNameInternal()
 {
 	return {ifname_, ndk::ScopedAStatus::ok()};
@@ -1998,6 +2006,14 @@ ndk::ScopedAStatus P2pIface::setWfdR2DeviceInfoInternal(
 		wpa_s->global, wfd_r2_device_info_set_cmd.data())) {
 		return createStatus(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
+	return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus P2pIface::removeClientInternal(
+    const std::vector<uint8_t>& peer_address, bool isLegacyClient)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	wpas_p2p_remove_client(wpa_s, peer_address.data(), isLegacyClient? 1 : 0);
 	return ndk::ScopedAStatus::ok();
 }
 
