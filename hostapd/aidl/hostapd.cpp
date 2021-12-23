@@ -848,7 +848,8 @@ Hostapd::Hostapd(struct hapd_interfaces* interfaces)
 				// clients.
 				for (const auto& callback : callbacks_) {
 					callback->onFailure(strlen(iface_hapd->conf->bridge) > 0 ?
-						iface_hapd->conf->bridge : iface_hapd->conf->iface);
+						iface_hapd->conf->bridge : iface_hapd->conf->iface,
+							    iface_hapd->conf->iface);
 				}
 			}
 		};
@@ -897,7 +898,8 @@ Hostapd::Hostapd(struct hapd_interfaces* interfaces)
 			// Invoke the failure callback on all registered clients.
 			for (const auto& callback : callbacks_) {
 				callback->onFailure(strlen(iface_hapd->conf->bridge) > 0 ?
-									iface_hapd->conf->bridge : iface_hapd->conf->iface);
+					iface_hapd->conf->bridge : iface_hapd->conf->iface,
+						    iface_hapd->conf->iface);
 			}
 		}
 	};
