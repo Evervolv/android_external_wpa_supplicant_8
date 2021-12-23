@@ -513,6 +513,18 @@ std::string CreateHostapdConfig(
 		bridge_as_string = StringPrintf("bridge=%s", br_name.c_str());
 	}
 
+	// vendor_elements string
+	std::string vendor_elements_as_string;
+	if (nw_params.vendorElements.size() > 0) {
+		std::stringstream ss;
+		ss << std::hex;
+		ss << std::setfill('0');
+		for (uint8_t b : nw_params.vendorElements) {
+			ss << std::setw(2) << static_cast<unsigned int>(b);
+		}
+		vendor_elements_as_string = StringPrintf("vendor_elements=%s", ss.str().c_str());
+	}
+
 	return StringPrintf(
 		"interface=%s\n"
 		"driver=nl80211\n"
@@ -535,6 +547,7 @@ std::string CreateHostapdConfig(
 		"%s\n"
 		"%s\n"
 		"%s\n"
+		"%s\n"
 		"%s\n",
 		iface_params.name.c_str(), ssid_as_string.c_str(),
 		channel_config_as_string.c_str(),
@@ -549,7 +562,8 @@ std::string CreateHostapdConfig(
 		encryption_config_as_string.c_str(),
 		bridge_as_string.c_str(),
 		enable_edmg_as_string.c_str(),
-		edmg_channel_as_string.c_str());
+		edmg_channel_as_string.c_str(),
+		vendor_elements_as_string.c_str());
 }
 
 Generation getGeneration(hostapd_hw_modes *current_mode)
