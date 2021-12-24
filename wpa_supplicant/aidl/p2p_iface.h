@@ -166,6 +166,9 @@ public:
 		const std::vector<uint8_t>& in_info) override;
 	::ndk::ScopedAStatus removeClient(
 		const std::vector<uint8_t>& peer_address, bool isLegacyClient) override;
+	::ndk::ScopedAStatus findOnSocialChannels(int32_t in_timeoutInSec) override;
+	::ndk::ScopedAStatus findOnSpecificFrequency(
+		int32_t in_freq, int32_t in_timeoutInSec) override;
 
 private:
 	// Corresponding worker functions for the AIDL methods.
@@ -280,6 +283,9 @@ private:
 		const std::vector<uint8_t>& info);
 	ndk::ScopedAStatus removeClientInternal(
 		const std::vector<uint8_t>& peer_address, bool isLegacyClient);
+	ndk::ScopedAStatus findOnSocialChannelsInternal(uint32_t timeout_in_sec);
+	ndk::ScopedAStatus findOnSpecificFrequencyInternal(
+		uint32_t freq, uint32_t timeout_in_sec);
 
 	struct wpa_supplicant* retrieveIfacePtr();
 	struct wpa_supplicant* retrieveGroupIfacePtr(
