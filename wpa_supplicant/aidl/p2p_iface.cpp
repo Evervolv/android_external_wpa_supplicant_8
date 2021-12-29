@@ -1900,7 +1900,7 @@ ndk::ScopedAStatus P2pIface::addGroupWithConfigInternal(
 
 		wpa_printf(MSG_ERROR, "P2P: Failed to find the group with "
 			"network name %s - stop join attempt",
-			ssid.data());
+			wpa_ssid_txt(ssid.data(), ssid.size()));
 		notifyGroupJoinFailure(wpa_s);
 		pending_scan_res_join_callback = NULL;
 	};
