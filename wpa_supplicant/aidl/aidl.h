@@ -126,6 +126,7 @@ extern "C"
 	void wpas_aidl_notify_transition_disable(
 		struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid, u8 bitmap);
 	void wpas_aidl_notify_network_not_found(struct wpa_supplicant *wpa_s);
+	void wpas_aidl_notify_bss_freq_changed(struct wpa_supplicant *wpa_s);
 #else   // CONFIG_CTRL_IFACE_AIDL
 static inline int wpas_aidl_register_interface(struct wpa_supplicant *wpa_s)
 {
@@ -276,6 +277,8 @@ static void wpas_aidl_notify_transition_disable(struct wpa_supplicant *wpa_s,
 						u8 bitmap)
 {}
 static void wpas_aidl_notify_network_not_found(struct wpa_supplicant *wpa_s)
+{}
+void wpas_aidl_notify_bss_freq_changed(struct wpa_supplicant *wpa_s)
 {}
 #endif  // CONFIG_CTRL_IFACE_AIDL
 
