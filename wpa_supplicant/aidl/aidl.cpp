@@ -921,3 +921,43 @@ void wpas_aidl_notify_network_not_found(struct wpa_supplicant *wpa_s)
 
 	aidl_manager->notifyNetworkNotFound(wpa_s);
 }
+
+void wpas_aidl_notify_bss_freq_changed(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s)
+		return;
+
+	AidlManager *aidl_manager = AidlManager::getInstance();
+	if (!aidl_manager)
+		return;
+
+	wpa_printf(MSG_DEBUG, "Notify %s frequency changed to %d",
+	    wpa_s->ifname, wpa_s->assoc_freq);
+
+	aidl_manager->notifyBssFreqChanged(wpa_s);
+}
+
+void wpas_aidl_notify_ceritification(struct wpa_supplicant *wpa_s,
+		int depth, const char *subject,
+		const char *altsubject[],
+		int num_altsubject,
+		const char *cert_hash,
+		const struct wpabuf *cert)
+{
+	if (!wpa_s)
+		return;
+
+	AidlManager *aidl_manager = AidlManager::getInstance();
+	if (!aidl_manager)
+		return;
+
+	wpa_printf(MSG_DEBUG, "Notify certification");
+
+	aidl_manager->notifyCertification(wpa_s,
+			depth,
+			subject,
+			altsubject,
+			num_altsubject,
+			cert_hash,
+			cert);
+}

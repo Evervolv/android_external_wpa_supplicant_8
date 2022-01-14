@@ -1688,6 +1688,8 @@ StaIface::getWpaDriverCapabilitiesInternal()
 #endif
 	mask |= static_cast<uint32_t>(WpaDriverCapabilitiesMask::WFD_R2);
 
+	mask |= static_cast<uint32_t>(WpaDriverCapabilitiesMask::TRUST_ON_FIRST_USE);
+
 	wpa_printf(MSG_DEBUG, "Driver capability mask: 0x%x", mask);
 
 	return {static_cast<WpaDriverCapabilitiesMask>(mask),

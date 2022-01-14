@@ -467,6 +467,8 @@ void wpas_notify_bss_freq_changed(struct wpa_supplicant *wpa_s,
 		return;
 
 	wpas_dbus_bss_signal_prop_changed(wpa_s, WPAS_DBUS_BSS_PROP_FREQ, id);
+
+	wpas_aidl_notify_bss_freq_changed(wpa_s);
 }
 
 
@@ -903,6 +905,10 @@ void wpas_notify_certification(struct wpa_supplicant *wpa_s,
 	for (i = 0; i < cert->num_altsubject; i++)
 		wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_EAP_PEER_ALT
 			"depth=%d %s", cert->depth, cert->altsubject[i]);
+
+	wpas_aidl_notify_ceritification(wpa_s, cert->depth, cert->subject,
+				       cert->altsubject, cert->num_altsubject,
+				       cert_hash, cert->cert);
 
 	/* notify the new DBus API */
 	wpas_dbus_signal_certification(wpa_s, cert->depth, cert->subject,
