@@ -2071,6 +2071,15 @@ ndk::ScopedAStatus StaNetwork::setPmkCacheInternal(const std::vector<uint8_t>& s
 	ss.write((char *) serializedEntry.data(), std::streamsize(serializedEntry.size()));
 	misc_utils::deserializePmkCacheEntry(ss, new_entry);
 	new_entry->network_ctx = wpa_ssid;
+
+	// If there is an entry has a later expiration, ignore this one.
+	struct rsn_pmksa_cache_entry *existing_entry = wpa_sm_pmksa_cache_get(
+		wpa_s->wpa, new_entry->aa, NULL, NULL, new_entry->akmp);
+	if (NULL != existing_entry &&
+		existing_entry->expiration >= new_entry->expiration) {
+		return ndk::ScopedAStatus::ok();
+	}
+
 	wpa_sm_pmksa_cache_add_entry(wpa_s->wpa, new_entry);
 
 	return ndk::ScopedAStatus::ok();
