@@ -8107,7 +8107,7 @@ void wpas_vendor_elem_update(struct wpa_supplicant *wpa_s)
 	}
 
 #ifdef CONFIG_P2P
-	if (wpa_s->parent == wpa_s &&
+	if ((wpa_s->parent == wpa_s || (wpa_s == wpa_s->p2pdev && wpa_s->p2p_mgmt)) &&
 	    wpa_s->global->p2p &&
 	    !wpa_s->global->p2p_disabled)
 		p2p_set_vendor_elems(wpa_s->global->p2p, wpa_s->vendor_elem);
