@@ -355,6 +355,9 @@ std::string CreateHostapdConfig(
 		encryption_config_as_string = StringPrintf(
 			"wpa=2\n"
 			"rsn_pairwise=%s\n"
+#ifdef ENABLE_HOSTAPD_CONFIG_80211W_MFP_OPTIONAL
+			"ieee80211w=1\n"
+#endif
 			"wpa_passphrase=%s",
 			is_60Ghz_band_only ? "GCMP" : "CCMP",
 			nw_params.passphrase.c_str());
