@@ -770,6 +770,31 @@ bool StaIface::isValid()
 		&StaIface::setMboCellularDataStatusInternal, in_available);
 }
 
+::ndk::ScopedAStatus StaIface::setQosPolicyFeatureEnabled(
+	bool in_enable)
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_UNKNOWN,
+		&StaIface::setQosPolicyFeatureEnabledInternal, in_enable);
+}
+
+::ndk::ScopedAStatus StaIface::sendQosPolicyResponse(
+	bool in_morePolicies,
+	const std::vector<QosPolicyStatus>& in_qosPolicyStatusList)
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_UNKNOWN,
+		&StaIface::sendQosPolicyResponseInternal, in_morePolicies,
+		in_qosPolicyStatusList);
+}
+
+::ndk::ScopedAStatus StaIface::removeAllQosPolicies()
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_UNKNOWN,
+		&StaIface::removeAllQosPoliciesInternal);
+}
+
 std::pair<std::string, ndk::ScopedAStatus> StaIface::getNameInternal()
 {
 	return {ifname_, ndk::ScopedAStatus::ok()};
@@ -1740,6 +1765,22 @@ StaIface::getKeyMgmtCapabilitiesInternal()
 
 	return {convertWpaKeyMgmtCapabilitiesToAidl(wpa_s, &capa),
 		ndk::ScopedAStatus::ok()};
+}
+
+ndk::ScopedAStatus StaIface::setQosPolicyFeatureEnabledInternal(bool enable)
+{
+	return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus StaIface::sendQosPolicyResponseInternal(
+	bool more_policies, const std::vector<QosPolicyStatus>& qos_policy_status_list)
+{
+	return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus StaIface::removeAllQosPoliciesInternal()
+{
+	return ndk::ScopedAStatus::ok();
 }
 
 /**
