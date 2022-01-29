@@ -1018,6 +1018,32 @@ ndk::ScopedAStatus P2pIface::addGroup(
 		&P2pIface::setWfdR2DeviceInfoInternal, in_info);
 }
 
+::ndk::ScopedAStatus P2pIface::removeClient(
+        const std::vector<uint8_t>& peer_address, bool isLegacyClient)
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+		&P2pIface::removeClientInternal, peer_address, isLegacyClient);
+}
+
+::ndk::ScopedAStatus P2pIface::findOnSocialChannels(
+	int32_t in_timeoutInSec)
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+		&P2pIface::findOnSocialChannelsInternal, in_timeoutInSec);
+}
+
+::ndk::ScopedAStatus P2pIface::findOnSpecificFrequency(
+	int32_t in_freq,
+	int32_t in_timeoutInSec)
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+		&P2pIface::findOnSpecificFrequencyInternal,
+		in_freq, in_timeoutInSec);
+}
+
 std::pair<std::string, ndk::ScopedAStatus> P2pIface::getNameInternal()
 {
 	return {ifname_, ndk::ScopedAStatus::ok()};
@@ -1996,6 +2022,45 @@ ndk::ScopedAStatus P2pIface::setWfdR2DeviceInfoInternal(
 		 wfd_r2_device_info_set_cmd_str.size() + 1);
 	if (wifi_display_subelem_set(
 		wpa_s->global, wfd_r2_device_info_set_cmd.data())) {
+		return createStatus(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus P2pIface::removeClientInternal(
+    const std::vector<uint8_t>& peer_address, bool isLegacyClient)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	wpas_p2p_remove_client(wpa_s, peer_address.data(), isLegacyClient? 1 : 0);
+	return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus P2pIface::findOnSocialChannelsInternal(uint32_t timeout_in_sec)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED) {
+		return createStatus(SupplicantStatusCode::FAILURE_IFACE_DISABLED);
+	}
+	uint32_t search_delay = wpas_p2p_search_delay(wpa_s);
+	if (wpas_p2p_find(
+		wpa_s, timeout_in_sec, P2P_FIND_ONLY_SOCIAL, 0, nullptr,
+		nullptr, search_delay, 0, nullptr, 0)) {
+		return createStatus(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus P2pIface::findOnSpecificFrequencyInternal(
+	uint32_t freq, uint32_t timeout_in_sec)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED) {
+		return createStatus(SupplicantStatusCode::FAILURE_IFACE_DISABLED);
+	}
+	uint32_t search_delay = wpas_p2p_search_delay(wpa_s);
+	if (wpas_p2p_find(
+		wpa_s, timeout_in_sec, P2P_FIND_START_WITH_FULL, 0, nullptr,
+		nullptr, search_delay, 0, nullptr, freq)) {
 		return createStatus(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 	return ndk::ScopedAStatus::ok();
