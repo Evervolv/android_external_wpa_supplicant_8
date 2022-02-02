@@ -20,6 +20,7 @@
 #include <aidl/android/hardware/wifi/supplicant/Hs20AnqpSubtypes.h>
 #include <aidl/android/hardware/wifi/supplicant/ISupplicantStaIfaceCallback.h>
 #include <aidl/android/hardware/wifi/supplicant/ISupplicantStaNetwork.h>
+#include <aidl/android/hardware/wifi/supplicant/QosPolicyStatus.h>
 #include <aidl/android/hardware/wifi/supplicant/RxFilterType.h>
 
 extern "C"
@@ -145,6 +146,10 @@ public:
 		DppResponderBootstrapInfo* _aidl_return) override;
 	::ndk::ScopedAStatus startDppEnrolleeResponder(int32_t in_listenChannel) override;
 	::ndk::ScopedAStatus stopDppResponder(int32_t in_ownBootstrapId) override;
+	::ndk::ScopedAStatus setQosPolicyFeatureEnabled(bool in_enable) override;
+	::ndk::ScopedAStatus sendQosPolicyResponse(
+		bool in_morePolicies, const std::vector<QosPolicyStatus>& in_qosPolicyStatusList) override;
+	::ndk::ScopedAStatus removeAllQosPolicies() override;
 
 private:
 	// Corresponding worker functions for the AIDL methods.
@@ -241,6 +246,10 @@ private:
 			DppCurve curve);
 	ndk::ScopedAStatus startDppEnrolleeResponderInternal(uint32_t listen_channel);
 	ndk::ScopedAStatus stopDppResponderInternal(uint32_t own_bootstrap_id);
+	ndk::ScopedAStatus setQosPolicyFeatureEnabledInternal(bool enable);
+	ndk::ScopedAStatus sendQosPolicyResponseInternal(
+		bool more_policies, const std::vector<QosPolicyStatus>& qos_policy_status_list);
+	ndk::ScopedAStatus removeAllQosPoliciesInternal();
 
 	struct wpa_supplicant* retrieveIfacePtr();
 
