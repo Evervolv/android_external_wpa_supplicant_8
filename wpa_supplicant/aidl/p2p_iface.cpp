@@ -46,6 +46,7 @@ std::function<void()> pending_scan_res_join_callback = NULL;
 using aidl::android::hardware::wifi::supplicant::ISupplicantP2pIface;
 using aidl::android::hardware::wifi::supplicant::ISupplicantStaNetwork;
 using aidl::android::hardware::wifi::supplicant::MiracastMode;
+using aidl::android::hardware::wifi::supplicant::P2pFrameTypeMask;
 
 uint8_t convertAidlMiracastModeToInternal(
 	MiracastMode mode)
@@ -505,6 +506,53 @@ void scanResJoinIgnore(struct wpa_supplicant *wpa_s, struct wpa_scan_results *sc
 
 }
 
+static void updateP2pVendorElem(struct wpa_supplicant* wpa_s, enum wpa_vendor_elem_frame frameType,
+	const std::vector<uint8_t>& vendorElemBytes) {
+
+	wpa_printf(MSG_INFO, "Set vendor elements to frames %d", frameType);
+	struct wpa_supplicant* vendor_elem_wpa_s = wpas_vendor_elem(wpa_s, frameType);
+	if (vendor_elem_wpa_s->vendor_elem[frameType]) {
+		wpabuf_free(vendor_elem_wpa_s->vendor_elem[frameType]);
+		vendor_elem_wpa_s->vendor_elem[frameType] = NULL;
+	}
+	if (vendorElemBytes.size() > 0) {
+		vendor_elem_wpa_s->vendor_elem[frameType] =
+			wpabuf_alloc_copy(vendorElemBytes.data(), vendorElemBytes.size());
+	}
+	wpas_vendor_elem_update(vendor_elem_wpa_s);
+}
+
+uint32_t convertWpaP2pFrameTypeToHalP2pFrameTypeBit(int frameType) {
+	switch (frameType) {
+	case VENDOR_ELEM_PROBE_REQ_P2P:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_PROBE_REQ_P2P);
+	case VENDOR_ELEM_PROBE_RESP_P2P:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_PROBE_RESP_P2P);
+	case VENDOR_ELEM_PROBE_RESP_P2P_GO:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_PROBE_RESP_P2P_GO);
+	case VENDOR_ELEM_BEACON_P2P_GO:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_BEACON_P2P_GO);
+	case VENDOR_ELEM_P2P_PD_REQ:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_P2P_PD_REQ);
+	case VENDOR_ELEM_P2P_PD_RESP:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_P2P_PD_RESP);
+	case VENDOR_ELEM_P2P_GO_NEG_REQ:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_P2P_GO_NEG_REQ);
+	case VENDOR_ELEM_P2P_GO_NEG_RESP:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_P2P_GO_NEG_RESP);
+	case VENDOR_ELEM_P2P_GO_NEG_CONF:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_P2P_GO_NEG_CONF);
+	case VENDOR_ELEM_P2P_INV_REQ:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_P2P_INV_REQ);
+	case VENDOR_ELEM_P2P_INV_RESP:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_P2P_INV_RESP);
+	case VENDOR_ELEM_P2P_ASSOC_REQ:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_P2P_ASSOC_REQ);
+	case VENDOR_ELEM_P2P_ASSOC_RESP:
+		return static_cast<uint32_t>(P2pFrameTypeMask::P2P_FRAME_P2P_ASSOC_RESP);
+	}
+	return 0;
+}
 }  // namespace
 
 namespace aidl {
@@ -1042,6 +1090,15 @@ ndk::ScopedAStatus P2pIface::addGroup(
 		this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
 		&P2pIface::findOnSpecificFrequencyInternal,
 		in_freq, in_timeoutInSec);
+}
+
+::ndk::ScopedAStatus P2pIface::setVendorElements(
+	P2pFrameTypeMask in_frameTypeMask,
+	const std::vector<uint8_t>& in_vendorElemBytes)
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_IFACE_INVALID,
+		&P2pIface::setVendorElementsInternal, in_frameTypeMask, in_vendorElemBytes);
 }
 
 std::pair<std::string, ndk::ScopedAStatus> P2pIface::getNameInternal()
@@ -2062,6 +2119,22 @@ ndk::ScopedAStatus P2pIface::findOnSpecificFrequencyInternal(
 		wpa_s, timeout_in_sec, P2P_FIND_START_WITH_FULL, 0, nullptr,
 		nullptr, search_delay, 0, nullptr, freq)) {
 		return createStatus(SupplicantStatusCode::FAILURE_UNKNOWN);
+	}
+	return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus P2pIface::setVendorElementsInternal(
+	P2pFrameTypeMask frameTypeMask,
+	const std::vector<uint8_t>& vendorElemBytes)
+{
+	struct wpa_supplicant* wpa_s = retrieveIfacePtr();
+	for (int i = 0; i < NUM_VENDOR_ELEM_FRAMES; i++) {
+		uint32_t bit = convertWpaP2pFrameTypeToHalP2pFrameTypeBit(i);
+		if (0 == bit) continue;
+
+		if (static_cast<uint32_t>(frameTypeMask) & bit) {
+			updateP2pVendorElem(wpa_s, (enum wpa_vendor_elem_frame) i, vendorElemBytes);
+		}
 	}
 	return ndk::ScopedAStatus::ok();
 }
