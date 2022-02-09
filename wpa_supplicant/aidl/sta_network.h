@@ -21,6 +21,7 @@
 #include <aidl/android/hardware/wifi/supplicant/NetworkRequestEapSimUmtsAuthParams.h>
 #include <aidl/android/hardware/wifi/supplicant/NetworkResponseEapSimUmtsAuthParams.h>
 #include <aidl/android/hardware/wifi/supplicant/SaeH2eMode.h>
+#include <aidl/android/hardware/wifi/supplicant/DppConnectionKeys.h>
 
 extern "C"
 {
@@ -63,6 +64,7 @@ public:
 		const std::shared_ptr<ISupplicantStaNetworkCallback>& in_callback) override;
 	::ndk::ScopedAStatus setSsid(const std::vector<uint8_t>& in_ssid) override;
 	::ndk::ScopedAStatus setBssid(const std::vector<uint8_t>& in_bssid) override;
+	::ndk::ScopedAStatus setDppKeys(const DppConnectionKeys& in_keys) override;
 	::ndk::ScopedAStatus setScanSsid(bool in_enable) override;
 	::ndk::ScopedAStatus setKeyMgmt(KeyMgmtMask in_keyMgmtMask) override;
 	::ndk::ScopedAStatus setProto(ProtoMask in_protoMask) override;
@@ -181,6 +183,7 @@ private:
 		const std::shared_ptr<ISupplicantStaNetworkCallback>& callback);
 	ndk::ScopedAStatus setSsidInternal(const std::vector<uint8_t>& ssid);
 	ndk::ScopedAStatus setBssidInternal(const std::vector<uint8_t>& bssid);
+	ndk::ScopedAStatus setDppKeysInternal(const DppConnectionKeys& keys);
 	ndk::ScopedAStatus setScanSsidInternal(bool enable);
 	ndk::ScopedAStatus setKeyMgmtInternal(
 		KeyMgmtMask mask);

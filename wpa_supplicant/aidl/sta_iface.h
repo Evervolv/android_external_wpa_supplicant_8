@@ -133,7 +133,9 @@ public:
 	::ndk::ScopedAStatus startDppConfiguratorInitiator(
 		int32_t in_peerBootstrapId, int32_t in_ownBootstrapId,
 		const std::string& in_ssid, const std::string& in_password,
-		const std::string& in_psk, DppNetRole in_netRole, DppAkm in_securityAkm) override;
+		const std::string& in_psk, DppNetRole in_netRole, DppAkm in_securityAkm,
+		const std::vector<uint8_t>& in_privEcKey,
+		std::vector<uint8_t>* _aidl_return) override;
 	::ndk::ScopedAStatus startDppEnrolleeInitiator(
 		int32_t in_peerBootstrapId, int32_t in_ownBootstrapId) override;
 	::ndk::ScopedAStatus stopDppInitiator() override;
@@ -146,6 +148,8 @@ public:
 		DppResponderBootstrapInfo* _aidl_return) override;
 	::ndk::ScopedAStatus startDppEnrolleeResponder(int32_t in_listenChannel) override;
 	::ndk::ScopedAStatus stopDppResponder(int32_t in_ownBootstrapId) override;
+	::ndk::ScopedAStatus generateSelfDppConfiguration(
+		const std::string& in_ssid, const std::vector<uint8_t>& in_privEcKey) override;
 	::ndk::ScopedAStatus setQosPolicyFeatureEnabled(bool in_enable) override;
 	::ndk::ScopedAStatus sendQosPolicyResponse(
 		bool in_morePolicies, const std::vector<QosPolicyStatus>& in_qosPolicyStatusList) override;
@@ -230,10 +234,10 @@ private:
 	std::pair<KeyMgmtMask, ndk::ScopedAStatus> getKeyMgmtCapabilitiesInternal();
 	std::pair<uint32_t, ndk::ScopedAStatus> addDppPeerUriInternal(const std::string& uri);
 	ndk::ScopedAStatus removeDppUriInternal(uint32_t bootstrap_id);
-	ndk::ScopedAStatus startDppConfiguratorInitiatorInternal(uint32_t peer_bootstrap_id,
-			uint32_t own_bootstrap_id,
-			const std::string& ssid, const std::string& password,
-			const std::string& psk, DppNetRole net_role, DppAkm security_akm);
+	std::pair<std::vector<uint8_t>, ndk::ScopedAStatus> startDppConfiguratorInitiatorInternal(
+		uint32_t peer_bootstrap_id, uint32_t own_bootstrap_id, const std::string& ssid,
+		const std::string& password, const std::string& psk, DppNetRole net_role,
+		DppAkm security_akm, const std::vector<uint8_t> &privEcKey);
 	ndk::ScopedAStatus startDppEnrolleeInitiatorInternal(uint32_t peer_bootstrap_id,
 			uint32_t own_bootstrap_id);
 	ndk::ScopedAStatus stopDppInitiatorInternal();
@@ -246,6 +250,8 @@ private:
 			DppCurve curve);
 	ndk::ScopedAStatus startDppEnrolleeResponderInternal(uint32_t listen_channel);
 	ndk::ScopedAStatus stopDppResponderInternal(uint32_t own_bootstrap_id);
+	ndk::ScopedAStatus generateSelfDppConfigurationInternal(
+		const std::string& ssid, const std::vector<uint8_t> &privEcKey);
 	ndk::ScopedAStatus setQosPolicyFeatureEnabledInternal(bool enable);
 	ndk::ScopedAStatus sendQosPolicyResponseInternal(
 		bool more_policies, const std::vector<QosPolicyStatus>& qos_policy_status_list);

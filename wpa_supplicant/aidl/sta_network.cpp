@@ -176,6 +176,13 @@ bool StaNetwork::isValid()
 		&StaNetwork::setBssidInternal, in_bssid);
 }
 
+::ndk::ScopedAStatus StaNetwork::setDppKeys(const DppConnectionKeys& in_keys)
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+		&StaNetwork::setDppKeysInternal, in_keys);
+}
+
 ::ndk::ScopedAStatus StaNetwork::setScanSsid(bool in_enable)
 {
 	return validateAndCall(
@@ -934,6 +941,16 @@ ndk::ScopedAStatus StaNetwork::setBssidInternal(
 		wpas_notify_network_bssid_set_changed(wpa_s, wpa_ssid);
 	}
 	return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus StaNetwork::setDppKeysInternal(const DppConnectionKeys& keys)
+{
+#ifdef CONFIG_DPP
+    // TODO Implement the function
+    return createStatus(SupplicantStatusCode::FAILURE_UNSUPPORTED);
+#else
+    return createStatus(SupplicantStatusCode::FAILURE_UNSUPPORTED);
+#endif
 }
 
 ndk::ScopedAStatus StaNetwork::setScanSsidInternal(bool enable)
