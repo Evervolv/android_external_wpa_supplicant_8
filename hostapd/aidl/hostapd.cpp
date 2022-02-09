@@ -400,7 +400,15 @@ std::string CreateHostapdConfig(
 			is_6Ghz_band_only ? 1 : 2,
 			nw_params.passphrase.c_str());
 		break;
-	case EncryptionType::OWE_TRANSITION:
+	case EncryptionType::WPA3_OWE_TRANSITION:
+		encryption_config_as_string = StringPrintf(
+			"wpa=2\n"
+			"rsn_pairwise=%s\n"
+			"wpa_key_mgmt=OWE\n"
+			"ieee80211w=2",
+			is_60Ghz_band_only ? "GCMP" : "CCMP");
+		break;
+	case EncryptionType::WPA3_OWE:
 		encryption_config_as_string = StringPrintf(
 			"wpa=2\n"
 			"rsn_pairwise=%s\n"
@@ -836,7 +844,7 @@ std::vector<uint8_t>  generateRandomOweSsid()
 		iface_params_new.name = managed_interfaces[i];
 
 		std::string owe_transition_ifname = "";
-		if (nw_params.encryptionType == EncryptionType::OWE_TRANSITION) {
+		if (nw_params.encryptionType == EncryptionType::WPA3_OWE_TRANSITION) {
 			if (i == 0 && i+1 < channelParamsListSize) {
 				owe_transition_ifname = managed_interfaces[i+1];
 				nw_params_new.encryptionType = EncryptionType::NONE;
