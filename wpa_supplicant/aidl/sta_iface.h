@@ -20,6 +20,7 @@
 #include <aidl/android/hardware/wifi/supplicant/Hs20AnqpSubtypes.h>
 #include <aidl/android/hardware/wifi/supplicant/ISupplicantStaIfaceCallback.h>
 #include <aidl/android/hardware/wifi/supplicant/ISupplicantStaNetwork.h>
+#include <aidl/android/hardware/wifi/supplicant/MloLinksInfo.h>
 #include <aidl/android/hardware/wifi/supplicant/QosPolicyStatus.h>
 #include <aidl/android/hardware/wifi/supplicant/RxFilterType.h>
 
@@ -150,6 +151,7 @@ public:
 	::ndk::ScopedAStatus sendQosPolicyResponse(
 		bool in_morePolicies, const std::vector<QosPolicyStatus>& in_qosPolicyStatusList) override;
 	::ndk::ScopedAStatus removeAllQosPolicies() override;
+	::ndk::ScopedAStatus getConnectionMloLinksInfo(MloLinksInfo* _aidl_return) override;
 
 private:
 	// Corresponding worker functions for the AIDL methods.
@@ -250,7 +252,7 @@ private:
 	ndk::ScopedAStatus sendQosPolicyResponseInternal(
 		bool more_policies, const std::vector<QosPolicyStatus>& qos_policy_status_list);
 	ndk::ScopedAStatus removeAllQosPoliciesInternal();
-
+	std::pair<MloLinksInfo, ndk::ScopedAStatus> getConnectionMloLinksInfoInternal();
 	struct wpa_supplicant* retrieveIfacePtr();
 
 	// Reference to the global wpa_struct. This is assumed to be valid for
