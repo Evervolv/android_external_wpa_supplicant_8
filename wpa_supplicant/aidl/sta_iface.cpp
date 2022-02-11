@@ -795,6 +795,12 @@ bool StaIface::isValid()
 		&StaIface::removeAllQosPoliciesInternal);
 }
 
+::ndk::ScopedAStatus StaIface::getConnectionMloLinksInfo(MloLinksInfo* _aidl_return) {
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_UNKNOWN,
+		&StaIface::getConnectionMloLinksInfoInternal, _aidl_return);
+}
+
 std::pair<std::string, ndk::ScopedAStatus> StaIface::getNameInternal()
 {
 	return {ifname_, ndk::ScopedAStatus::ok()};
@@ -1781,6 +1787,12 @@ ndk::ScopedAStatus StaIface::sendQosPolicyResponseInternal(
 ndk::ScopedAStatus StaIface::removeAllQosPoliciesInternal()
 {
 	return ndk::ScopedAStatus::ok();
+}
+
+std::pair<MloLinksInfo, ndk::ScopedAStatus> StaIface::getConnectionMloLinksInfoInternal()
+{
+	MloLinksInfo linksInfo;
+	return {linksInfo, ndk::ScopedAStatus::ok()};
 }
 
 /**
