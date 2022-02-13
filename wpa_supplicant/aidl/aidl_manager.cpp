@@ -1559,6 +1559,7 @@ void AidlManager::notifyDppConfigReceived(struct wpa_supplicant *wpa_s,
 		struct wpa_ssid *config)
 {
 	DppAkm securityAkm;
+	DppConnectionKeys aidl_keys{};
 	std::string aidl_ifname = misc_utils::charBufToString(wpa_s->ifname);
 
 	if ((config->key_mgmt & WPA_KEY_MGMT_SAE) &&
@@ -1566,6 +1567,8 @@ void AidlManager::notifyDppConfigReceived(struct wpa_supplicant *wpa_s,
 		securityAkm = DppAkm::SAE;
 	} else if (config->key_mgmt & WPA_KEY_MGMT_PSK) {
 			securityAkm = DppAkm::PSK;
+	} else if (config->key_mgmt & WPA_KEY_MGMT_DPP) {
+			securityAkm = DppAkm::DPP;
 	} else {
 		/* Unsupported AKM */
 		wpa_printf(MSG_ERROR, "DPP: Error: Unsupported AKM 0x%X",
@@ -1579,6 +1582,10 @@ void AidlManager::notifyDppConfigReceived(struct wpa_supplicant *wpa_s,
 		config->ssid,
 		config->ssid + config->ssid_len);
 
+	if (securityAkm == DppAkm::DPP) {
+		// TODO Add code to fill aidl_keys
+	}
+
 	/* At this point, the network is already registered, notify about new
 	 * received configuration
 	 */
@@ -1586,7 +1593,8 @@ void AidlManager::notifyDppConfigReceived(struct wpa_supplicant *wpa_s,
 			std::bind(
 					&ISupplicantStaIfaceCallback::onDppSuccessConfigReceived,
 					std::placeholders::_1, aidl_ssid, passphrase,
-					byteArrToVec(config->psk, 32), securityAkm));
+					byteArrToVec(config->psk, 32), securityAkm,
+					aidl_keys));
 }
 
 /**
