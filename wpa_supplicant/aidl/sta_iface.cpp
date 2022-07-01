@@ -50,6 +50,7 @@ enum WifiChannelWidthInMhz {
   WIDTH_80P80 = 4,
   WIDTH_5	 = 5,
   WIDTH_10	= 6,
+  WIDTH_320	= 7,
   WIDTH_INVALID = -1
 };
 
@@ -1747,7 +1748,9 @@ StaIface::getConnectionCapabilitiesInternal()
 
 	if (wpa_s->connection_set) {
 		capa.legacyMode = LegacyMode::UNKNOWN;
-		if (wpa_s->connection_he) {
+		if (wpa_s->connection_eht) {
+			capa.technology = WifiTechnology::EHT;
+		} else if (wpa_s->connection_he) {
 			capa.technology = WifiTechnology::HE;
 		} else if (wpa_s->connection_vht) {
 			capa.technology = WifiTechnology::VHT;
@@ -1777,6 +1780,9 @@ StaIface::getConnectionCapabilitiesInternal()
 			break;
 		case CHAN_WIDTH_80P80:
 			capa.channelBandwidth = WifiChannelWidthInMhz::WIDTH_80P80;
+			break;
+		case CHAN_WIDTH_320:
+			capa.channelBandwidth = WifiChannelWidthInMhz::WIDTH_320;
 			break;
 		default:
 			capa.channelBandwidth = WifiChannelWidthInMhz::WIDTH_20;
