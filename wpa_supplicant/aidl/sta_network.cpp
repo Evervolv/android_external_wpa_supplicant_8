@@ -2160,6 +2160,7 @@ ndk::ScopedAStatus StaNetwork::setKeyMgmtInternal(
 	if (key_mgmt_mask & WPA_KEY_MGMT_OWE) {
 		// Do not allow to connect to Open network when OWE is selected
 		wpa_ssid->owe_only = 1;
+		wpa_ssid->owe_ptk_workaround = 1;
 	}
 	wpa_ssid->key_mgmt = key_mgmt_mask;
 	wpa_printf(MSG_MSGDUMP, "key_mgmt: 0x%x", wpa_ssid->key_mgmt);
