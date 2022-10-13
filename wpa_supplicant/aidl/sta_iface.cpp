@@ -1930,7 +1930,23 @@ ndk::ScopedAStatus StaIface::removeAllQosPoliciesInternal()
 
 std::pair<MloLinksInfo, ndk::ScopedAStatus> StaIface::getConnectionMloLinksInfoInternal()
 {
+	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	MloLinksInfo linksInfo;
+	MloLink link;
+
+	if (!wpa_s->valid_links)
+		 return {linksInfo, ndk::ScopedAStatus::ok()};
+
+	for (int i = 0; i < MAX_NUM_MLD_LINKS; i++) {
+		if (!(wpa_s->valid_links & BIT(i)))
+			continue;
+
+		wpa_printf(MSG_DEBUG, "Add MLO Link ID %d info", i);
+		link.linkId = i;
+		link.staLinkMacAddress.assign(wpa_s->links[i].addr, wpa_s->links[i].addr + ETH_ALEN);
+		linksInfo.links.push_back(link);
+	}
+
 	return {linksInfo, ndk::ScopedAStatus::ok()};
 }
 
