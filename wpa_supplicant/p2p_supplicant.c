@@ -7014,6 +7014,11 @@ static int wpas_start_p2p_client(struct wpa_supplicant *wpa_s,
 	if (params->passphrase)
 		ssid->passphrase = os_strdup(params->passphrase);
 
+	if (params->bssid_set) {
+		ssid->bssid_set = 1;
+		os_memcpy(ssid->bssid, params->bssid, ETH_ALEN);
+	}
+
 	wpa_s->show_group_started = 1;
 	wpa_s->p2p_in_invitation = 1;
 	wpa_s->p2p_retry_limit = retry_limit;
