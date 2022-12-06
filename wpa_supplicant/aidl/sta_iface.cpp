@@ -1987,9 +1987,7 @@ StaIface::getSignalPollResultsInternal()
 			result.linkId = 0;
 			result.currentRssiDbm = mlo_si.links[i].current_signal;
 			result.txBitrateMbps = mlo_si.links[i].current_txrate / 1000;
-			/* TODO: Rx bitrate is not available in signal poll. Add
-			 * it. */
-			result.rxBitrateMbps = 0;
+			result.rxBitrateMbps = mlo_si.links[i].current_rxrate / 1000;
 			result.frequencyMhz = mlo_si.links[i].frequency;
 			results.push_back(result);
 		}
@@ -1998,8 +1996,7 @@ StaIface::getSignalPollResultsInternal()
 		result.linkId = 0;
 		result.currentRssiDbm = si.current_signal;
 		result.txBitrateMbps = si.current_txrate / 1000;
-		/* TODO: Rx bitrate is not available in signal poll. Add it. */
-		result.rxBitrateMbps = 0;
+		result.rxBitrateMbps = si.current_rxrate / 1000;
 		result.frequencyMhz = si.frequency;
 		results.push_back(result);
 	}
