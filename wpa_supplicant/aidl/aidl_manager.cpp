@@ -2209,6 +2209,21 @@ int AidlManager::addSupplicantCallbackAidlObject(
 }
 
 /**
+ * Store the |INonStandardCertCallback| aidl object reference.
+ *
+ * @param callback Aidl reference of the |INonStandardCertCallback| object.
+ *
+ * @return 0 on success, 1 on failure.
+ */
+int AidlManager::registerNonStandardCertCallbackAidlObject(
+	const std::shared_ptr<INonStandardCertCallback> &callback)
+{
+	if (callback == nullptr) return 1;
+	non_standard_cert_callback_ = callback;
+	return 0;
+}
+
+/**
  * Add a new iface callback aidl object reference to our
  * interface callback list.
  *
@@ -2558,6 +2573,28 @@ void AidlManager::notifyQosPolicyRequest(struct wpa_supplicant *wpa_s,
 		misc_utils::charBufToString(wpa_s->ifname), std::bind(
 			&ISupplicantStaIfaceCallback::onQosPolicyRequest,
 			std::placeholders::_1, wpa_s->dscp_req_dialog_token, qosPolicyData));
+}
+
+ssize_t AidlManager::getCertificate(const char* alias, uint8_t** value) {
+	if (alias == nullptr) {
+		wpa_printf(MSG_ERROR, "Cannot pass a null alias string to the callback");
+		return -1;
+	} else if (non_standard_cert_callback_ == nullptr) {
+		wpa_printf(MSG_ERROR, "NonStandardCertCallback has not been registered");
+		return -1;
+	}
+
+	std::vector<uint8_t> blob;
+	const auto& status =
+		non_standard_cert_callback_->getBlob(misc_utils::charBufToString(alias), &blob);
+	if (!status.isOk()) {
+		wpa_printf(MSG_ERROR, "Cert callback error, code=%d",
+			status.getServiceSpecificError());
+		return -1;
+	}
+
+	*value = blob.data();
+	return blob.size();
 }
 
 }  // namespace supplicant
