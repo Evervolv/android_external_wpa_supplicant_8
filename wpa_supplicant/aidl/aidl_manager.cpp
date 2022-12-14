@@ -2576,25 +2576,17 @@ void AidlManager::notifyQosPolicyRequest(struct wpa_supplicant *wpa_s,
 }
 
 ssize_t AidlManager::getCertificate(const char* alias, uint8_t** value) {
-	if (alias == nullptr) {
-		wpa_printf(MSG_ERROR, "Cannot pass a null alias string to the callback");
-		return -1;
-	} else if (non_standard_cert_callback_ == nullptr) {
-		wpa_printf(MSG_ERROR, "NonStandardCertCallback has not been registered");
+	if (alias == nullptr || value == nullptr) {
+		wpa_printf(MSG_ERROR, "Null pointer argument was passed to getCertificate");
 		return -1;
 	}
-
-	std::vector<uint8_t> blob;
-	const auto& status =
-		non_standard_cert_callback_->getBlob(misc_utils::charBufToString(alias), &blob);
-	if (!status.isOk()) {
-		wpa_printf(MSG_ERROR, "Cert callback error, code=%d",
-			status.getServiceSpecificError());
-		return -1;
+	if (auto cert = certificate_utils::getCertificate(alias, non_standard_cert_callback_)) {
+		*value = (uint8_t *) os_malloc(cert->size());
+		if (*value == nullptr) return -1;
+		os_memcpy(*value, cert->data(), cert->size());
+		return cert->size();
 	}
-
-	*value = blob.data();
-	return blob.size();
+	return -1;
 }
 
 }  // namespace supplicant

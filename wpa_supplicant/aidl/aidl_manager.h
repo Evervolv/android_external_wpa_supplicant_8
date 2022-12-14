@@ -16,6 +16,7 @@
 #include <aidl/android/hardware/wifi/supplicant/ISupplicantStaIfaceCallback.h>
 #include <aidl/android/hardware/wifi/supplicant/ISupplicantStaNetworkCallback.h>
 
+#include "certificate_utils.h"
 #include "p2p_iface.h"
 #include "p2p_network.h"
 #include "rsn_supp/pmksa_cache.h"
