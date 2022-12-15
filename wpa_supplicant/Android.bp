@@ -75,7 +75,6 @@ cc_defaults {
         "libcrypto",
         "libcutils",
         "libkeystore-engine-wifi-hidl",
-        "libkeystore-wifi-hidl",
         "liblog",
         "libnl",
         "libssl",
