@@ -466,15 +466,19 @@ static void wpa_supplicant_optimize_freqs(
 			}
 			if (bss && !disabled_freq(wpa_s, bss->freq)) {
 				params->freqs = os_calloc(2, sizeof(int));
-				if (params->freqs)
+				if (params->freqs) {
+					wpa_dbg(wpa_s, MSG_DEBUG,
+						"P2P: Scan only the known GO frequency %d MHz during invitation",
+						bss->freq);
 					params->freqs[0] = bss->freq;
+				}
 			}
 		}
 		/*
 		 * Optimize scan based on GO information during persistent
 		 * group reinvocation
 		 */
-		if (params->freqs == NULL && wpa_s->p2p_in_invitation < 5 &&
+		if (!params->freqs && wpa_s->p2p_in_invitation < 5 &&
 		    wpa_s->p2p_invite_go_freq > 0) {
 			if (wpa_s->p2p_invite_go_freq == 2 ||
 			    wpa_s->p2p_invite_go_freq == 5) {
