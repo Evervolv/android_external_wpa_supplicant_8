@@ -223,23 +223,29 @@ static void log_cert_validation_failure(const char *reason)
 }
 
 
-static BIO* BIO_from_keystore(const char *alias)
+static BIO* BIO_from_keystore(const char *alias, struct tls_connection *conn)
 {
 	BIO *bio = NULL;
 	uint8_t *value = NULL;
-	if (tls_global != NULL && certificate_callback_global != NULL) {
+
+	void *cb_ctx = NULL;
+	if (conn != NULL && conn->context != NULL) {
+		cb_ctx = conn->context->cb_ctx;
+	}
+
+	if (cb_ctx != NULL && certificate_callback_global != NULL) {
 		wpa_printf(MSG_INFO, "Retrieving certificate using callback");
-		int length = (*certificate_callback_global)(tls_global->cb_ctx, alias, &value);
+		int length = (*certificate_callback_global)(cb_ctx, alias, &value);
 		if (length != -1 && (bio = BIO_new(BIO_s_mem())) != NULL)
 			BIO_write(bio, value, length);
+		free(value);
 	}
-	free(value);
 	return bio;
 }
 
-static int tls_add_ca_from_keystore(X509_STORE *ctx, const char *alias)
+static int tls_add_ca_from_keystore(X509_STORE *ctx, const char *alias, struct tls_connection *conn)
 {
-	BIO *bio = BIO_from_keystore(alias);
+	BIO *bio = BIO_from_keystore(alias, conn);
 	STACK_OF(X509_INFO) *stack = NULL;
 	stack_index_t i;
 	int ret = 0;
@@ -280,7 +286,8 @@ static int tls_add_ca_from_keystore(X509_STORE *ctx, const char *alias)
 
 
 static int tls_add_ca_from_keystore_encoded(X509_STORE *ctx,
-					    const char *encoded_alias)
+						const char *encoded_alias,
+						struct tls_connection *conn)
 {
 	int rc = -1;
 	int len = os_strlen(encoded_alias);
@@ -297,7 +304,7 @@ static int tls_add_ca_from_keystore_encoded(X509_STORE *ctx,
 		if (!hexstr2bin(encoded_alias, decoded_alias, len / 2)) {
 			decoded_alias[len / 2] = '\0';
 			rc = tls_add_ca_from_keystore(
-				ctx, (const char *) decoded_alias);
+				ctx, (const char *) decoded_alias, conn);
 		}
 		os_free(decoded_alias);
 	}
@@ -2902,7 +2909,7 @@ static int tls_connection_ca_cert(struct tls_data *data,
 	if (ca_cert && os_strncmp(ANDROID_KEYSTORE_PREFIX, ca_cert,
 					ANDROID_KEYSTORE_PREFIX_LEN) == 0) {
 		if (tls_add_ca_from_keystore(SSL_CTX_get_cert_store(ssl_ctx),
-				&ca_cert[ANDROID_KEYSTORE_PREFIX_LEN]) < 0)
+				&ca_cert[ANDROID_KEYSTORE_PREFIX_LEN], conn) < 0)
 			return -1;
 		SSL_set_verify(conn->ssl, SSL_VERIFY_PEER, tls_verify_cb);
 		return 0;
@@ -2923,7 +2930,7 @@ static int tls_connection_ca_cert(struct tls_data *data,
 		alias = strtok_r(aliases, delim, &savedptr);
 		for (; alias; alias = strtok_r(NULL, delim, &savedptr)) {
 			if (tls_add_ca_from_keystore_encoded(
-					SSL_CTX_get_cert_store(ssl_ctx), alias)) {
+					SSL_CTX_get_cert_store(ssl_ctx), alias, conn)) {
 				wpa_printf(MSG_ERROR,
 						"OpenSSL: Failed to add ca_cert %s from keystore",
 						alias);
@@ -3487,7 +3494,7 @@ static int tls_connection_client_cert(struct tls_connection *conn,
 #ifdef ANDROID
 	if (os_strncmp(ANDROID_KEYSTORE_PREFIX, client_cert,
 			ANDROID_KEYSTORE_PREFIX_LEN) == 0) {
-		BIO *bio = BIO_from_keystore(&client_cert[ANDROID_KEYSTORE_PREFIX_LEN]);
+		BIO *bio = BIO_from_keystore(&client_cert[ANDROID_KEYSTORE_PREFIX_LEN], conn);
 		X509 *x509 = NULL;
 		if (!bio) {
 			return -1;
