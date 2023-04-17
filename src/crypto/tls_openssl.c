@@ -143,6 +143,62 @@ struct tls_context {
 	struct dl_list sessions; /* struct tls_session_data */
 };
 
+struct tls_data {
+	SSL_CTX *ssl;
+	unsigned int tls_session_lifetime;
+	int check_crl;
+	int check_crl_strict;
+	char *ca_cert;
+	unsigned int crl_reload_interval;
+	struct os_reltime crl_last_reload;
+	char *check_cert_subject;
+};
+
+struct tls_connection {
+	struct tls_context *context;
+	struct tls_data *data;
+	SSL_CTX *ssl_ctx;
+	SSL *ssl;
+	BIO *ssl_in, *ssl_out;
+#if defined(ANDROID) || !defined(OPENSSL_NO_ENGINE)
+	ENGINE *engine;        /* functional reference to the engine */
+	EVP_PKEY *private_key; /* the private key if using engine */
+#endif /* OPENSSL_NO_ENGINE */
+	char *subject_match, *altsubject_match, *suffix_match, *domain_match;
+	char *check_cert_subject;
+	int read_alerts, write_alerts, failed;
+
+	tls_session_ticket_cb session_ticket_cb;
+	void *session_ticket_cb_ctx;
+
+	/* SessionTicket received from OpenSSL hello_extension_cb (server) */
+	u8 *session_ticket;
+	size_t session_ticket_len;
+
+	unsigned int ca_cert_verify:1;
+	unsigned int cert_probe:1;
+	unsigned int server_cert_only:1;
+	unsigned int invalid_hb_used:1;
+	unsigned int success_data:1;
+	unsigned int client_hello_generated:1;
+	unsigned int server:1;
+
+	u8 srv_cert_hash[32];
+
+	unsigned int flags;
+
+	X509 *peer_cert;
+	X509 *peer_issuer;
+	X509 *peer_issuer_issuer;
+	char *peer_subject; /* peer subject info for authenticated peer */
+
+	unsigned char client_random[SSL3_RANDOM_SIZE];
+	unsigned char server_random[SSL3_RANDOM_SIZE];
+
+	u16 cipher_suite;
+	int server_dh_prime_len;
+};
+
 static struct tls_context *tls_global = NULL;
 static tls_get_certificate_cb certificate_callback_global = NULL;
 
@@ -250,62 +306,6 @@ static int tls_add_ca_from_keystore_encoded(X509_STORE *ctx,
 }
 
 #endif /* ANDROID */
-
-struct tls_data {
-	SSL_CTX *ssl;
-	unsigned int tls_session_lifetime;
-	int check_crl;
-	int check_crl_strict;
-	char *ca_cert;
-	unsigned int crl_reload_interval;
-	struct os_reltime crl_last_reload;
-	char *check_cert_subject;
-};
-
-struct tls_connection {
-	struct tls_context *context;
-	struct tls_data *data;
-	SSL_CTX *ssl_ctx;
-	SSL *ssl;
-	BIO *ssl_in, *ssl_out;
-#if defined(ANDROID) || !defined(OPENSSL_NO_ENGINE)
-	ENGINE *engine;        /* functional reference to the engine */
-	EVP_PKEY *private_key; /* the private key if using engine */
-#endif /* OPENSSL_NO_ENGINE */
-	char *subject_match, *altsubject_match, *suffix_match, *domain_match;
-	char *check_cert_subject;
-	int read_alerts, write_alerts, failed;
-
-	tls_session_ticket_cb session_ticket_cb;
-	void *session_ticket_cb_ctx;
-
-	/* SessionTicket received from OpenSSL hello_extension_cb (server) */
-	u8 *session_ticket;
-	size_t session_ticket_len;
-
-	unsigned int ca_cert_verify:1;
-	unsigned int cert_probe:1;
-	unsigned int server_cert_only:1;
-	unsigned int invalid_hb_used:1;
-	unsigned int success_data:1;
-	unsigned int client_hello_generated:1;
-	unsigned int server:1;
-
-	u8 srv_cert_hash[32];
-
-	unsigned int flags;
-
-	X509 *peer_cert;
-	X509 *peer_issuer;
-	X509 *peer_issuer_issuer;
-	char *peer_subject; /* peer subject info for authenticated peer */
-
-	unsigned char client_random[SSL3_RANDOM_SIZE];
-	unsigned char server_random[SSL3_RANDOM_SIZE];
-
-	u16 cipher_suite;
-	int server_dh_prime_len;
-};
 
 
 static struct tls_context * tls_context_new(const struct tls_config *conf)
