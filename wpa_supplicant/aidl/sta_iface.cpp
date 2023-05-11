@@ -1045,6 +1045,7 @@ ndk::ScopedAStatus StaIface::initiateAnqpQueryInternal(
 	if (info_elements.size() > kMaxAnqpElems) {
 		return createStatus(SupplicantStatusCode::FAILURE_ARGS_INVALID);
 	}
+#ifdef CONFIG_INTERWORKING
 	uint16_t info_elems_buf[kMaxAnqpElems];
 	uint32_t num_info_elems = 0;
 	for (const auto &info_element : info_elements) {
@@ -1065,11 +1066,15 @@ ndk::ScopedAStatus StaIface::initiateAnqpQueryInternal(
 		return createStatus(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 	return ndk::ScopedAStatus::ok();
+#else
+	return createStatus(SupplicantStatusCode::FAILURE_UNSUPPORTED);
+#endif /* CONFIG_INTERWORKING */
 }
 
 ndk::ScopedAStatus StaIface::initiateVenueUrlAnqpQueryInternal(
 	const std::vector<uint8_t> &mac_address)
 {
+#ifdef CONFIG_INTERWORKING
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	uint16_t info_elems_buf[1] = {ANQP_VENUE_URL};
 
@@ -1078,11 +1083,15 @@ ndk::ScopedAStatus StaIface::initiateVenueUrlAnqpQueryInternal(
 		return createStatus(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 	return ndk::ScopedAStatus::ok();
+#else
+	return createStatus(SupplicantStatusCode::FAILURE_UNSUPPORTED);
+#endif /* CONFIG_INTERWORKING */
 }
 
 ndk::ScopedAStatus StaIface::initiateHs20IconQueryInternal(
 	const std::vector<uint8_t> &mac_address, const std::string &file_name)
 {
+#ifdef CONFIG_HS20
 	struct wpa_supplicant *wpa_s = retrieveIfacePtr();
 	wpa_s->fetch_osu_icon_in_progress = 0;
 	if (hs20_anqp_send_req(
@@ -1092,6 +1101,9 @@ ndk::ScopedAStatus StaIface::initiateHs20IconQueryInternal(
 		return createStatus(SupplicantStatusCode::FAILURE_UNKNOWN);
 	}
 	return ndk::ScopedAStatus::ok();
+#else
+	return createStatus(SupplicantStatusCode::FAILURE_UNSUPPORTED);
+#endif /* CONFIG_HS20 */
 }
 
 std::pair<std::vector<uint8_t>, ndk::ScopedAStatus>
