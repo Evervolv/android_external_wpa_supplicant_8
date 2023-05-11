@@ -757,6 +757,7 @@ int AidlManager::notifyNetworkRequest(
 	return 1;
 }
 
+#ifdef CONFIG_INTERWORKING
 /**
  * Notify all listeners about the end of an ANQP query.
  *
@@ -803,6 +804,7 @@ void AidlManager::notifyAnqpQueryDone(
 			}
 		}
 
+#ifdef CONFIG_HS20
 		aidl_hs20_anqp_data.operatorFriendlyName =
 			misc_utils::convertWpaBufToVector(
 			anqp->hs20_operator_friendly_name);
@@ -814,6 +816,16 @@ void AidlManager::notifyAnqpQueryDone(
 		aidl_hs20_anqp_data.osuProvidersList =
 			misc_utils::convertWpaBufToVector(
 			anqp->hs20_osu_providers_list);
+#else
+		aidl_hs20_anqp_data.operatorFriendlyName =
+			misc_utils::convertWpaBufToVector(NULL);
+		aidl_hs20_anqp_data.wanMetrics =
+			misc_utils::convertWpaBufToVector(NULL);
+		aidl_hs20_anqp_data.connectionCapability =
+			misc_utils::convertWpaBufToVector(NULL);
+		aidl_hs20_anqp_data.osuProvidersList =
+			misc_utils::convertWpaBufToVector(NULL);
+#endif /* CONFIG_HS20 */
 	}
 
 	callWithEachStaIfaceCallback(
@@ -822,6 +834,7 @@ void AidlManager::notifyAnqpQueryDone(
 				   std::placeholders::_1, macAddrToVec(bssid), aidl_anqp_data,
 				   aidl_hs20_anqp_data));
 }
+#endif /* CONFIG_INTERWORKING */
 
 /**
  * Notify all listeners about the end of an HS20 icon query.
