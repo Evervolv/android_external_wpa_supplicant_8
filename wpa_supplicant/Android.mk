@@ -1835,7 +1835,7 @@ ifeq ($(CONFIG_TLS), openssl)
 PASNOBJS += src/crypto/crypto_openssl.c
 ifdef TLS_FUNCS
 PASNOBJS += src/crypto/tls_openssl.c
-#PASNOBJS += -lssl -lcrypto
+PASNOBJS += src/crypto/tls_openssl_ocsp.c
 NEED_TLS_PRF_SHA256=y
 endif
 endif
@@ -2038,13 +2038,20 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
 include $(BUILD_STATIC_LIBRARY)
 endif # WPA_SUPPLICANT_USE_AIDL == y
 
-#include $(CLEAR_VARS)
-#LOCAL_MODULE = libpasn
-#LOCAL_CFLAGS = $(L_CFLAGS)
-#LOCAL_SRC_FILES = $(PASNOBJS)
-#LOCAL_C_INCLUDES = $(INCLUDES)
-#LOCAL_SHARED_LIBRARIES := libc libcutils liblog
-#ifeq ($(CONFIG_TLS), openssl)
-#LOCAL_SHARED_LIBRARIES := libcrypto libssl
-#endif
-#include $(BUILD_SHARED_LIBRARY)
+ifeq ($(CONFIG_PASN), y)
+include $(CLEAR_VARS)
+LOCAL_MODULE = libpasn
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-BSD SPDX-license-identifier-BSD-3-Clause SPDX-license-identifier-ISC legacy_unencumbered
+LOCAL_LICENSE_CONDITIONS := notice unencumbered
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../LICENSE
+LOCAL_VENDOR_MODULE := true
+LOCAL_CFLAGS = $(L_CFLAGS)
+LOCAL_SRC_FILES = $(PASNOBJS)
+LOCAL_C_INCLUDES = $(INCLUDES)
+LOCAL_SHARED_LIBRARIES := libc libcutils liblog
+ifeq ($(CONFIG_TLS), openssl)
+LOCAL_SHARED_LIBRARIES += libcrypto libssl libkeystore-wifi-hidl
+LOCAL_SHARED_LIBRARIES += libkeystore-engine-wifi-hidl
+endif
+include $(BUILD_SHARED_LIBRARY)
+endif # CONFIG_PASN == y
