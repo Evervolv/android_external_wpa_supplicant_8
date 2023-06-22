@@ -2689,9 +2689,9 @@ ndk::ScopedAStatus StaNetwork::setMinimumTlsVersionEapPhase1ParamInternal(TlsVer
 			FALLTHROUGH_INTENDED;
 		case TlsVersion::TLS_V1_1:
 			tlsFlags |= TLS_CONN_DISABLE_TLSv1_0;
-			FALLTHROUGH_INTENDED;
-		default:
 			break;
+		default:
+			return createStatus(SupplicantStatusCode::FAILURE_UNSUPPORTED);
 	}
 
 	generateTlsParams();
