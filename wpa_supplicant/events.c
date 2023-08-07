@@ -5451,6 +5451,7 @@ static void wpas_tid_link_map(struct wpa_supplicant *wpa_s,
 		}
 	}
 
+	wpas_notify_mlo_info_change_reason(wpa_s, MLO_TID_TO_LINK_MAP);
 	wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_T2LM_UPDATE "%s", map_info);
 }
 
@@ -5488,6 +5489,7 @@ static void wpas_link_reconfig(struct wpa_supplicant *wpa_s)
 		return;
 	}
 
+	wpas_notify_mlo_info_change_reason(wpa_s, MLO_LINK_RECONFIG_AP_REMOVAL);
 	wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_LINK_RECONFIG "valid_links=0x%x",
 		wpa_s->valid_links);
 }
