@@ -76,6 +76,17 @@ struct hapd_interfaces {
 
 #ifdef CONFIG_DPP
 	struct dpp_global *dpp;
+#ifdef CONFIG_DPP3
+	struct os_reltime dpp_pb_time;
+	struct os_reltime dpp_pb_announce_time;
+	struct dpp_pb_info dpp_pb[DPP_PB_INFO_COUNT];
+	struct dpp_bootstrap_info *dpp_pb_bi;
+	u8 dpp_pb_c_nonce[DPP_MAX_NONCE_LEN];
+	u8 dpp_pb_resp_hash[SHA256_MAC_LEN];
+	struct os_reltime dpp_pb_last_resp;
+	bool dpp_pb_result_indicated;
+	char *dpp_pb_cmd;
+#endif /* CONFIG_DPP3 */
 #endif /* CONFIG_DPP */
 
 #ifdef CONFIG_CTRL_IFACE_UDP
@@ -324,6 +335,7 @@ struct hostapd_data {
 #ifdef CONFIG_PROXYARP
 	struct l2_packet_data *sock_dhcp;
 	struct l2_packet_data *sock_ndisc;
+	bool x_snoop_initialized;
 #endif /* CONFIG_PROXYARP */
 #ifdef CONFIG_MESH
 	int num_plinks;
@@ -340,11 +352,15 @@ struct hostapd_data {
 #endif /* CONFIG_SQLITE */
 
 #ifdef CONFIG_SAE
+
+#define COMEBACK_KEY_SIZE 8
+#define COMEBACK_PENDING_IDX_SIZE 256
+
 	/** Key used for generating SAE anti-clogging tokens */
-	u8 comeback_key[8];
+	u8 comeback_key[COMEBACK_KEY_SIZE];
 	struct os_reltime last_comeback_key_update;
 	u16 comeback_idx;
-	u16 comeback_pending_idx[256];
+	u16 comeback_pending_idx[COMEBACK_PENDING_IDX_SIZE];
 	int dot11RSNASAERetransPeriod; /* msec */
 	struct dl_list sae_commit_queue; /* struct hostapd_sae_commit_queue */
 #endif /* CONFIG_SAE */
@@ -400,6 +416,7 @@ struct hostapd_data {
 	struct dpp_pkex *dpp_pkex;
 	struct dpp_bootstrap_info *dpp_pkex_bi;
 	char *dpp_pkex_code;
+	size_t dpp_pkex_code_len;
 	char *dpp_pkex_identifier;
 	enum dpp_pkex_ver dpp_pkex_ver;
 	char *dpp_pkex_auth_cmd;
@@ -420,6 +437,7 @@ struct hostapd_data {
 	int dpp_chirp_round;
 	int dpp_chirp_scan_done;
 	int dpp_chirp_listen;
+	struct os_reltime dpp_relay_last_needs_ctrl;
 #endif /* CONFIG_DPP2 */
 #ifdef CONFIG_TESTING_OPTIONS
 	char *dpp_config_obj_override;
@@ -626,6 +644,11 @@ struct hostapd_iface {
 	/* Previous WMM element information */
 	struct hostapd_wmm_ac_params prev_wmm[WMM_AC_NUM];
 
+	/* Maximum number of interfaces supported for MBSSID advertisement */
+	unsigned int mbssid_max_interfaces;
+	/* Maximum profile periodicity for enhanced MBSSID advertisement */
+	unsigned int ema_max_periodicity;
+
 	int (*enable_iface_cb)(struct hostapd_iface *iface);
 	int (*disable_iface_cb)(struct hostapd_iface *iface);
 };
@@ -655,6 +678,7 @@ void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 void hostapd_interface_deinit_free(struct hostapd_iface *iface);
 int hostapd_enable_iface(struct hostapd_iface *hapd_iface);
 int hostapd_reload_iface(struct hostapd_iface *hapd_iface);
+int hostapd_reload_bss_only(struct hostapd_data *bss);
 int hostapd_disable_iface(struct hostapd_iface *hapd_iface);
 void hostapd_bss_deinit_no_free(struct hostapd_data *hapd);
 void hostapd_free_hapd_data(struct hostapd_data *hapd);
@@ -703,7 +727,7 @@ int hostapd_probe_req_rx(struct hostapd_data *hapd, const u8 *sa, const u8 *da,
 			 int ssi_signal);
 void hostapd_event_ch_switch(struct hostapd_data *hapd, int freq, int ht,
 			     int offset, int width, int cf1, int cf2,
-			     int finished);
+			     u16 punct_bitmap, int finished);
 struct survey_results;
 void hostapd_event_get_survey(struct hostapd_iface *iface,
 			      struct survey_results *survey_results);
@@ -726,5 +750,7 @@ void fst_hostapd_fill_iface_obj(struct hostapd_data *hapd,
 #endif /* CONFIG_FST */
 
 int hostapd_set_acl(struct hostapd_data *hapd);
+struct hostapd_data * hostapd_mbssid_get_tx_bss(struct hostapd_data *hapd);
+int hostapd_mbssid_get_bss_index(struct hostapd_data *hapd);
 
 #endif /* HOSTAPD_H */

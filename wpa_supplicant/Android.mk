@@ -108,6 +108,7 @@ INCLUDES += $(LOCAL_PATH)/src/rsn_supp
 INCLUDES += $(LOCAL_PATH)/src/tls
 INCLUDES += $(LOCAL_PATH)/src/utils
 INCLUDES += $(LOCAL_PATH)/src/wps
+INCLUDES += $(LOCAL_PATH)/src/pasn
 INCLUDES += system/security/keystore/include
 ifdef CONFIG_DRIVER_NL80211
 ifneq ($(wildcard external/libnl),)
@@ -276,6 +277,7 @@ L_CFLAGS += -DCONFIG_SAE
 OBJS += src/common/sae.c
 ifdef CONFIG_SAE_PK
 L_CFLAGS += -DCONFIG_SAE_PK
+NEED_AES_SIV=y
 OBJS += src/common/sae_pk.c
 endif
 NEED_ECC=y
@@ -419,6 +421,7 @@ NEED_HMAC_SHA384_KDF=y
 NEED_SHA256=y
 NEED_SHA384=y
 OBJS += src/common/ptksa_cache.c
+OBJS += src/pasn/pasn_initiator.c
 OBJS += pasn_supplicant.c
 endif
 
@@ -984,6 +987,8 @@ endif
 ifdef NEED_AP_MLME
 OBJS += src/ap/wmm.c
 OBJS += src/ap/ap_list.c
+OBJS += src/ap/comeback_token.c
+OBJS += src/pasn/pasn_responder.c
 OBJS += src/ap/ieee802_11.c
 OBJS += src/ap/hw_features.c
 OBJS += src/ap/dfs.c
@@ -1756,6 +1761,142 @@ ifndef LDO
 LDO=$(CC)
 endif
 
+PASNOBJS =
+PASNOBJS += src/utils/$(CONFIG_ELOOP).c
+PASNOBJS += src/utils/wpa_debug.c
+PASNOBJS += src/utils/wpabuf.c
+PASNOBJS += src/utils/os_$(CONFIG_OS).c
+PASNOBJS += src/utils/config.c
+PASNOBJS += src/utils/common.c
+
+ifdef NEED_BASE64
+PASNOBJS += src/utils/base64.c
+endif
+
+ifdef CONFIG_WPA_TRACE
+PASNOBJS += src/utils/trace.c
+endif
+
+ifdef CONFIG_EXT_PASSWORD_FILE
+PASNOBJS += src/utils/ext_password_file.c
+endif
+
+ifdef CONFIG_EXT_PASSWORD_TEST
+PASNOBJS += src/utils/ext_password_test.c
+endif
+
+ifdef NEED_EXT_PASSWORD
+PASNOBJS += src/utils/ext_password.c
+endif
+
+ifdef CONFIG_SAE
+PASNOBJS += src/common/sae.c
+endif
+
+ifdef CONFIG_SAE_PK
+PASNOBJS += src/common/sae_pk.c
+endif
+
+ifndef CONFIG_NO_WPA
+PASNOBJS += src/common/wpa_common.c
+endif
+
+PASNOBJS += src/common/ieee802_11_common.c
+
+ifdef NEED_DRAGONFLY
+PASNOBJS += src/common/dragonfly.c
+endif
+
+PASNOBJS += src/common/ptksa_cache.c
+
+ifndef CONFIG_NO_WPA
+PASNOBJS += src/rsn_supp/pmksa_cache.c
+PASNOBJS += src/rsn_supp/wpa_ie.c
+endif
+
+PASNOBJS += src/ap/comeback_token.c
+PASNOBJS += src/ap/pmksa_cache_auth.c
+
+ifdef NEED_EAP_COMMON
+PASNOBJS += src/eap_common/eap_common.c
+endif
+
+ifdef CHAP
+PASNOBJS += src/eap_common/chap.c
+endif
+
+ifdef CONFIG_IEEE8021X_EAPOL
+PASNOBJS += src/eap_peer/eap.c
+PASNOBJS += src/eap_peer/eap_methods.c
+PASNOBJS += src/eapol_supp/eapol_supp_sm.c
+endif
+
+ifeq ($(CONFIG_TLS), openssl)
+PASNOBJS += src/crypto/crypto_openssl.c
+ifdef TLS_FUNCS
+PASNOBJS += src/crypto/tls_openssl.c
+#PASNOBJS += -lssl -lcrypto
+NEED_TLS_PRF_SHA256=y
+endif
+endif
+
+ifeq ($(CONFIG_TLS), gnutls)
+PASNOBJS += src/crypto/crypto_$(CONFIG_CRYPTO).c
+ifdef TLS_FUNCS
+PASNOBJS += src/crypto/tls_gnutls.c
+PASNOBJS += -lgnutls -lgpg-error
+PASNOBJS += -lgcrypt
+endif
+endif
+
+ifdef NEED_TLS_PRF_SHA256
+PASNOBJS += src/crypto/sha256-tlsprf.c
+endif
+
+ifdef NEED_SHA512
+PASNOBJS += src/crypto/sha512-prf.c
+endif
+
+ifdef NEED_SHA384
+PASNOBJS += src/crypto/sha384-prf.c
+endif
+
+PASNOBJS += src/crypto/sha256-prf.c
+
+ifdef NEED_HMAC_SHA512_KDF
+PASNOBJS += src/crypto/sha512-kdf.c
+endif
+
+ifdef NEED_HMAC_SHA384_KDF
+PASNOBJS += src/crypto/sha384-kdf.c
+endif
+
+ifdef NEED_HMAC_SHA256_KDF
+PASNOBJS += src/crypto/sha256-kdf.c
+endif
+
+ifdef NEED_DH_GROUPS
+PASNOBJS += src/crypto/dh_groups.c
+endif
+
+ifdef NEED_AES_SIV
+PASNOBJS += src/crypto/aes-siv.c
+endif
+
+ifdef NEED_AES_CTR
+PASNOBJS += src/crypto/aes-ctr.c
+endif
+
+ifdef NEED_SHA1
+PASNOBJS += src/crypto/sha1-prf.c
+ifdef NEED_TLS_PRF
+PASNOBJS += src/crypto/sha1-tlsprf.c
+endif
+endif
+
+PASNOBJS += src/pasn/pasn_initiator.c
+PASNOBJS += src/pasn/pasn_responder.c
+
 ########################
 
 include $(CLEAR_VARS)
@@ -1790,7 +1931,7 @@ LOCAL_STATIC_LIBRARIES += $(LIB_STATIC_EAP_PROXY)
 LOCAL_SHARED_LIBRARIES += $(LIB_SHARED_EAP_PROXY)
 endif
 ifeq ($(CONFIG_TLS), openssl)
-LOCAL_SHARED_LIBRARIES += libcrypto libssl libkeystore-wifi-hidl
+LOCAL_SHARED_LIBRARIES += libcrypto libssl
 endif
 
 # With BoringSSL we need libkeystore-engine in order to provide access to
@@ -1811,7 +1952,8 @@ ifeq ($(DBUS), y)
 LOCAL_SHARED_LIBRARIES += libdbus
 endif
 ifeq ($(WPA_SUPPLICANT_USE_AIDL), y)
-LOCAL_SHARED_LIBRARIES += android.hardware.wifi.supplicant-V1-ndk
+LOCAL_SHARED_LIBRARIES += android.hardware.wifi.supplicant-V2-ndk
+LOCAL_SHARED_LIBRARIES += android.system.keystore2-V1-ndk
 LOCAL_SHARED_LIBRARIES += libutils libbase
 LOCAL_SHARED_LIBRARIES += libbinder_ndk
 LOCAL_STATIC_LIBRARIES += libwpa_aidl
@@ -1876,6 +2018,7 @@ LOCAL_C_INCLUDES := $(INCLUDES)
 LOCAL_SRC_FILES := \
     aidl/aidl.cpp \
     aidl/aidl_manager.cpp \
+    aidl/certificate_utils.cpp \
     aidl/iface_config_utils.cpp \
     aidl/p2p_iface.cpp \
     aidl/p2p_network.cpp \
@@ -1883,7 +2026,8 @@ LOCAL_SRC_FILES := \
     aidl/sta_network.cpp \
     aidl/supplicant.cpp
 LOCAL_SHARED_LIBRARIES := \
-    android.hardware.wifi.supplicant-V1-ndk \
+    android.hardware.wifi.supplicant-V2-ndk \
+    android.system.keystore2-V1-ndk \
     libbinder_ndk \
     libbase \
     libutils \
@@ -1893,3 +2037,14 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/aidl
 include $(BUILD_STATIC_LIBRARY)
 endif # WPA_SUPPLICANT_USE_AIDL == y
+
+#include $(CLEAR_VARS)
+#LOCAL_MODULE = libpasn
+#LOCAL_CFLAGS = $(L_CFLAGS)
+#LOCAL_SRC_FILES = $(PASNOBJS)
+#LOCAL_C_INCLUDES = $(INCLUDES)
+#LOCAL_SHARED_LIBRARIES := libc libcutils liblog
+#ifeq ($(CONFIG_TLS), openssl)
+#LOCAL_SHARED_LIBRARIES := libcrypto libssl
+#endif
+#include $(BUILD_SHARED_LIBRARY)

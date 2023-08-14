@@ -272,6 +272,7 @@ L_CFLAGS += -DCONFIG_SAE
 OBJS += src/common/sae.c
 ifdef CONFIG_SAE_PK
 L_CFLAGS += -DCONFIG_SAE_PK
+NEED_AES_SIV=y
 OBJS += src/common/sae_pk.c
 endif
 NEED_ECC=y
@@ -1055,6 +1056,8 @@ endif
 ifdef NEED_AP_MLME
 OBJS += src/ap/wmm.c
 OBJS += src/ap/ap_list.c
+OBJS += src/ap/comeback_token.c
+OBJS += src/pasn/pasn_responder.c
 OBJS += src/ap/ieee802_11.c
 OBJS += src/ap/hw_features.c
 OBJS += src/ap/dfs.c

@@ -203,6 +203,21 @@ nl80211_scan_common(struct i802_bss *bss, u8 cmd,
 				goto fail;
 		}
 		nla_nest_end(msg, ssids);
+
+		/*
+		 * If allowed, scan for 6 GHz APs that are reported by other
+		 * APs. Note that if the flag is not set and 6 GHz channels are
+		 * to be scanned, it is highly likely that non-PSC channels
+		 * would be scanned passively (due to the Probe Request frame
+		 * transmission restrictions mandated in IEEE Std 802.11ax-2021,
+		 * 26.17.2.3 (Scanning in the 6 GHz band). Passive scanning of
+		 * all non-PSC channels would take a significant amount of time.
+		 */
+		if (!params->non_coloc_6ghz) {
+			wpa_printf(MSG_DEBUG,
+				   "nl80211: Scan co-located APs on 6 GHz");
+			scan_flags |= NL80211_SCAN_FLAG_COLOCATED_6GHZ;
+		}
 	} else {
 		wpa_printf(MSG_DEBUG, "nl80211: Passive scan requested");
 	}
@@ -397,7 +412,7 @@ int wpa_driver_nl80211_scan(struct i802_bss *bss,
 	drv->scan_state = SCAN_REQUESTED;
 	/* Not all drivers generate "scan completed" wireless event, so try to
 	 * read results after a timeout. */
-	timeout = 10;
+	timeout = drv->uses_6ghz ? 15 : 10;
 	if (drv->scan_complete_events) {
 		/*
 		 * The driver seems to deliver events to notify when scan is
@@ -896,8 +911,21 @@ static void nl80211_check_bss_status(struct wpa_driver_nl80211_data *drv,
 			   "nl80211: Local state (associated with " MACSTR
 			   ") does not match with BSS state",
 			   MAC2STR(drv->bssid));
-		clear_state_mismatch(drv, r->bssid);
-		clear_state_mismatch(drv, drv->bssid);
+
+		if (os_memcmp(drv->sta_mlo_info.ap_mld_addr, drv->bssid,
+			      ETH_ALEN) != 0) {
+			clear_state_mismatch(drv, r->bssid);
+
+			if (!is_zero_ether_addr(drv->sta_mlo_info.ap_mld_addr))
+				clear_state_mismatch(
+					drv, drv->sta_mlo_info.ap_mld_addr);
+			else
+				clear_state_mismatch(drv, drv->bssid);
+
+		} else {
+			wpa_printf(MSG_DEBUG,
+				   "nl80211: BSSID is the MLD address");
+		}
 	}
 }
 

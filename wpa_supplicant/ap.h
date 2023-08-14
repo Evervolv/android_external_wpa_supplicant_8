@@ -16,7 +16,8 @@ int wpa_supplicant_create_ap(struct wpa_supplicant *wpa_s,
 			     struct wpa_ssid *ssid);
 void wpa_supplicant_ap_deinit(struct wpa_supplicant *wpa_s);
 void wpa_supplicant_ap_rx_eapol(struct wpa_supplicant *wpa_s,
-				const u8 *src_addr, const u8 *buf, size_t len);
+				const u8 *src_addr, const u8 *buf, size_t len,
+				enum frame_encryption encrypted);
 int wpa_supplicant_ap_wps_pbc(struct wpa_supplicant *wpa_s, const u8 *bssid,
 			      const u8 *p2p_dev_addr);
 int wpa_supplicant_ap_wps_pin(struct wpa_supplicant *wpa_s, const u8 *bssid,
@@ -72,7 +73,8 @@ int ap_switch_channel(struct wpa_supplicant *wpa_s,
 		      struct csa_settings *settings);
 int ap_ctrl_iface_chanswitch(struct wpa_supplicant *wpa_s, const char *txtaddr);
 void wpas_ap_ch_switch(struct wpa_supplicant *wpa_s, int freq, int ht,
-		       int offset, int width, int cf1, int cf2, int finished);
+		       int offset, int width, int cf1, int cf2,
+		       u16 punct_bitmap, int finished);
 struct wpabuf * wpas_ap_wps_nfc_config_token(struct wpa_supplicant *wpa_s,
 					     int ndef);
 #ifdef CONFIG_AP
