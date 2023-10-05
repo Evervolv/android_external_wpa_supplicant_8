@@ -101,20 +101,20 @@ static void * eap_sim_init(struct eap_sm *sm)
 		return NULL;
 	}
 
-	if (config && config->imsi_privacy_key) {
+	if (config && config->imsi_privacy_cert) {
 #ifdef CRYPTO_RSA_OAEP_SHA256
 		data->imsi_privacy_key = crypto_rsa_key_read(
-			config->imsi_privacy_key, false);
+			config->imsi_privacy_cert, false);
 		if (!data->imsi_privacy_key) {
 			wpa_printf(MSG_ERROR,
-				   "EAP-SIM: Failed to read/parse IMSI privacy key %s",
-				   config->imsi_privacy_key);
+				   "EAP-SIM: Failed to read/parse IMSI privacy certificate %s",
+				   config->imsi_privacy_cert);
 			os_free(data);
 			return NULL;
 		}
 #else /* CRYPTO_RSA_OAEP_SHA256 */
 		wpa_printf(MSG_ERROR,
-			   "EAP-SIM: No support for imsi_privacy_key in the build");
+			   "EAP-SIM: No support for imsi_privacy_cert in the build");
 		os_free(data);
 		return NULL;
 #endif /* CRYPTO_RSA_OAEP_SHA256 */
@@ -133,6 +133,9 @@ static void * eap_sim_init(struct eap_sm *sm)
 					   "sim_min_num_chal configuration "
 					   "(%lu, expected 2 or 3)",
 					   (unsigned long) data->min_num_chal);
+#ifdef CRYPTO_RSA_OAEP_SHA256
+				crypto_rsa_key_free(data->imsi_privacy_key);
+#endif /* CRYPTO_RSA_OAEP_SHA256 */
 				os_free(data);
 				return NULL;
 			}
@@ -504,11 +507,12 @@ static struct wpabuf * eap_sim_client_error(struct eap_sim_data *data, u8 id,
 #ifdef CRYPTO_RSA_OAEP_SHA256
 static struct wpabuf *
 eap_sim_encrypt_identity(struct crypto_rsa_key *imsi_privacy_key,
-			 const u8 *identity, size_t identity_len)
+			 const u8 *identity, size_t identity_len,
+			 const char *attr)
 {
 	struct wpabuf *imsi_buf, *enc;
 	char *b64;
-	size_t b64_len;
+	size_t b64_len, len;
 
 	wpa_hexdump_ascii(MSG_DEBUG, "EAP-SIM: Encrypt permanent identity",
 			  identity, identity_len);
@@ -526,7 +530,10 @@ eap_sim_encrypt_identity(struct crypto_rsa_key *imsi_privacy_key,
 	if (!b64)
 		return NULL;
 
-	enc = wpabuf_alloc(1 + b64_len);
+	len = 1 + b64_len;
+	if (attr)
+		len += 1 + os_strlen(attr);
+	enc = wpabuf_alloc(len);
 	if (!enc) {
 		os_free(b64);
 		return NULL;
@@ -534,6 +541,10 @@ eap_sim_encrypt_identity(struct crypto_rsa_key *imsi_privacy_key,
 	wpabuf_put_u8(enc, '\0');
 	wpabuf_put_data(enc, b64, b64_len);
 	os_free(b64);
+	if (attr) {
+		wpabuf_put_u8(enc, ',');
+		wpabuf_put_str(enc, attr);
+	}
 	wpa_hexdump_ascii(MSG_DEBUG, "EAP-SIM: Encrypted permanent identity",
 			  wpabuf_head(enc), wpabuf_len(enc));
 
@@ -565,6 +576,12 @@ static struct wpabuf * eap_sim_response_start(struct eap_sm *sm,
 		identity_len = data->pseudonym_len;
 		eap_sim_clear_identities(sm, data, CLEAR_REAUTH_ID);
 	} else if (id_req != NO_ID_REQ) {
+		if (id_req == PERMANENT_ID && eap_get_config_strict_conservative_peer_mode(sm)) {
+			wpa_printf(MSG_INFO, "EAP-SIM: permanent_id_req is denied in "
+				   "the strict conservative peer mode");
+			eap_notify_permanent_id_req_denied(sm);
+			return  eap_sim_client_error(data, id, EAP_SIM_UNABLE_TO_PROCESS_PACKET);
+		}
 		identity = eap_get_config_identity(sm, &identity_len);
 		if (identity) {
 			int ids = CLEAR_PSEUDONYM | CLEAR_REAUTH_ID;
@@ -577,9 +594,15 @@ static struct wpabuf * eap_sim_response_start(struct eap_sm *sm,
 		}
 #ifdef CRYPTO_RSA_OAEP_SHA256
 		if (identity && data->imsi_privacy_key) {
+			struct eap_peer_config *config;
+			const char *attr = NULL;
+
+			config = eap_get_config(sm);
+			if (config)
+				attr = config->imsi_privacy_attr;
 			enc_identity = eap_sim_encrypt_identity(
 				data->imsi_privacy_key,
-				identity, identity_len);
+				identity, identity_len, attr);
 			if (!enc_identity) {
 				wpa_printf(MSG_INFO,
 					   "EAP-SIM: Failed to encrypt permanent identity");

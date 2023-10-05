@@ -122,6 +122,8 @@ struct wpa_bss {
 	size_t ie_len;
 	/** Length of the following Beacon IE field in octets */
 	size_t beacon_ie_len;
+	/** MLD address of the AP */
+	u8 mld_addr[ETH_ALEN];
 	/* followed by ie_len octets of IEs */
 	/* followed by beacon_ie_len octets of IEs */
 	u8 ies[];
@@ -198,5 +200,7 @@ static inline void wpa_bss_update_level(struct wpa_bss *bss, int new_level)
 void calculate_update_time(const struct os_reltime *fetch_time,
 			   unsigned int age_ms,
 			   struct os_reltime *update_time);
+
+struct wpabuf * wpa_bss_defrag_mle(const struct wpa_bss *bss, u8 type);
 
 #endif /* BSS_H */

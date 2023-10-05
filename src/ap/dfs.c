@@ -50,15 +50,15 @@ static int dfs_get_used_n_chans(struct hostapd_iface *iface, int *seg1)
 
 	if (iface->conf->ieee80211ac || iface->conf->ieee80211ax) {
 		switch (hostapd_get_oper_chwidth(iface->conf)) {
-		case CHANWIDTH_USE_HT:
+		case CONF_OPER_CHWIDTH_USE_HT:
 			break;
-		case CHANWIDTH_80MHZ:
+		case CONF_OPER_CHWIDTH_80MHZ:
 			n_chans = 4;
 			break;
-		case CHANWIDTH_160MHZ:
+		case CONF_OPER_CHWIDTH_160MHZ:
 			n_chans = 8;
 			break;
-		case CHANWIDTH_80P80MHZ:
+		case CONF_OPER_CHWIDTH_80P80MHZ:
 			n_chans = 4;
 			*seg1 = 4;
 			break;
@@ -281,6 +281,10 @@ static int dfs_find_channel(struct hostapd_iface *iface,
 		if (chan->max_tx_power < iface->conf->min_tx_power)
 			continue;
 
+		if ((chan->flag & HOSTAPD_CHAN_INDOOR_ONLY) &&
+		    iface->conf->country[2] == 0x4f)
+			continue;
+
 		if (ret_chan && idx == channel_idx) {
 			wpa_printf(MSG_DEBUG, "Selected channel %d (%d)",
 				   chan->freq, chan->chan);
@@ -311,7 +315,7 @@ static void dfs_adjust_center_freq(struct hostapd_iface *iface,
 	*oper_centr_freq_seg1_idx = 0;
 
 	switch (hostapd_get_oper_chwidth(iface->conf)) {
-	case CHANWIDTH_USE_HT:
+	case CONF_OPER_CHWIDTH_USE_HT:
 		if (secondary_channel == 1)
 			*oper_centr_freq_seg0_idx = chan->chan + 2;
 		else if (secondary_channel == -1)
@@ -319,13 +323,13 @@ static void dfs_adjust_center_freq(struct hostapd_iface *iface,
 		else
 			*oper_centr_freq_seg0_idx = chan->chan;
 		break;
-	case CHANWIDTH_80MHZ:
+	case CONF_OPER_CHWIDTH_80MHZ:
 		*oper_centr_freq_seg0_idx = chan->chan + 6;
 		break;
-	case CHANWIDTH_160MHZ:
+	case CONF_OPER_CHWIDTH_160MHZ:
 		*oper_centr_freq_seg0_idx = chan->chan + 14;
 		break;
-	case CHANWIDTH_80P80MHZ:
+	case CONF_OPER_CHWIDTH_80P80MHZ:
 		*oper_centr_freq_seg0_idx = chan->chan + 6;
 		*oper_centr_freq_seg1_idx = sec_chan_idx_80p80 + 6;
 		break;
@@ -361,17 +365,17 @@ static int dfs_get_start_chan_idx(struct hostapd_iface *iface, int *seg1_start)
 	/* VHT/HE */
 	if (iface->conf->ieee80211ac || iface->conf->ieee80211ax) {
 		switch (hostapd_get_oper_chwidth(iface->conf)) {
-		case CHANWIDTH_USE_HT:
+		case CONF_OPER_CHWIDTH_USE_HT:
 			break;
-		case CHANWIDTH_80MHZ:
+		case CONF_OPER_CHWIDTH_80MHZ:
 			channel_no = hostapd_get_oper_centr_freq_seg0_idx(
 				iface->conf) - 6;
 			break;
-		case CHANWIDTH_160MHZ:
+		case CONF_OPER_CHWIDTH_160MHZ:
 			channel_no = hostapd_get_oper_centr_freq_seg0_idx(
 				iface->conf) - 14;
 			break;
-		case CHANWIDTH_80P80MHZ:
+		case CONF_OPER_CHWIDTH_80P80MHZ:
 			channel_no = hostapd_get_oper_centr_freq_seg0_idx(
 				iface->conf) - 6;
 			chan_seg1 = hostapd_get_oper_centr_freq_seg1_idx(
@@ -441,6 +445,8 @@ static int dfs_check_chans_radar(struct hostapd_iface *iface,
 	mode = iface->current_mode;
 
 	for (i = 0; i < n_chans; i++) {
+		if (start_chan_idx + i >= mode->num_channels)
+			break;
 		channel = &mode->channels[start_chan_idx + i];
 		if (channel->flag & HOSTAPD_CHAN_RADAR)
 			res++;
@@ -555,7 +561,8 @@ dfs_get_valid_channel(struct hostapd_iface *iface,
 		*secondary_channel = 0;
 
 	/* Get secondary channel for HT80P80 */
-	if (hostapd_get_oper_chwidth(iface->conf) == CHANWIDTH_80P80MHZ) {
+	if (hostapd_get_oper_chwidth(iface->conf) ==
+	    CONF_OPER_CHWIDTH_80P80MHZ) {
 		if (num_available_chandefs <= 1) {
 			wpa_printf(MSG_ERROR,
 				   "only 1 valid chan, can't support 80+80");
@@ -792,6 +799,8 @@ static unsigned int dfs_get_cac_time(struct hostapd_iface *iface,
 	mode = iface->current_mode;
 
 	for (i = 0; i < n_chans; i++) {
+		if (start_chan_idx + i >= mode->num_channels)
+			break;
 		channel = &mode->channels[start_chan_idx + i];
 		if (!(channel->flag & HOSTAPD_CHAN_RADAR))
 			continue;
@@ -1220,7 +1229,7 @@ dfs_downgrade_bandwidth(struct hostapd_iface *iface, int *secondary_channel,
 			int oper_chwidth;
 
 			oper_chwidth = hostapd_get_oper_chwidth(iface->conf);
-			if (oper_chwidth == CHANWIDTH_USE_HT)
+			if (oper_chwidth == CONF_OPER_CHWIDTH_USE_HT)
 				break;
 			*channel_type = DFS_AVAILABLE;
 			hostapd_set_oper_chwidth(iface->conf, oper_chwidth - 1);

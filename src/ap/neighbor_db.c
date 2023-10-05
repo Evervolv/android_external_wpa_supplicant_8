@@ -136,7 +136,7 @@ int hostapd_neighbor_set(struct hostapd_data *hapd, const u8 *bssid,
 
 	os_memcpy(entry->bssid, bssid, ETH_ALEN);
 	os_memcpy(&entry->ssid, ssid, sizeof(entry->ssid));
-	entry->short_ssid = crc32(ssid->ssid, ssid->ssid_len);
+	entry->short_ssid = ieee80211_crc32(ssid->ssid, ssid->ssid_len);
 
 	entry->nr = wpabuf_dup(nr);
 	if (!entry->nr)
@@ -199,19 +199,21 @@ void hostapd_free_neighbor_db(struct hostapd_data *hapd)
 static enum nr_chan_width hostapd_get_nr_chan_width(struct hostapd_data *hapd,
 						    int ht, int vht, int he)
 {
-	u8 oper_chwidth = hostapd_get_oper_chwidth(hapd->iconf);
+	enum oper_chan_width oper_chwidth;
+
+	oper_chwidth = hostapd_get_oper_chwidth(hapd->iconf);
 
 	if (!ht && !vht && !he)
 		return NR_CHAN_WIDTH_20;
 	if (!hapd->iconf->secondary_channel)
 		return NR_CHAN_WIDTH_20;
-	if ((!vht && !he) || oper_chwidth == CHANWIDTH_USE_HT)
+	if ((!vht && !he) || oper_chwidth == CONF_OPER_CHWIDTH_USE_HT)
 		return NR_CHAN_WIDTH_40;
-	if (oper_chwidth == CHANWIDTH_80MHZ)
+	if (oper_chwidth == CONF_OPER_CHWIDTH_80MHZ)
 		return NR_CHAN_WIDTH_80;
-	if (oper_chwidth == CHANWIDTH_160MHZ)
+	if (oper_chwidth == CONF_OPER_CHWIDTH_160MHZ)
 		return NR_CHAN_WIDTH_160;
-	if (oper_chwidth == CHANWIDTH_80P80MHZ)
+	if (oper_chwidth == CONF_OPER_CHWIDTH_80P80MHZ)
 		return NR_CHAN_WIDTH_80P80;
 	return NR_CHAN_WIDTH_20;
 }

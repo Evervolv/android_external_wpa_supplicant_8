@@ -1011,6 +1011,16 @@ size_t crypto_ecdh_prime_len(struct crypto_ecdh *ecdh);
 struct crypto_ec_key * crypto_ec_key_parse_priv(const u8 *der, size_t der_len);
 
 /**
+ * crypto_ec_key_set_priv - Initialize EC key pair from raw key data
+ * @group: Identifying number for the ECC group
+ * @raw: Raw key data
+ * @raw_len: Length of @raw buffer
+ * Returns: EC key or %NULL on failure
+ */
+struct crypto_ec_key * crypto_ec_key_set_priv(int group,
+					      const u8 *raw, size_t raw_len);
+
+/**
  * crypto_ec_key_parse_pub - Initialize EC key pair from SubjectPublicKeyInfo ASN.1
  * @der: DER encoding of ASN.1 SubjectPublicKeyInfo
  * @der_len: Length of @der buffer
@@ -1058,7 +1068,8 @@ void crypto_ec_key_deinit(struct crypto_ec_key *key);
 /**
  * crypto_ec_key_get_subject_public_key - Get SubjectPublicKeyInfo ASN.1 for an EC key
  * @key: EC key from crypto_ec_key_parse/set_pub/priv() or crypto_ec_key_gen()
- * Returns: Buffer with DER encoding of ASN.1 SubjectPublicKeyInfo or %NULL on failure
+ * Returns: Buffer with DER encoding of ASN.1 SubjectPublicKeyInfo using
+ * compressed point format, or %NULL on failure
  */
 struct wpabuf * crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key);
 
@@ -1086,16 +1097,20 @@ struct wpabuf * crypto_ec_key_get_pubkey_point(struct crypto_ec_key *key,
  * crypto_ec_key_get_public_key - Get EC public key as an EC point
  * @key: EC key from crypto_ec_key_parse/set_pub() or crypto_ec_key_parse_priv()
  * Returns: Public key as an EC point or %NULL on failure
+ *
+ * The caller needs to free the returned value with crypto_ec_point_deinit().
  */
-const struct crypto_ec_point *
+struct crypto_ec_point *
 crypto_ec_key_get_public_key(struct crypto_ec_key *key);
 
 /**
  * crypto_ec_key_get_private_key - Get EC private key as a bignum
  * @key: EC key from crypto_ec_key_parse/set_pub() or crypto_ec_key_parse_priv()
  * Returns: Private key as a bignum or %NULL on failure
+ *
+ * The caller needs to free the returned value with crypto_bignum_deinit().
  */
-const struct crypto_bignum *
+struct crypto_bignum *
 crypto_ec_key_get_private_key(struct crypto_ec_key *key);
 
 /**
@@ -1308,6 +1323,58 @@ struct wpabuf * crypto_rsa_oaep_sha256_decrypt(struct crypto_rsa_key *key,
  * @key: RSA key from crypto_rsa_key_read()
  */
 void crypto_rsa_key_free(struct crypto_rsa_key *key);
+
+enum hpke_mode {
+	HPKE_MODE_BASE = 0x00,
+	HPKE_MODE_PSK = 0x01,
+	HPKE_MODE_AUTH = 0x02,
+	HPKE_MODE_AUTH_PSK = 0x03,
+};
+
+enum hpke_kem_id {
+	HPKE_DHKEM_P256_HKDF_SHA256 = 0x0010,
+	HPKE_DHKEM_P384_HKDF_SHA384 = 0x0011,
+	HPKE_DHKEM_P521_HKDF_SHA512 = 0x0012,
+	HPKE_DHKEM_X5519_HKDF_SHA256 = 0x0020,
+	HPKE_DHKEM_X448_HKDF_SHA512 = 0x0021,
+};
+
+enum hpke_kdf_id {
+	HPKE_KDF_HKDF_SHA256 = 0x0001,
+	HPKE_KDF_HKDF_SHA384 = 0x0002,
+	HPKE_KDF_HKDF_SHA512 = 0x0003,
+};
+
+enum hpke_aead_id {
+	HPKE_AEAD_AES_128_GCM = 0x0001,
+	HPKE_AEAD_AES_256_GCM = 0x0002,
+	HPKE_AEAD_CHACHA20POLY1305 = 0x0003,
+};
+
+/**
+ * hpke_base_seal - HPKE base mode single-shot encrypt
+ * Returns: enc | ct; or %NULL on failure
+ */
+struct wpabuf * hpke_base_seal(enum hpke_kem_id kem_id,
+			       enum hpke_kdf_id kdf_id,
+			       enum hpke_aead_id aead_id,
+			       struct crypto_ec_key *peer_pub,
+			       const u8 *info, size_t info_len,
+			       const u8 *aad, size_t aad_len,
+			       const u8 *pt, size_t pt_len);
+
+/**
+ * hpke_base_open - HPKE base mode single-shot decrypt
+ * @enc_ct: enc | ct
+ * Returns: pt; or %NULL on failure
+ */
+struct wpabuf * hpke_base_open(enum hpke_kem_id kem_id,
+			       enum hpke_kdf_id kdf_id,
+			       enum hpke_aead_id aead_id,
+			       struct crypto_ec_key *own_priv,
+			       const u8 *info, size_t info_len,
+			       const u8 *aad, size_t aad_len,
+			       const u8 *enc_ct, size_t enc_ct_len);
 
 /**
  * crypto_unload - Unload crypto resources
