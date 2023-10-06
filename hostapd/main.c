@@ -243,6 +243,9 @@ static int hostapd_driver_init(struct hostapd_iface *iface)
 				wpa_printf(MSG_ERROR, "set_wowlan failed");
 		}
 		os_free(triggs);
+
+		iface->mbssid_max_interfaces = capa.mbssid_max_interfaces;
+		iface->ema_max_periodicity = capa.ema_max_periodicity;
 	}
 
 	return 0;
@@ -445,6 +448,13 @@ static int hostapd_global_run(struct hapd_interfaces *ifaces, int daemonize,
 		}
 	}
 
+#ifdef CONFIG_CTRL_IFACE_AIDL
+	if (hostapd_aidl_init(ifaces)) {
+		wpa_printf(MSG_ERROR, "Failed to initialize AIDL interface");
+		return -1;
+	}
+#endif /* CONFIG_CTRL_IFACE_AIDL */
+
 	eloop_run();
 
 	return 0;
@@ -468,7 +478,7 @@ static void usage(void)
 	show_version();
 	fprintf(stderr,
 		"\n"
-		"usage: hostapd [-hdBKtv] [-P <PID file>] [-e <entropy file>] "
+		"usage: hostapd [-hdBKtvq] [-P <PID file>] [-e <entropy file>] "
 		"\\\n"
 		"         [-g <global ctrl_iface>] [-G <group>]\\\n"
 		"         [-i <comma-separated list of interface names>]\\\n"
@@ -496,7 +506,8 @@ static void usage(void)
 #endif /* CONFIG_DEBUG_SYSLOG */
 		"   -S   start all the interfaces synchronously\n"
 		"   -t   include timestamps in some debug messages\n"
-		"   -v   show hostapd version\n");
+		"   -v   show hostapd version\n"
+		"   -q   show less debug messages (-qq for even less)\n");
 
 	exit(1);
 }
@@ -687,7 +698,7 @@ int main(int argc, char *argv[])
 #endif /* CONFIG_DPP */
 
 	for (;;) {
-		c = getopt(argc, argv, "b:Bde:f:hi:KP:sSTtu:vg:G:");
+		c = getopt(argc, argv, "b:Bde:f:hi:KP:sSTtu:vg:G:q");
 		if (c < 0)
 			break;
 		switch (c) {
@@ -759,6 +770,9 @@ int main(int argc, char *argv[])
 			if (hostapd_get_interface_names(&if_names,
 							&if_names_size, optarg))
 				goto out;
+			break;
+		case 'q':
+			wpa_debug_level++;
 			break;
 		default:
 			usage();
@@ -891,12 +905,6 @@ int main(int argc, char *argv[])
 			goto out;
 	}
 
-#ifdef CONFIG_CTRL_IFACE_AIDL
-	if (hostapd_aidl_init(&interfaces)) {
-		wpa_printf(MSG_ERROR, "Failed to initialize AIDL interface");
-		goto out;
-	}
-#endif /* CONFIG_CTRL_IFACE_AIDL */
 	hostapd_global_ctrl_iface_init(&interfaces);
 
 	if (hostapd_global_run(&interfaces, daemonize, pid_file)) {

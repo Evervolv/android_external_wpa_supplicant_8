@@ -18,6 +18,7 @@ struct ieee80211_vht_capabilities;
 struct ieee80211_mgmt;
 struct radius_sta;
 enum ieee80211_op_mode;
+enum oper_chan_width;
 
 int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		    struct hostapd_frame_info *fi);
@@ -45,7 +46,8 @@ static inline int ieee802_11_get_mib_sta(struct hostapd_data *hapd,
 #endif /* NEED_AP_MLME */
 u16 hostapd_own_capab_info(struct hostapd_data *hapd);
 void ap_ht2040_timeout(void *eloop_data, void *user_data);
-u8 * hostapd_eid_ext_capab(struct hostapd_data *hapd, u8 *eid);
+u8 * hostapd_eid_ext_capab(struct hostapd_data *hapd, u8 *eid,
+			   bool mbssid_complete);
 u8 * hostapd_eid_qos_map_set(struct hostapd_data *hapd, u8 *eid);
 u8 * hostapd_eid_supp_rates(struct hostapd_data *hapd, u8 *eid);
 u8 * hostapd_eid_ext_supp_rates(struct hostapd_data *hapd, u8 *eid);
@@ -214,5 +216,14 @@ u16 copy_sta_eht_capab(struct hostapd_data *hapd, struct sta_info *sta,
 		       enum ieee80211_op_mode opmode,
 		       const u8 *he_capab, size_t he_capab_len,
 		       const u8 *eht_capab, size_t eht_capab_len);
+size_t hostapd_eid_mbssid_len(struct hostapd_data *hapd, u32 frame_type,
+			      u8 *elem_count, const u8 *known_bss,
+			      size_t known_bss_len);
+u8 * hostapd_eid_mbssid(struct hostapd_data *hapd, u8 *eid, u8 *end,
+			unsigned int frame_stype, u8 elem_count,
+			u8 **elem_offset,
+			const u8 *known_bss, size_t known_bss_len);
+void punct_update_legacy_bw(u16 bitmap, u8 pri_chan,
+			    enum oper_chan_width *width, u8 *seg0, u8 *seg1);
 
 #endif /* IEEE802_11_H */

@@ -353,7 +353,9 @@ int __must_check tls_global_set_verify(void *tls_ctx, int check_crl,
  * tls_connection_set_verify - Set certificate verification options
  * @tls_ctx: TLS context data from tls_init()
  * @conn: Connection context data from tls_connection_init()
- * @verify_peer: 1 = verify peer certificate
+ * @verify_peer: 0 = do not verify peer certificate, 1 = verify peer
+ *	certificate (require it to be provided), 2 = verify peer certificate if
+ *	provided
  * @flags: Connection flags (TLS_CONN_*)
  * @session_ctx: Session caching context or %NULL to use default
  * @session_ctx_len: Length of @session_ctx in bytes.
@@ -681,5 +683,14 @@ const char * tls_connection_get_peer_subject(struct tls_connection *conn);
  * Returns: true if own certificate was used during authentication
  */
 bool tls_connection_get_own_cert_used(struct tls_connection *conn);
+
+/**
+ * tls_register_cert_callback - Register a callback to retrieve certificates
+ * @cb: Callback object to register
+ */
+typedef ssize_t (*tls_get_certificate_cb)
+(void* ctx, const char* alias, uint8_t** value);
+
+void tls_register_cert_callback(tls_get_certificate_cb cb);
 
 #endif /* TLS_H */
