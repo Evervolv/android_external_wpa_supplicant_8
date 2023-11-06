@@ -652,7 +652,8 @@ void wpas_aidl_notify_p2p_sd_response(
 }
 
 void wpas_aidl_notify_ap_sta_authorized(
-	struct wpa_supplicant *wpa_s, const u8 *sta, const u8 *p2p_dev_addr)
+	struct wpa_supplicant *wpa_s, const u8 *sta, const u8 *p2p_dev_addr,
+	const u8 *ip)
 {
 	if (!wpa_s || !sta)
 		return;
@@ -666,7 +667,7 @@ void wpas_aidl_notify_ap_sta_authorized(
 	if (!aidl_manager)
 		return;
 
-	aidl_manager->notifyApStaAuthorized(wpa_s, sta, p2p_dev_addr);
+	aidl_manager->notifyApStaAuthorized(wpa_s, sta, p2p_dev_addr, ip);
 }
 
 void wpas_aidl_notify_ap_sta_deauthorized(
