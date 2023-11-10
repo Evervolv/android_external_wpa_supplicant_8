@@ -1952,7 +1952,7 @@ ifeq ($(DBUS), y)
 LOCAL_SHARED_LIBRARIES += libdbus
 endif
 ifeq ($(WPA_SUPPLICANT_USE_AIDL), y)
-LOCAL_SHARED_LIBRARIES += android.hardware.wifi.supplicant-V2-ndk
+LOCAL_SHARED_LIBRARIES += android.hardware.wifi.supplicant-V3-ndk
 LOCAL_SHARED_LIBRARIES += android.system.keystore2-V1-ndk
 LOCAL_SHARED_LIBRARIES += libutils libbase
 LOCAL_SHARED_LIBRARIES += libbinder_ndk
@@ -2026,7 +2026,7 @@ LOCAL_SRC_FILES := \
     aidl/sta_network.cpp \
     aidl/supplicant.cpp
 LOCAL_SHARED_LIBRARIES := \
-    android.hardware.wifi.supplicant-V2-ndk \
+    android.hardware.wifi.supplicant-V3-ndk \
     android.system.keystore2-V1-ndk \
     libbinder_ndk \
     libbase \
