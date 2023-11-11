@@ -101,7 +101,7 @@ extern "C"
 		const u8 *tlvs, size_t tlvs_len);
 	void wpas_aidl_notify_ap_sta_authorized(
 		struct wpa_supplicant *wpa_s, const u8 *sta,
-		const u8 *p2p_dev_addr);
+		const u8 *p2p_dev_addr, const u8 *ip);
 	void wpas_aidl_notify_ap_sta_deauthorized(
 		struct wpa_supplicant *wpa_s, const u8 *sta,
 		const u8 *p2p_dev_addr);
@@ -260,7 +260,8 @@ static void wpas_aidl_notify_p2p_sd_response(
 	const u8 *tlvs, size_t tlvs_len)
 {}
 static void wpas_aidl_notify_ap_sta_authorized(
-	struct wpa_supplicant *wpa_s, const u8 *sta, const u8 *p2p_dev_addr)
+	struct wpa_supplicant *wpa_s, const u8 *sta, const u8 *p2p_dev_addr,
+	const u8 *ip)
 {}
 static void wpas_aidl_notify_ap_sta_deauthorized(
 	struct wpa_supplicant *wpa_s, const u8 *sta, const u8 *p2p_dev_addr)

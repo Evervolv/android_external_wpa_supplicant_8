@@ -1603,19 +1603,30 @@ void AidlManager::notifyP2pSdResponse(
 }
 
 void AidlManager::notifyApStaAuthorized(
-	struct wpa_supplicant *wpa_group_s, const u8 *sta, const u8 *p2p_dev_addr)
+	struct wpa_supplicant *wpa_group_s, const u8 *sta, const u8 *p2p_dev_addr,
+	const u8 *ip)
 {
 	if (!wpa_group_s || !wpa_group_s->parent || !sta)
 		return;
 	wpa_supplicant *wpa_s = getTargetP2pIfaceForGroup(wpa_group_s);
 	if (!wpa_s)
 		return;
+
+	int aidl_ip = 0;
+	if (NULL != ip) {
+		os_memcpy(&aidl_ip, &ip[0], 4);
+	}
+
+	P2pPeerClientJoinedEventParams params;
+	params.groupInterfaceName = misc_utils::charBufToString(wpa_group_s->ifname);
+	params.clientInterfaceAddress = macAddrToArray(sta);
+	params.clientDeviceAddress = macAddrToArray(p2p_dev_addr);
+	params.clientIpAddress = aidl_ip;
 	callWithEachP2pIfaceCallback(
 		misc_utils::charBufToString(wpa_s->ifname),
 		std::bind(
-		&ISupplicantP2pIfaceCallback::onStaAuthorized,
-		std::placeholders::_1, macAddrToVec(sta),
-		p2p_dev_addr ? macAddrToVec(p2p_dev_addr) : kZeroBssid));
+		&ISupplicantP2pIfaceCallback::onPeerClientJoined,
+		std::placeholders::_1, params));
 }
 
 void AidlManager::notifyApStaDeauthorized(
@@ -1627,12 +1638,15 @@ void AidlManager::notifyApStaDeauthorized(
 	if (!wpa_s)
 		return;
 
+	P2pPeerClientDisconnectedEventParams params;
+	params.groupInterfaceName = misc_utils::charBufToString(wpa_group_s->ifname);
+	params.clientInterfaceAddress = macAddrToArray(sta);
+	params.clientDeviceAddress = macAddrToArray(p2p_dev_addr);
 	callWithEachP2pIfaceCallback(
 		misc_utils::charBufToString(wpa_s->ifname),
 		std::bind(
-		&ISupplicantP2pIfaceCallback::onStaDeauthorized,
-		std::placeholders::_1, macAddrToVec(sta),
-		p2p_dev_addr ? macAddrToVec(p2p_dev_addr) : kZeroBssid));
+		&ISupplicantP2pIfaceCallback::onPeerClientDisconnected,
+		std::placeholders::_1, params));
 }
 
 void AidlManager::notifyExtRadioWorkStart(

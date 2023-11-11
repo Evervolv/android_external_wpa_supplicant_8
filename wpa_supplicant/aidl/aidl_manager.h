@@ -122,7 +122,7 @@ public:
 		const u8 *tlvs, size_t tlvs_len);
 	void notifyApStaAuthorized(
 		struct wpa_supplicant *wpa_s, const u8 *sta,
-		const u8 *p2p_dev_addr);
+		const u8 *p2p_dev_addr, const u8 *ip);
 	void notifyApStaDeauthorized(
 		struct wpa_supplicant *wpa_s, const u8 *sta,
 		const u8 *p2p_dev_addr);
