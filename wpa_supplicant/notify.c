@@ -793,6 +793,10 @@ void wpas_notify_p2p_sd_response(struct wpa_supplicant *wpa_s,
  * @status: Valid only in case of response (0 in case of success)
  * @config_methods: WPS config methods
  * @generated_pin: PIN to be displayed in case of WPS_CONFIG_DISPLAY method
+ * @group_ifname: Group interface name of the group owner in case the provision
+ *                discovery request is received with P2P Group ID attribute.
+ *                i.e., valid only when the peer device is joining an
+ *                operating P2P group.
  *
  * This can be used to notify:
  * - Requests or responses
@@ -803,7 +807,8 @@ void wpas_notify_p2p_provision_discovery(struct wpa_supplicant *wpa_s,
 					 const u8 *dev_addr, int request,
 					 enum p2p_prov_disc_status status,
 					 u16 config_methods,
-					 unsigned int generated_pin)
+					 unsigned int generated_pin,
+					 const char *group_ifname)
 {
 	wpas_dbus_signal_p2p_provision_discovery(wpa_s, dev_addr, request,
 						 status, config_methods,
@@ -811,7 +816,7 @@ void wpas_notify_p2p_provision_discovery(struct wpa_supplicant *wpa_s,
 
 	wpas_aidl_notify_p2p_provision_discovery(wpa_s, dev_addr, request,
 						 status, config_methods,
-						 generated_pin);
+						 generated_pin, group_ifname);
 
 }
 
