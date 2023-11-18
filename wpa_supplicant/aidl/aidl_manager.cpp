@@ -1620,8 +1620,10 @@ void AidlManager::notifyApStaAuthorized(
 	P2pPeerClientJoinedEventParams params;
 	params.groupInterfaceName = misc_utils::charBufToString(wpa_group_s->ifname);
 	params.clientInterfaceAddress = macAddrToArray(sta);
-	params.clientDeviceAddress = macAddrToArray(p2p_dev_addr);
+	params.clientDeviceAddress = p2p_dev_addr ?
+			macAddrToArray(p2p_dev_addr) : macAddrToArray(kZeroBssid.data());
 	params.clientIpAddress = aidl_ip;
+
 	callWithEachP2pIfaceCallback(
 		misc_utils::charBufToString(wpa_s->ifname),
 		std::bind(
@@ -1641,7 +1643,9 @@ void AidlManager::notifyApStaDeauthorized(
 	P2pPeerClientDisconnectedEventParams params;
 	params.groupInterfaceName = misc_utils::charBufToString(wpa_group_s->ifname);
 	params.clientInterfaceAddress = macAddrToArray(sta);
-	params.clientDeviceAddress = macAddrToArray(p2p_dev_addr);
+	params.clientDeviceAddress = p2p_dev_addr ?
+			macAddrToArray(p2p_dev_addr) : macAddrToArray(kZeroBssid.data());
+
 	callWithEachP2pIfaceCallback(
 		misc_utils::charBufToString(wpa_s->ifname),
 		std::bind(
