@@ -129,7 +129,8 @@ void wpas_notify_p2p_provision_discovery(struct wpa_supplicant *wpa_s,
 					 const u8 *dev_addr, int request,
 					 enum p2p_prov_disc_status status,
 					 u16 config_methods,
-					 unsigned int generated_pin);
+					 unsigned int generated_pin,
+					 const char *group_ifname);
 void wpas_notify_p2p_group_started(struct wpa_supplicant *wpa_s,
 				   struct wpa_ssid *ssid, int persistent,
 				   int client, const u8 *ip);

@@ -1558,7 +1558,7 @@ void AidlManager::notifyP2pInvitationResult(
 void AidlManager::notifyP2pProvisionDiscovery(
 	struct wpa_supplicant *wpa_s, const u8 *dev_addr, int request,
 	enum p2p_prov_disc_status status, u16 config_methods,
-	unsigned int generated_pin)
+	unsigned int generated_pin, const char *group_ifname)
 {
 	if (!wpa_s || !dev_addr)
 		return;
@@ -1567,20 +1567,24 @@ void AidlManager::notifyP2pProvisionDiscovery(
 		p2p_iface_object_map_.end())
 		return;
 
-	std::string aidl_generated_pin;
+	P2pProvisionDiscoveryCompletedEventParams params;
+	params.p2pDeviceAddress =  macAddrToArray(dev_addr);
+	params.isRequest = (request == 1);
+	params.status = static_cast<P2pProvDiscStatusCode>(status);
+	params.configMethods = static_cast<WpsConfigMethods>(config_methods);
 	if (generated_pin > 0) {
-		aidl_generated_pin =
+		params.generatedPin =
 			misc_utils::convertWpsPinToString(generated_pin);
 	}
-	bool aidl_is_request = (request == 1 ? true : false);
+	if (group_ifname != NULL) {
+		params.groupInterfaceName = misc_utils::charBufToString(group_ifname);
+	}
 
 	callWithEachP2pIfaceCallback(
 		misc_utils::charBufToString(wpa_s->ifname),
 		std::bind(
-		&ISupplicantP2pIfaceCallback::onProvisionDiscoveryCompleted,
-		std::placeholders::_1, macAddrToVec(dev_addr), aidl_is_request,
-		static_cast<P2pProvDiscStatusCode>(status),
-		static_cast<WpsConfigMethods>(config_methods), aidl_generated_pin));
+		&ISupplicantP2pIfaceCallback::onProvisionDiscoveryCompletedEvent,
+		std::placeholders::_1, params));
 }
 
 void AidlManager::notifyP2pSdResponse(
