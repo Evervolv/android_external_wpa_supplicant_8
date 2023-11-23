@@ -2666,6 +2666,7 @@ done:
 				     wfd_dev_info_len, wfd_r2_dev_info,
 				     wfd_r2_dev_info_len, new_device);
 	os_free(wfd_dev_info);
+	os_free(wfd_r2_dev_info);
 }
 
 
