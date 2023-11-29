@@ -891,6 +891,13 @@ ndk::ScopedAStatus StaNetwork::getBssid(
 		&StaNetwork::setMinimumTlsVersionEapPhase1ParamInternal, in_tlsVersion);
 }
 
+::ndk::ScopedAStatus StaNetwork::disableEht()
+{
+    return validateAndCall(
+            this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+                &StaNetwork::disableEhtInternal);
+}
+
 std::pair<uint32_t, ndk::ScopedAStatus> StaNetwork::getIdInternal()
 {
 	return {network_id_, ndk::ScopedAStatus::ok()};
@@ -2696,6 +2703,17 @@ ndk::ScopedAStatus StaNetwork::setMinimumTlsVersionEapPhase1ParamInternal(TlsVer
 
 	generateTlsParams();
 	return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus StaNetwork::disableEhtInternal()
+{
+  struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+  if (wpa_ssid == nullptr ) {
+    return createStatus(SupplicantStatusCode::FAILURE_NETWORK_INVALID);
+  }
+  wpa_ssid->disable_eht = 1;
+  resetInternalStateAfterParamsUpdate();
+  return ndk::ScopedAStatus::ok();
 }
 
 /**
