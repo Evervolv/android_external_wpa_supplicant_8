@@ -898,6 +898,14 @@ ndk::ScopedAStatus StaNetwork::getBssid(
                 &StaNetwork::disableEhtInternal);
 }
 
+::ndk::ScopedAStatus StaNetwork::setVendorData(
+	const std::vector<common::OuiKeyedData>& in_vendorData)
+{
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_NETWORK_INVALID,
+		&StaNetwork::setVendorDataInternal, in_vendorData);
+}
+
 std::pair<uint32_t, ndk::ScopedAStatus> StaNetwork::getIdInternal()
 {
 	return {network_id_, ndk::ScopedAStatus::ok()};
@@ -2714,6 +2722,12 @@ ndk::ScopedAStatus StaNetwork::disableEhtInternal()
   wpa_ssid->disable_eht = 1;
   resetInternalStateAfterParamsUpdate();
   return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus StaNetwork::setVendorDataInternal(
+		const std::vector<common::OuiKeyedData>& /* vendorData */) {
+	// Not implemented in the default implementation.
+	return ndk::ScopedAStatus::ok();
 }
 
 /**
