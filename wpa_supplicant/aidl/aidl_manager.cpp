@@ -1344,16 +1344,35 @@ void AidlManager::notifyP2pDeviceFound(
 			std::back_inserter(aidl_vendor_elems));
 	}
 
-	const std::function<
-		ndk::ScopedAStatus(std::shared_ptr<ISupplicantP2pIfaceCallback>)>
-		func = std::bind(
-		&ISupplicantP2pIfaceCallback::onDeviceFoundWithVendorElements,
-		std::placeholders::_1, macAddrToVec(addr), macAddrToVec(info->p2p_device_addr),
-		byteArrToVec(info->pri_dev_type, 8), misc_utils::charBufToString(info->device_name),
-		static_cast<WpsConfigMethods>(info->config_methods),
-		info->dev_capab, static_cast<P2pGroupCapabilityMask>(info->group_capab), aidl_peer_wfd_device_info,
-		aidl_peer_wfd_r2_device_info, aidl_vendor_elems);
-	callWithEachP2pIfaceCallback(wpa_s->ifname, func);
+	if (isAidlServiceVersionAtLeast(3)) {
+		P2pDeviceFoundEventParams params;
+		params.srcAddress = macAddrToArray(addr);
+		params.p2pDeviceAddress = macAddrToArray(info->p2p_device_addr);
+		params.primaryDeviceType = byteArrToVec(info->pri_dev_type, 8);
+		params.deviceName = misc_utils::charBufToString(info->device_name);
+		params.configMethods = info->config_methods;
+		params.deviceCapabilities = info->dev_capab;
+		params.groupCapabilities = info->group_capab;
+		params.wfdDeviceInfo = aidl_peer_wfd_device_info;
+		params.wfdR2DeviceInfo = aidl_peer_wfd_r2_device_info;
+		params.vendorElemBytes = aidl_vendor_elems;
+		callWithEachP2pIfaceCallback(
+			misc_utils::charBufToString(wpa_s->ifname),
+			std::bind(
+			&ISupplicantP2pIfaceCallback::onDeviceFoundWithParams,
+			std::placeholders::_1, params));
+	} else {
+		const std::function<
+			ndk::ScopedAStatus(std::shared_ptr<ISupplicantP2pIfaceCallback>)>
+			func = std::bind(
+			&ISupplicantP2pIfaceCallback::onDeviceFoundWithVendorElements,
+			std::placeholders::_1, macAddrToVec(addr), macAddrToVec(info->p2p_device_addr),
+			byteArrToVec(info->pri_dev_type, 8), misc_utils::charBufToString(info->device_name),
+			static_cast<WpsConfigMethods>(info->config_methods),
+			info->dev_capab, static_cast<P2pGroupCapabilityMask>(info->group_capab), aidl_peer_wfd_device_info,
+			aidl_peer_wfd_r2_device_info, aidl_vendor_elems);
+		callWithEachP2pIfaceCallback(wpa_s->ifname, func);
+	}
 }
 
 void AidlManager::notifyP2pDeviceLost(
