@@ -843,6 +843,18 @@ bool StaIface::isValid()
 	    &StaIface::removeQosPolicyForScsInternal, _aidl_return, in_scsPolicyIds);
 }
 
+::ndk::ScopedAStatus StaIface::configureMscs(const MscsParams& in_params) {
+	return validateAndCall(
+	    this, SupplicantStatusCode::FAILURE_UNKNOWN,
+	    &StaIface::configureMscsInternal, in_params);
+}
+
+::ndk::ScopedAStatus StaIface::disableMscs() {
+	return validateAndCall(
+		this, SupplicantStatusCode::FAILURE_UNKNOWN,
+		&StaIface::disableMscsInternal);
+}
+
 std::pair<std::string, ndk::ScopedAStatus> StaIface::getNameInternal()
 {
 	return {ifname_, ndk::ScopedAStatus::ok()};
@@ -2425,6 +2437,14 @@ StaIface::removeQosPolicyForScsInternal(const std::vector<uint8_t>& scsPolicyIds
 
 	return {std::vector<QosPolicyScsRequestStatus>(reports),
 		ndk::ScopedAStatus::ok()};
+}
+
+::ndk::ScopedAStatus StaIface::configureMscsInternal(const MscsParams& params) {
+	return createStatus(SupplicantStatusCode::FAILURE_UNSUPPORTED);
+}
+
+::ndk::ScopedAStatus StaIface::disableMscsInternal() {
+	return createStatus(SupplicantStatusCode::FAILURE_UNSUPPORTED);
 }
 
 /**
