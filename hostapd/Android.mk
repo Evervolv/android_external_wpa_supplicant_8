@@ -1199,6 +1199,7 @@ LOCAL_SHARED_LIBRARIES += android.hardware.wifi.common-V1-ndk
 LOCAL_SHARED_LIBRARIES += libbase libutils
 LOCAL_SHARED_LIBRARIES += libbinder_ndk
 LOCAL_STATIC_LIBRARIES += libhostapd_aidl
+LOCAL_MIN_SDK_VERSION := 34
 endif
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_SRC_FILES := $(OBJS)
@@ -1255,6 +1256,7 @@ LOCAL_SHARED_LIBRARIES := \
     libbase \
     libutils \
     liblog
+LOCAL_MIN_SDK_VERSION := 34
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/aidl
 include $(BUILD_STATIC_LIBRARY)

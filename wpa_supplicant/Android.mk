@@ -1968,6 +1968,7 @@ LOCAL_SHARED_LIBRARIES += libutils libbase
 LOCAL_SHARED_LIBRARIES += libbinder_ndk
 LOCAL_STATIC_LIBRARIES += libwpa_aidl
 LOCAL_VINTF_FRAGMENTS := aidl/android.hardware.wifi.supplicant.xml
+LOCAL_MIN_SDK_VERSION := 34
 ifeq ($(WIFI_HIDL_UNIFIED_SUPPLICANT_SERVICE_RC_ENTRY), true)
 LOCAL_INIT_RC=aidl/android.hardware.wifi.supplicant-service.rc
 endif
@@ -2073,6 +2074,7 @@ LOCAL_SHARED_LIBRARIES := \
     libutils \
     liblog \
     libssl
+LOCAL_MIN_SDK_VERSION := 34
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/aidl
 include $(BUILD_STATIC_LIBRARY)
